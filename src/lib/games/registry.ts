@@ -8,7 +8,20 @@ const modules: Record<string, GameModule> = {
 };
 
 export function getGameModule(id = "mafia-city"): GameModule {
-  return modules[id] ?? mafiaCityModule;
+  const normalized = (id ?? "").trim().toLowerCase();
+  if (!normalized) return mafiaCityModule;
+
+  const mapped =
+    normalized === "5-alive" ||
+    normalized === "5alive" ||
+    normalized === "fivealive" ||
+    normalized === "five-alive"
+      ? "five-alive"
+      : normalized === "mafia" || normalized === "mafia-city"
+        ? "mafia-city"
+        : normalized;
+
+  return modules[mapped] ?? mafiaCityModule;
 }
 
 export function listGames(): GameModule[] {

@@ -131,6 +131,16 @@ export function OpenLobbies({
                   <p className="text-sm text-ink">
                     Host <span className="font-semibold">{lobby.hostName}</span>
                   </p>
+                  <p className="mt-1 text-xs text-ink-steel">
+                    Game:{" "}
+                    <span className="font-mono text-ink-steel/90">
+                      {lobby.gameId === "five-alive"
+                        ? "5 Alive"
+                        : lobby.gameId === "mafia-city"
+                          ? "Mafia City"
+                          : lobby.gameId}
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
