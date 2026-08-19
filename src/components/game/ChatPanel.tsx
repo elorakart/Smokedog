@@ -162,7 +162,7 @@ export function ChatPanel({
         </p>
       )}
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
+      <div data-lenis-prevent className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 && (
           <p className="text-sm text-ink-steel">
             {active === "town" && state.phase === "night"

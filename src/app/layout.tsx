@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Montserrat } from "next/font/google";
+import { LenisProvider } from "@/components/providers/LenisProvider";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -34,7 +35,7 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} ${inter.variable} ${jetbrains.variable} font-sans antialiased`}
       >
-        {children}
+        <LenisProvider>{children}</LenisProvider>
       </body>
     </html>
   );

@@ -356,7 +356,8 @@ export function GameClient({ roomId }: { roomId: string }) {
                   onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
                 />
                 <div className="space-y-4">
-                  <GlassPanel className="max-h-48 overflow-y-auto p-4">
+                  <div data-lenis-prevent className="max-h-48 overflow-y-auto">
+                    <GlassPanel className="p-4">
                     <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
                       Announcements
                     </h3>
@@ -368,6 +369,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                       ))}
                     </ul>
                   </GlassPanel>
+                  </div>
                   {state.detectiveResult && (
                     <GlassPanel className="p-4">
                       <p className="font-mono text-[10px] uppercase text-crimson-glow">
