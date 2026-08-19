@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0b141e;
+  color: #dae3f1;
+  min-height: 100%;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse at center, rgba(24, 32, 42, 0.4) 0%, transparent 55%),
+    radial-gradient(ellipse at center, transparent 35%, rgba(6, 15, 24, 0.92) 100%);
+}
+
+::selection {
+  background: #e61919;
+  color: #fff;
+}
+
+input[type="range"] {
+  accent-color: #e61919;
+}
