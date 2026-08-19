@@ -20,6 +20,8 @@ Open [http://localhost:3000](http://localhost:3000). The custom `server.ts` serv
 
 **Rollback:** If the game server fails, point Vercel `NEXT_PUBLIC_SOCKET_URL` back to Railway. See [docs/GAME_SERVER.md](docs/GAME_SERVER.md).
 
+**Oracle migration:** Step-by-step guide → [docs/ORACLE_WALKTHROUGH.md](docs/ORACLE_WALKTHROUGH.md).
+
 ```bash
 npm run start:game
 ```
