@@ -12,6 +12,7 @@ import type {
 import { loadProfile } from "@/lib/profile";
 import { getSocket, type GameSocket } from "@/lib/socket/client";
 import { AfkHostModal } from "@/components/game/AfkHostModal";
+import { ActionPrompt } from "@/components/game/ActionPrompt";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
@@ -20,6 +21,8 @@ import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { phaseSwap } from "@/components/ui/motion";
+import { availableChannels, CHANNEL_LABELS } from "@/lib/chat-access";
+import { Mic } from "lucide-react";
 
 export function GameClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -27,6 +30,14 @@ export function GameClient({ roomId }: { roomId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [afk, setAfk] = useState<{ playerId: string; name: string } | null>(null);
   const [socket, setSocket] = useState<GameSocket | null>(null);
+  const [voiceInvite, setVoiceInvite] = useState<{
+    channel: ChatChannel;
+    fromName: string;
+  } | null>(null);
+  const [joinVoiceRequest, setJoinVoiceRequest] = useState<{
+    nonce: number;
+    channel: ChatChannel;
+  } | null>(null);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -52,9 +63,18 @@ export function GameClient({ roomId }: { roomId: string }) {
       setAfk({ playerId: payload.playerId, name: payload.name });
     };
 
+    const onInvite = (payload: {
+      channel: ChatChannel;
+      fromId: string;
+      fromName: string;
+    }) => {
+      setVoiceInvite({ channel: payload.channel, fromName: payload.fromName });
+    };
+
     s.on("room:state", onState);
     s.on("room:error", onErr);
     s.on("host:afkWarning", onAfk);
+    s.on("voice:invite", onInvite);
 
     const join = () => {
       s.emit("room:rejoin", { roomId, playerId: profile.playerId });
@@ -66,6 +86,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("room:state", onState);
       s.off("room:error", onErr);
       s.off("host:afkWarning", onAfk);
+      s.off("voice:invite", onInvite);
       s.off("connect", join);
     };
   }, [roomId, router]);
@@ -121,6 +142,24 @@ export function GameClient({ roomId }: { roomId: string }) {
   const emitChat = (channel: ChatChannel, text: string) =>
     socket.emit("chat:send", { roomId: state.roomId, channel, text });
 
+  const voiceChannel =
+    state.you &&
+    availableChannels({
+      alive: state.you.alive,
+      role: state.you.role,
+      blackmailed: state.you.blackmailed,
+      phase: state.phase,
+    }).find((c) => c === "town" || c === "mafia");
+
+  const emitVoiceInvite = (targetId: string) => {
+    if (!voiceChannel) return;
+    socket.emit("voice:invite", {
+      roomId: state.roomId,
+      channel: voiceChannel,
+      targetId,
+    });
+  };
+
   const nightTheme = state.phase === "night";
 
   return (
@@ -141,6 +180,37 @@ export function GameClient({ roomId }: { roomId: string }) {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
+        {voiceInvite && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-emerald-400/40 bg-emerald-400/10 px-4 py-3">
+            <p className="text-sm text-emerald-100">
+              <span className="font-semibold">{voiceInvite.fromName}</span> wants
+              you on {CHANNEL_LABELS[voiceInvite.channel]} voice.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setJoinVoiceRequest({
+                    nonce: Date.now(),
+                    channel: voiceInvite.channel,
+                  });
+                  setVoiceInvite(null);
+                }}
+                className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/20 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-emerald-200"
+              >
+                <Mic size={12} /> Join voice
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoiceInvite(null)}
+                className="px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel"
+              >
+                Later
+              </button>
+            </div>
+          </div>
+        )}
+        <ActionPrompt state={state} />
         <AnimatePresence mode="wait">
           <motion.div
             key={state.phase}
@@ -166,7 +236,11 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.phase === "night" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-                <NightActionPanel state={state} onAct={emitNight} />
+                <NightActionPanel
+                  state={state}
+                  onAct={emitNight}
+                  onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
+                />
                 <div className="space-y-4">
                   <GlassPanel className="p-4">
                     <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
@@ -178,7 +252,12 @@ export function GameClient({ roomId }: { roomId: string }) {
                       ))}
                     </ul>
                   </GlassPanel>
-                  <ChatPanel state={state} socket={socket} onSend={emitChat} />
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    joinVoiceRequest={joinVoiceRequest}
+                  />
                 </div>
               </div>
             )}
@@ -191,6 +270,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                   onSkipDay={() =>
                     socket.emit("host:skipDay", { roomId: state.roomId })
                   }
+                  onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
                 />
                 <div className="space-y-4">
                   <GlassPanel className="max-h-48 overflow-y-auto p-4">
@@ -219,7 +299,12 @@ export function GameClient({ roomId }: { roomId: string }) {
                       </p>
                     </GlassPanel>
                   )}
-                  <ChatPanel state={state} socket={socket} onSend={emitChat} />
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    joinVoiceRequest={joinVoiceRequest}
+                  />
                 </div>
               </div>
             )}

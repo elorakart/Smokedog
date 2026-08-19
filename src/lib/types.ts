@@ -102,6 +102,7 @@ export interface PublicGameState {
   } | null;
   votes: Record<string, string>;
   submittedNightAction: boolean;
+  nightActionTargetId: string | null;
   detectiveResult: { targetId: string; faction: Faction } | null;
   afkWarnedPlayerIds: string[];
   chat: ChatMessage[];
@@ -179,6 +180,11 @@ export type ClientToServerEvents = {
   "host:skipDay": (payload: { roomId: string }) => void;
   "voice:join": (payload: { roomId: string; channel: ChatChannel }) => void;
   "voice:leave": (payload: { roomId: string; channel: ChatChannel }) => void;
+  "voice:invite": (payload: {
+    roomId: string;
+    channel: ChatChannel;
+    targetId: string;
+  }) => void;
   "voice:signal": (payload: {
     roomId: string;
     channel: ChatChannel;
@@ -217,4 +223,9 @@ export type ServerToClientEvents = {
     signal: VoiceSignalPayload;
   }) => void;
   "voice:error": (payload: { message: string }) => void;
+  "voice:invite": (payload: {
+    channel: ChatChannel;
+    fromId: string;
+    fromName: string;
+  }) => void;
 };

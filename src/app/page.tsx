@@ -117,7 +117,7 @@ export default function HomePage() {
           <span className="hidden font-mono text-[10px] uppercase tracking-widest text-ink-steel sm:block">
             Operator Access
           </span>
-          <div className="overflow-hidden rounded-[4px] ring-1 ring-white/10">
+          <div className="overflow-hidden rounded-full ring-1 ring-white/10">
             <PlayerAvatar id={profile?.avatarId ?? 0} size={36} />
           </div>
         </div>

@@ -17,10 +17,12 @@ export function ChatPanel({
   state,
   socket,
   onSend,
+  joinVoiceRequest,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
   onSend: (channel: ChatChannel, text: string) => void;
+  joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
 }) {
   const you = state.you;
   const channelOpts = useMemo(
@@ -64,6 +66,21 @@ export function ChatPanel({
     canUseActive ? active : null,
     canUseActive
   );
+
+  useEffect(() => {
+    if (!joinVoiceRequest) return;
+    if (tabs.some((t) => t.id === joinVoiceRequest.channel)) {
+      setTab(joinVoiceRequest.channel);
+    }
+  }, [joinVoiceRequest, tabs]);
+
+  useEffect(() => {
+    if (!joinVoiceRequest) return;
+    if (active !== joinVoiceRequest.channel) return;
+    void voice.join();
+    // Only fire when a new invite-accept arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinVoiceRequest?.nonce, active]);
 
   const submit = () => {
     if (!text.trim() || !canUseActive) return;

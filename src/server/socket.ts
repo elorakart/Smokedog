@@ -193,6 +193,16 @@ export function attachSocketServer(
       runtime.joinVoice(payload.roomId, socket.data.playerId, payload.channel);
     });
 
+    socket.on("voice:invite", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.inviteVoice(
+        payload.roomId,
+        socket.data.playerId,
+        payload.channel,
+        payload.targetId
+      );
+    });
+
     socket.on("voice:leave", (payload) => {
       if (!socket.data.playerId) return;
       runtime.leaveVoice(payload.roomId, socket.data.playerId, payload.channel);

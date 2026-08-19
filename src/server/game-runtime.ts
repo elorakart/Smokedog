@@ -167,6 +167,11 @@ export class GameRuntime {
       submittedNightAction:
         !!you &&
         room.nightActions.some((a) => a.playerId === you.id && !a.auto),
+      nightActionTargetId:
+        you && room.phase === "night"
+          ? room.nightActions.find((a) => a.playerId === you.id)?.targetId ??
+            null
+          : null,
       detectiveResult: you ? room.detectiveByPlayer[you.id] ?? null : null,
       afkWarnedPlayerIds: you?.isHost ? room.afkWarnedPlayerIds : [],
       chat: this.visibleChat(room, you),
@@ -880,6 +885,45 @@ export class GameRuntime {
     room.voiceParticipants[channel].add(playerId);
     this.broadcastVoiceParticipants(room, channel);
     this.emitRoom(room);
+  }
+
+  inviteVoice(
+    roomId: string,
+    fromId: string,
+    channel: ChatChannel,
+    targetId: string
+  ) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    const from = room.players.find((p) => p.id === fromId);
+    const target = room.players.find((p) => p.id === targetId);
+    if (!from?.socketId || !target?.socketId || target.isBot || from.id === target.id) {
+      return;
+    }
+    const fromOk = canAccessChannel(channel, {
+      alive: from.alive,
+      role: from.role,
+      blackmailed: from.blackmailed,
+      phase: room.phase,
+    });
+    const targetOk = canAccessChannel(channel, {
+      alive: target.alive,
+      role: target.role,
+      blackmailed: target.blackmailed,
+      phase: room.phase,
+    });
+    if (!fromOk || !targetOk) {
+      this.io.to(from.socketId).emit("voice:error", {
+        message: "That operator cannot join this channel right now.",
+      });
+      return;
+    }
+    if (room.voiceParticipants[channel].has(targetId)) return;
+    this.io.to(target.socketId).emit("voice:invite", {
+      channel,
+      fromId: from.id,
+      fromName: from.name,
+    });
   }
 
   leaveVoice(roomId: string, playerId: string, channel: ChatChannel) {

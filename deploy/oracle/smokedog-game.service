@@ -1,0 +1,20 @@
+# Copy to /etc/systemd/system/smokedog-game.service on Oracle VM
+# Then: sudo systemctl daemon-reload && sudo systemctl enable smokedog-game && sudo systemctl start smokedog-game
+
+[Unit]
+Description=SMOKEDOG Mafia City game server (Socket.io)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Smokedog
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=CORS_ORIGIN=https://smokedog.vercel.app
+ExecStart=/usr/bin/npm run start:game
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -15,8 +15,10 @@ Open [http://localhost:3000](http://localhost:3000). The custom `server.ts` serv
 
 ## Production
 
-- **UI:** Vercel (Next.js). Set `NEXT_PUBLIC_SOCKET_URL` to the game server origin.
-- **Game server:** Railway (or any always-on Node host).
+- **UI:** [Vercel](https://smokedog.vercel.app) — set `NEXT_PUBLIC_SOCKET_URL` to the game server origin.
+- **Game server:** [Railway](https://game-production-22ef.up.railway.app) today; [Oracle Cloud migration planned](docs/GAME_SERVER.md).
+
+**Rollback:** If the game server fails, point Vercel `NEXT_PUBLIC_SOCKET_URL` back to Railway. See [docs/GAME_SERVER.md](docs/GAME_SERVER.md).
 
 ```bash
 npm run start:game

@@ -1,12 +1,13 @@
 "use client";
 
-import { MicOff, WifiOff } from "lucide-react";
+import { Mic, MicOff, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
 import type { NightActionType, PublicGameState, PublicPlayer } from "@/lib/types";
 import { nightActionFor } from "@/lib/games/mafia-city/roles";
+import { NIGHT_ACTION_LOCKED, NIGHT_ACTION_PROMPTS } from "@/lib/action-prompt";
 
 function tags(p: PublicPlayer) {
   return (
@@ -33,6 +34,8 @@ export function PlayerGrid({
   selectedId,
   onSelect,
   showVotes,
+  onInviteVoice,
+  voiceParticipantIds,
 }: {
   state: PublicGameState;
   selectable?: boolean;
@@ -40,6 +43,8 @@ export function PlayerGrid({
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   showVotes?: boolean;
+  onInviteVoice?: (id: string) => void;
+  voiceParticipantIds?: string[];
 }) {
   const voteCounts: Record<string, number> = {};
   if (showVotes) {
@@ -47,6 +52,7 @@ export function PlayerGrid({
       voteCounts[t] = (voteCounts[t] ?? 0) + 1;
     }
   }
+  const inVoice = new Set(voiceParticipantIds ?? []);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -55,14 +61,16 @@ export function PlayerGrid({
           !selectable ||
           !p.alive ||
           (p.id === state.you?.id && !allowSelf);
+        const selected = selectedId === p.id;
+        const canInvite =
+          !!onInviteVoice &&
+          p.alive &&
+          !p.isBot &&
+          p.connected &&
+          p.id !== state.you?.id &&
+          !inVoice.has(p.id);
         return (
-          <button
-            key={p.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect?.(p.id)}
-            className={`text-left ${disabled ? "cursor-default" : ""}`}
-          >
+          <div key={p.id} className="text-left">
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -71,13 +79,26 @@ export function PlayerGrid({
             >
             <GlassPanel
               className={`p-3 transition ${
-                selectedId === p.id ? "ring-2 ring-crimson shadow-glow" : ""
+                selected ? "ring-2 ring-crimson shadow-glow" : ""
               } ${!p.alive ? "opacity-50" : ""}`}
             >
-              <div className="overflow-hidden rounded-[4px]">
-                <PlayerAvatar id={p.avatarId} className="h-auto w-full" size={160} />
-              </div>
-              <p className="mt-2 truncate font-display text-sm font-semibold">{p.name}</p>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onSelect?.(p.id)}
+                className={`mx-auto block ${disabled ? "cursor-default" : ""}`}
+              >
+                <div
+                  className={`overflow-hidden rounded-full ring-2 transition ${
+                    selected
+                      ? "ring-crimson shadow-glow"
+                      : "ring-transparent"
+                  }`}
+                >
+                  <PlayerAvatar id={p.avatarId} className="h-auto w-full" size={160} />
+                </div>
+              </button>
+              <p className="mt-2 truncate text-center font-display text-sm font-semibold">{p.name}</p>
               {p.role && state.phase === "gameover" && (
                 <p className="font-mono text-[10px] uppercase text-ink-steel">
                   {ROLE_META[p.role].label}
@@ -89,9 +110,18 @@ export function PlayerGrid({
                   {voteCounts[p.id]} vote{voteCounts[p.id] > 1 ? "s" : ""}
                 </p>
               ) : null}
+              {canInvite && (
+                <button
+                  type="button"
+                  onClick={() => onInviteVoice(p.id)}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-emerald-400/30 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300"
+                >
+                  <Mic size={10} /> Invite voice
+                </button>
+              )}
             </GlassPanel>
             </motion.div>
-          </button>
+          </div>
         );
       })}
     </div>
@@ -101,13 +131,16 @@ export function PlayerGrid({
 export function NightActionPanel({
   state,
   onAct,
+  onInviteVoice,
 }: {
   state: PublicGameState;
   onAct: (type: NightActionType, targetId: string) => void;
+  onInviteVoice?: (id: string) => void;
 }) {
   const you = state.you;
   const type = you?.role ? (nightActionFor(you.role) as NightActionType | null) : null;
   const noBullets = you?.role === "vigilante" && (you.bulletsLeft ?? 0) <= 0;
+  const target = state.players.find((p) => p.id === state.nightActionTargetId);
 
   if (!you?.alive) {
     return <p className="text-ink-steel">You are spectating the night from the graveyard.</p>;
@@ -122,27 +155,27 @@ export function NightActionPanel({
     );
   }
 
-  const labels: Record<string, string> = {
-    mafia_kill: "Mark a target for the hit",
-    doctor_protect: "Choose someone to heal",
-    detective_inspect: "Investigate an alignment",
-    bodyguard_protect: "Stand in front of someone",
-    vigilante_shoot: `Fire a round (${you.bulletsLeft} left)`,
-    blackmail: "Silence a civilian",
-  };
-
   return (
     <div>
-      <h3 className="font-display text-xl font-bold">{labels[type]}</h3>
-      {state.submittedNightAction && (
+      <h3 className="font-display text-xl font-bold">{NIGHT_ACTION_PROMPTS[type]}</h3>
+      {state.submittedNightAction && target ? (
+        <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
+          {NIGHT_ACTION_LOCKED[type](target.name)}
+        </p>
+      ) : state.submittedNightAction ? (
         <p className="mt-1 font-mono text-xs uppercase text-emerald-300">Action locked in</p>
+      ) : (
+        <p className="mt-1 text-sm text-ink-steel">Tap a portrait to lock your target.</p>
       )}
       <div className="mt-4">
         <PlayerGrid
           state={state}
           selectable
           allowSelf={type === "doctor_protect" || type === "bodyguard_protect"}
+          selectedId={state.nightActionTargetId}
           onSelect={(id) => onAct(type, id)}
+          onInviteVoice={onInviteVoice}
+          voiceParticipantIds={state.voiceParticipants.mafia ?? state.voiceParticipants.town}
         />
       </div>
     </div>
@@ -153,14 +186,18 @@ export function VotePanel({
   state,
   onVote,
   onSkipDay,
+  onInviteVoice,
 }: {
   state: PublicGameState;
   onVote: (targetId: string) => void;
   onSkipDay?: () => void;
+  onInviteVoice?: (id: string) => void;
 }) {
   const muted = !!state.you?.blackmailed;
   const dead = !state.you?.alive;
   const isHost = !!state.you?.isHost;
+  const votedId = state.you ? state.votes[state.you.id] : null;
+  const votedName = state.players.find((p) => p.id === votedId)?.name;
   return (
     <div>
       <h3 className="font-display text-xl font-bold">Lynch vote</h3>
@@ -175,13 +212,20 @@ export function VotePanel({
           Blackmailed — you cannot vote or speak
         </p>
       )}
+      {votedName && !muted && (
+        <p className="mt-2 font-mono text-xs uppercase text-emerald-300">
+          You voted to lynch {votedName}
+        </p>
+      )}
       <div className="mt-4">
         <PlayerGrid
           state={state}
           selectable={!muted && !dead}
-          selectedId={state.you ? state.votes[state.you.id] : null}
+          selectedId={votedId}
           onSelect={onVote}
           showVotes
+          onInviteVoice={onInviteVoice}
+          voiceParticipantIds={state.voiceParticipants.town}
         />
       </div>
       {isHost && onSkipDay && (

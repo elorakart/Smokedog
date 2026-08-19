@@ -219,7 +219,7 @@ export function LobbyView({
             return (
               <motion.div key={p.id} variants={popIn} layout>
                 <GlassPanel className="p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
-                  <div className="overflow-hidden rounded-[4px]">
+                  <div className="mx-auto w-fit overflow-hidden rounded-full ring-1 ring-white/10">
                     <PlayerAvatar id={p.avatarId} size={200} className="h-auto w-full" />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-1">

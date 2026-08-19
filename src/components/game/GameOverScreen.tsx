@@ -43,7 +43,7 @@ export function GameOverScreen({
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {(state.recap ?? state.players).map((p) => (
           <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-            <div className="overflow-hidden rounded-[4px]">
+            <div className="overflow-hidden rounded-full ring-1 ring-white/10">
               <PlayerAvatar id={p.avatarId} size={56} />
             </div>
             <div>
