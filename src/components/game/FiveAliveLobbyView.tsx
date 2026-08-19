@@ -1,17 +1,80 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, Shield, UserPlus } from "lucide-react";
+import { Clock, Shield, UserMinus, UserPlus } from "lucide-react";
 import type { PublicGameState, RoomSettings } from "@/lib/types";
 import { PrimaryButton, GlassPanel, StatusChip } from "@/components/ui/primitives";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { fadeUp, stagger } from "@/components/ui/motion";
+
+function AutoPlayerControls({
+  state,
+  onAddBot,
+  onRemoveBot,
+}: {
+  state: PublicGameState;
+  onAddBot: (fillTo?: number) => void;
+  onRemoveBot: () => void;
+}) {
+  const full = state.players.length >= 6;
+  const autoCount = state.autoPlayerCount;
+
+  return (
+    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+          Auto players
+        </p>
+        {autoCount > 0 && (
+          <StatusChip tone="bot">{autoCount} active</StatusChip>
+        )}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-ink-steel">
+        Fill empty seats with AI players that play cards on timers. Only you can
+        tell them apart from real operators.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onAddBot()}
+          disabled={full}
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+        >
+          <UserPlus size={12} /> Add one
+        </button>
+        <button
+          type="button"
+          onClick={onRemoveBot}
+          disabled={autoCount === 0}
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+        >
+          <UserMinus size={12} /> Remove one
+        </button>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {([2, 4, 6] as const).map((target) => (
+          <button
+            key={target}
+            type="button"
+            onClick={() => onAddBot(target)}
+            disabled={state.players.length >= target}
+            className="rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+          >
+            Fill {target}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function FiveAliveLobbyView({
   state,
   onStart,
   onSettings,
   onKick,
+  onAddBot,
+  onRemoveBot,
 }: {
   state: PublicGameState;
   onStart: () => void;
@@ -79,7 +142,7 @@ export function FiveAliveLobbyView({
                       onClick={() => onKick(p.id)}
                       className="mt-2 font-mono text-[10px] uppercase text-crimson-glow"
                     >
-                      Kick
+                      {p.isBot ? "Remove" : "Kick"}
                     </button>
                   )}
                 </GlassPanel>
@@ -92,24 +155,38 @@ export function FiveAliveLobbyView({
       <GlassPanel className="h-fit p-6">
         <h2 className="font-display text-lg font-bold">Game Settings</h2>
 
-        <div className="mt-4">
-          <label className="block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-            Turn timer — {state.settings.daySeconds}s
-          </label>
-          <div className="mt-2 flex items-center gap-2">
-            <Clock size={14} className="text-ink-steel" />
-            <input
-              type="range"
-              min={10}
-              max={120}
-              value={state.settings.daySeconds}
-              onChange={(e) =>
-                onSettings({ daySeconds: Number(e.target.value) })
-              }
-              className="w-full"
+        {host ? (
+          <>
+            <div className="mt-4">
+              <label className="block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                Turn timer — {state.settings.daySeconds}s
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <Clock size={14} className="text-ink-steel" />
+                <input
+                  type="range"
+                  min={10}
+                  max={120}
+                  value={state.settings.daySeconds}
+                  onChange={(e) =>
+                    onSettings({ daySeconds: Number(e.target.value) })
+                  }
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <AutoPlayerControls
+              state={state}
+              onAddBot={onAddBot}
+              onRemoveBot={onRemoveBot}
             />
-          </div>
-        </div>
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-ink-steel">
+            Waiting for the host to configure settings and start the game.
+          </p>
+        )}
 
         <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] px-4 py-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
@@ -117,14 +194,14 @@ export function FiveAliveLobbyView({
             Lives are tracked per player (5 each).
           </div>
           <p className="mt-2 text-sm text-ink-steel">
-            You can start with 2–6 players. Auto players are not yet implemented for 5 Alive.
+            Start with 2–6 players. Auto players fill empty seats for testing.
           </p>
         </div>
 
         <PrimaryButton className="mt-6 w-full" disabled={!canStart} onClick={onStart}>
           Start Game
         </PrimaryButton>
-        {!canStart && (
+        {!canStart && host && (
           <p className="mt-2 text-center font-mono text-[10px] text-ink-steel">
             Need at least 2 operators to begin.
           </p>
@@ -133,4 +210,3 @@ export function FiveAliveLobbyView({
     </div>
   );
 }
-

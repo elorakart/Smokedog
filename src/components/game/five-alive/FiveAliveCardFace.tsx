@@ -1,0 +1,103 @@
+"use client";
+
+import {
+  ArrowLeftRight,
+  Bomb,
+  SkipForward,
+  Sparkles,
+  Zap,
+} from "lucide-react";
+import { cn } from "@/lib/cn";
+import { fiveAliveCardVisual } from "@/lib/games/5-alive/card-visual";
+import type { PublicFiveAliveCard } from "@/lib/types";
+
+export type FiveAliveCardFaceProps = {
+  card: PublicFiveAliveCard;
+  className?: string;
+  width?: number;
+  selected?: boolean;
+  highlight?: "defuse" | "playable" | null;
+  elevated?: boolean;
+};
+
+function CategoryIcon({
+  category,
+  className,
+}: {
+  category: ReturnType<typeof fiveAliveCardVisual>["category"];
+  className?: string;
+}) {
+  const props = { className: cn("size-[1.1em]", className), strokeWidth: 2.5 };
+  switch (category) {
+    case "action":
+      return <Zap {...props} />;
+    case "penalty":
+      return <Bomb {...props} />;
+    case "wild":
+      return <Sparkles {...props} />;
+    case "special":
+      return <SkipForward {...props} />;
+    default:
+      return null;
+  }
+}
+
+export function FiveAliveCardFace({
+  card,
+  className,
+  width = 88,
+  selected = false,
+  highlight = null,
+  elevated = false,
+}: FiveAliveCardFaceProps) {
+  const visual = fiveAliveCardVisual(card);
+  const isUtility =
+    card.type === "skip" || card.type === "reverse";
+
+  return (
+    <div
+      className={cn(
+        "relative aspect-[5/7] select-none overflow-hidden rounded-xl border-2 bg-white text-[#1d3557] shadow-[0_2px_4px_rgba(29,53,87,0.12),0_8px_20px_rgba(29,53,87,0.08)] transition-all duration-200",
+        visual.borderClass,
+        selected && "ring-2 ring-[#e63946] ring-offset-2 ring-offset-transparent scale-105",
+        highlight === "defuse" && "ring-2 ring-[#2a9d8f]",
+        highlight === "playable" && "hover:-translate-y-1 hover:shadow-xl",
+        elevated && "-translate-y-2 shadow-xl",
+        className
+      )}
+      style={{ fontSize: width / 14, width }}
+    >
+      <div className="absolute inset-x-0 top-[0.55em] text-center font-display text-[0.65em] font-extrabold uppercase tracking-[0.18em] text-[#e63946]">
+        5 Alive
+      </div>
+
+      <div className="absolute right-[0.55em] top-[0.55em] opacity-70">
+        <CategoryIcon category={visual.category} className={visual.accentClass} />
+      </div>
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-2 pt-3">
+        {isUtility ? (
+          <ArrowLeftRight
+            className={cn("mb-1 size-[2em]", visual.accentClass)}
+            strokeWidth={2.5}
+          />
+        ) : null}
+        <span
+          className={cn(
+            "font-display font-extrabold leading-none",
+            visual.label.length > 3 ? "text-[2em]" : "text-[3.2em]",
+            visual.accentClass
+          )}
+        >
+          {visual.label}
+        </span>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-[0.5em] text-center">
+        <span className="rounded-full bg-black/[0.04] px-2 py-0.5 font-mono text-[0.55em] uppercase tracking-widest text-[#457b9d]">
+          {visual.tagLabel}
+        </span>
+      </div>
+    </div>
+  );
+}

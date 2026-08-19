@@ -122,32 +122,39 @@ export interface PublicGameState {
   voiceParticipants: Partial<Record<ChatChannel, string[]>>;
   autoPlayerCount: number;
   // Optional per-game state for 5 Alive.
-  fiveAlive?: {
-    runningTotal: number;
-    direction: 1 | -1;
-    turnPlayerId: string | null;
-    skipNext: boolean;
-    pendingDrawCount: number;
-    yourHand: Array<{
-      id: string;
-      type:
-        | "number"
-        | "eq21"
-        | "reset0"
-        | "skip"
-        | "reverse"
-        | "draw1"
-        | "draw2"
-        | "bomb"
-        | "wild";
-      // Only present for `type === "number"`.
-      value?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-    }>;
-    bombAwaitingPlayerId: string | null;
-    bombActorId: string | null;
-    bombResponderIds: string[];
-  };
+  fiveAlive?: FiveAlivePublicState;
 }
+
+export type PublicFiveAliveCard = {
+  id: string;
+  type:
+    | "number"
+    | "eq21"
+    | "reset0"
+    | "skip"
+    | "reverse"
+    | "draw1"
+    | "draw2"
+    | "bomb"
+    | "wild";
+  value?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+};
+
+export type FiveAlivePublicState = {
+  runningTotal: number;
+  direction: 1 | -1;
+  turnPlayerId: string | null;
+  skipNext: boolean;
+  pendingDrawCount: number;
+  yourHand: PublicFiveAliveCard[];
+  bombAwaitingPlayerId: string | null;
+  bombActorId: string | null;
+  bombResponderIds: string[];
+  drawPileCount: number;
+  discardPileCount: number;
+  centerPileCount: number;
+  centerTopCard: PublicFiveAliveCard | null;
+};
 
 export type VoiceSignalPayload =
   | { type: "offer"; sdp: RTCSessionDescriptionInit }

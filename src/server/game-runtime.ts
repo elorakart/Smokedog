@@ -10,6 +10,7 @@ import type {
   OpenLobby,
   Phase,
   Player,
+  PublicFiveAliveCard,
   PublicGameState,
   PublicPlayer,
   RoomSettings,
@@ -40,6 +41,11 @@ import {
   validNightTargets,
   winCheck,
 } from "@/lib/games/mafia-city/resolve";
+import {
+  botFiveAliveDelayMs,
+  pickBotFiveAliveBombResponse,
+  pickBotFiveAliveTurnPlay,
+} from "@/lib/games/5-alive/bot-ai";
 import { canAccessChannel } from "@/lib/chat-access";
 
 import {
@@ -98,6 +104,13 @@ interface Room {
 function log(room: Room, text: string) {
   room.logs.push({ id: randomUUID(), text, at: Date.now() });
   if (room.logs.length > 80) room.logs.splice(0, room.logs.length - 80);
+}
+
+function toPublicFiveAliveCard(card: FiveAliveCardInstance): PublicFiveAliveCard {
+  if (card.type === "number") {
+    return { id: card.id, type: card.type, value: card.value };
+  }
+  return { id: card.id, type: card.type };
 }
 
 function living(room: Room): Player[] {
@@ -217,10 +230,21 @@ export class GameRuntime {
             turnPlayerId: five.turnPlayerId,
             skipNext: five.skipNext,
             pendingDrawCount: five.pendingDrawCount,
-            yourHand: five.handsByPlayerId[you?.id ?? ""] ?? [],
+            yourHand: (five.handsByPlayerId[you?.id ?? ""] ?? []).map(
+              toPublicFiveAliveCard
+            ),
             bombAwaitingPlayerId: five.bombAwaitingPlayerId,
             bombActorId: five.bombActorId,
             bombResponderIds: five.bombResponderIds,
+            drawPileCount: five.drawDeck.length,
+            discardPileCount: five.discardPile.length,
+            centerPileCount: five.centerPile.length,
+            centerTopCard:
+              five.centerPile.length > 0
+                ? toPublicFiveAliveCard(
+                    five.centerPile[five.centerPile.length - 1] as FiveAliveCardInstance
+                  )
+                : null,
           }
         : undefined,
     };
@@ -339,6 +363,55 @@ export class GameRuntime {
   private scheduleBots(room: Room) {
     this.clearBotTimers(room);
     if (room.paused) return;
+
+    if (room.gameId === "five-alive") {
+      const five = room.fiveAlive;
+      if (!five) return;
+
+      if (room.phase === "fivealive_turn" && five.turnPlayerId) {
+        const bot = room.players.find(
+          (p) => p.id === five.turnPlayerId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        const wait = botFiveAliveDelayMs();
+        this.delayBot(room, wait, () => {
+          if (room.phase !== "fivealive_turn" || room.paused || !bot.alive) return;
+          if (five.turnPlayerId !== bot.id) return;
+          const currentHand = five.handsByPlayerId[bot.id] ?? [];
+          const play = pickBotFiveAliveTurnPlay(currentHand, five.runningTotal);
+          if (!play) return;
+          this.submitFiveAlivePlayCard(
+            room.id,
+            bot.id,
+            play.cardId,
+            play.wildValue
+          );
+        });
+        return;
+      }
+
+      if (room.phase === "fivealive_bomb" && five.bombAwaitingPlayerId) {
+        const bot = room.players.find(
+          (p) =>
+            p.id === five.bombAwaitingPlayerId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        const wait = botFiveAliveDelayMs();
+        this.delayBot(room, wait, () => {
+          if (room.phase !== "fivealive_bomb" || room.paused || !bot.alive) return;
+          if (five.bombAwaitingPlayerId !== bot.id) return;
+          const currentHand = five.handsByPlayerId[bot.id] ?? [];
+          const response = pickBotFiveAliveBombResponse(currentHand);
+          if ("pass" in response) {
+            this.submitFiveAlivePlayCard(room.id, bot.id, null, undefined, true);
+          } else {
+            this.submitFiveAlivePlayCard(room.id, bot.id, response.cardId);
+          }
+        });
+      }
+      return;
+    }
+
     if (room.phase === "night") {
       for (const bot of living(room).filter((p) => p.isBot)) {
         const wait = botNightDelayMs(bot.role);
@@ -780,6 +853,7 @@ export class GameRuntime {
 
     log(room, "5 Alive begins: keep the running total at or below 21.");
     this.setPhase(room, "fivealive_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
@@ -1062,6 +1136,7 @@ export class GameRuntime {
     five.bombResponderIds = [];
     five.bombActorId = null;
     this.setPhase(room, "fivealive_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
@@ -1100,6 +1175,7 @@ export class GameRuntime {
     five.pendingDrawCount = 0;
 
     this.setPhase(room, "fivealive_bomb", room.settings.daySeconds);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
@@ -1313,6 +1389,7 @@ export class GameRuntime {
           this.fiveAliveMaybeWin(room);
         }
       } else {
+        this.scheduleBots(room);
         this.emitRoom(room);
       }
     }
