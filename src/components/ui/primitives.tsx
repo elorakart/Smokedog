@@ -21,7 +21,7 @@ export function StatusChip({
   tone = "neutral",
 }: {
   children: ReactNode;
-  tone?: "neutral" | "live" | "dead" | "mute" | "afk" | "mafia" | "town";
+  tone?: "neutral" | "live" | "dead" | "mute" | "afk" | "mafia" | "town" | "bot";
 }) {
   const tones: Record<string, string> = {
     neutral: "text-ink-steel border-white/10",
@@ -31,6 +31,7 @@ export function StatusChip({
     afk: "text-crimson-glow border-crimson/40",
     mafia: "text-crimson-glow border-crimson/40",
     town: "text-sky-200 border-sky-400/30",
+    bot: "text-violet-200 border-violet-400/30",
   };
   return (
     <span
@@ -49,7 +50,7 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className={`rounded-sm bg-crimson px-5 py-3 font-display text-sm font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
+      className={`rounded-sm bg-crimson px-5 py-3 font-display text-sm font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 hover:shadow-[0_0_32px_rgba(230,25,25,0.55)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
     >
       {children}
     </button>

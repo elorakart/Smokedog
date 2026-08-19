@@ -2,15 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { ArrowRight, Clock, Users } from "lucide-react";
+import { OpenLobbies } from "@/components/hub/OpenLobbies";
 import { ProfileModal } from "@/components/hub/ProfileModal";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
-import { COMING_SOON, ensurePlayerId, loadProfile, saveProfile } from "@/lib/profile";
+import { fadeUp, stagger } from "@/components/ui/motion";
+import {
+  ensurePlayerId,
+  loadProfile,
+  saveProfile,
+} from "@/lib/profile";
 import { getSocket } from "@/lib/socket/client";
 
 export default function HomePage() {
   const router = useRouter();
   const [modal, setModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "join">("create");
+  const [prefillCode, setPrefillCode] = useState("");
   const [profile, setProfile] = useState(() => loadProfile());
   const [error, setError] = useState<string | null>(null);
 
@@ -39,12 +48,14 @@ export default function HomePage() {
     socket.off("room:state");
     socket.on("room:error", ({ message }) => setError(message));
     socket.on("room:state", (state) => {
+      setError(null);
       router.push(`/room/${state.roomId}`);
     });
     return socket;
   };
 
   const onCreate = (name: string, avatarId: number) => {
+    setError(null);
     const p = persist(name, avatarId);
     const socket = bindErrors(p.playerId);
     socket.emit("room:create", {
@@ -56,6 +67,7 @@ export default function HomePage() {
   };
 
   const onJoin = (name: string, avatarId: number, code: string) => {
+    setError(null);
     const p = persist(name, avatarId);
     const socket = bindErrors(p.playerId);
     socket.emit("room:join", {
@@ -66,11 +78,37 @@ export default function HomePage() {
     });
   };
 
+  const joinWithProfile = (code: string) => {
+    const p = loadProfile();
+    if (!p?.name) {
+      setPrefillCode(code);
+      setModalMode("join");
+      setModal(true);
+      return;
+    }
+    onJoin(p.name, p.avatarId, code);
+  };
+
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between px-6 py-5 md:px-10">
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(230,25,25,0.12),transparent_55%)]" />
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative flex items-center justify-between px-6 py-5 md:px-10"
+      >
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-[4px] bg-crimson shadow-glow" />
+          <motion.div
+            className="h-8 w-8 rounded-[4px] bg-crimson shadow-glow"
+            animate={{
+              boxShadow: [
+                "0 0 12px rgba(230,25,25,0.35)",
+                "0 0 28px rgba(230,25,25,0.7)",
+                "0 0 12px rgba(230,25,25,0.35)",
+              ],
+            }}
+            transition={{ duration: 2.8, repeat: Infinity }}
+          />
           <span className="font-display text-xl font-extrabold tracking-[0.18em]">
             SMOKEDOG
           </span>
@@ -83,33 +121,48 @@ export default function HomePage() {
             <PlayerAvatar id={profile?.avatarId ?? 0} size={36} />
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      <main className="mx-auto max-w-6xl px-6 pb-16 md:px-10">
-        <p className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow">
+      <motion.main
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="relative mx-auto max-w-6xl px-6 pb-16 md:px-10"
+      >
+        <motion.p
+          variants={fadeUp}
+          className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow"
+        >
           Active operation
-        </p>
-        <h1 className="mt-3 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+        </motion.p>
+        <motion.h1
+          variants={fadeUp}
+          className="mt-3 font-display text-4xl font-extrabold tracking-tight md:text-5xl"
+        >
           Select Your Battlefield
-        </h1>
-        <p className="mt-3 max-w-xl text-ink-steel">
+        </motion.h1>
+        <motion.p variants={fadeUp} className="mt-3 max-w-xl text-ink-steel">
           A modular multiplayer platform. Mafia City is live. More operations
           incoming.
-        </p>
+        </motion.p>
 
-        {error && (
-          <p className="mt-4 font-mono text-sm text-crimson-glow">{error}</p>
-        )}
-
-        <button
+        <motion.button
+          variants={fadeUp}
           type="button"
-          onClick={() => setModal(true)}
+          onClick={() => {
+            setError(null);
+            setPrefillCode("");
+            setModalMode("create");
+            setModal(true);
+          }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.995 }}
           className="group relative mt-10 w-full overflow-hidden rounded-lg text-left"
         >
           <img
             src="https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1600&q=80"
             alt=""
-            className="h-[340px] w-full object-cover opacity-50 transition duration-500 group-hover:scale-105 md:h-[420px]"
+            className="h-[340px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105 md:h-[420px]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-void via-void/40 to-transparent" />
           <div className="absolute inset-0 p-8 md:p-12">
@@ -131,40 +184,61 @@ export default function HomePage() {
               </span>
             </div>
             <span className="mt-8 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-widest text-crimson-glow">
-              Play now <ArrowRight size={16} />
+              Play now{" "}
+              <ArrowRight
+                size={16}
+                className="transition group-hover:translate-x-1"
+              />
             </span>
           </div>
-        </button>
+        </motion.button>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {COMING_SOON.map((game) => (
-            <article
-              key={game.id}
-              className="relative overflow-hidden rounded-lg border border-white/10 opacity-70"
-            >
-              <img
-                src={game.image}
-                alt=""
-                className="h-48 w-full object-cover grayscale"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
-              <div className="absolute bottom-0 p-5">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                  Coming soon
-                </span>
-                <h3 className="mt-1 font-display text-xl font-bold">{game.title}</h3>
-                <p className="mt-1 text-sm text-ink-steel">{game.blurb}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </main>
+        <OpenLobbies
+          onJoin={joinWithProfile}
+          onNeedProfile={(code) => {
+            setError(null);
+            setPrefillCode(code ?? "");
+            setModalMode("join");
+            setModal(true);
+          }}
+        />
+
+        <motion.article
+          variants={fadeUp}
+          className="relative mt-8 overflow-hidden rounded-lg border border-white/10 opacity-80"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=80"
+            alt=""
+            className="h-40 w-full object-cover grayscale md:h-48"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-transparent" />
+          <div className="absolute bottom-0 p-6 md:p-8">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+              Coming soon
+            </span>
+            <h3 className="mt-2 font-display text-2xl font-bold md:text-3xl">
+              More games on the way
+            </h3>
+            <p className="mt-2 max-w-lg text-sm text-ink-steel">
+              New operations are in development. Mafia City is live now — check
+              back for the next drop.
+            </p>
+          </div>
+        </motion.article>
+      </motion.main>
 
       <ProfileModal
         open={modal}
         defaultName={profile?.name ?? ""}
         defaultAvatar={profile?.avatarId ?? 0}
-        onClose={() => setModal(false)}
+        error={error}
+        initialCode={prefillCode}
+        initialMode={modalMode}
+        onClose={() => {
+          setModal(false);
+          setError(null);
+        }}
         onCreate={onCreate}
         onJoin={onJoin}
       />

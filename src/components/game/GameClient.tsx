@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import type {
   ChatChannel,
   NightActionType,
@@ -17,7 +18,8 @@ import { GameOverScreen } from "@/components/game/GameOverScreen";
 import { LobbyView } from "@/components/game/LobbyView";
 import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
-import { GlassPanel } from "@/components/ui/primitives";
+import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
+import { phaseSwap } from "@/components/ui/motion";
 
 export function GameClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -35,10 +37,16 @@ export function GameClient({ roomId }: { roomId: string }) {
     const s = getSocket(profile.playerId);
     setSocket(s);
 
-    const onState = (next: PublicGameState) => setState(next);
-    const onErr = ({ message }: { message: string }) => {
+    const onState = (next: PublicGameState) => {
+      setError(null);
+      setState(next);
+    };
+    const onErr = ({ message, code }: { message: string; code?: string }) => {
       setError(message);
       if (message.toLowerCase().includes("kicked")) router.replace("/");
+      if (code === "NOT_FOUND" || code === "NOT_IN_ROOM") {
+        setState(null);
+      }
     };
     const onAfk = (payload: { playerId: string; name: string }) => {
       setAfk({ playerId: payload.playerId, name: payload.name });
@@ -65,9 +73,21 @@ export function GameClient({ roomId }: { roomId: string }) {
   if (error && !state) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
-        <GlassPanel className="p-8">
-          <p className="font-mono text-sm text-crimson-glow">{error}</p>
-        </GlassPanel>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <GlassPanel className="p-8 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
+              Channel closed
+            </p>
+            <p className="mt-3 text-ink">{error}</p>
+            <PrimaryButton className="mt-6" onClick={() => router.replace("/")}>
+              Back to hub
+            </PrimaryButton>
+          </GlassPanel>
+        </motion.div>
       </div>
     );
   }
@@ -75,18 +95,25 @@ export function GameClient({ roomId }: { roomId: string }) {
   if (!state || !socket) {
     return (
       <div className="flex min-h-screen items-center justify-center font-mono text-xs uppercase tracking-widest text-ink-steel">
-        Linking secure channel…
+        <motion.span
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.6, repeat: Infinity }}
+        >
+          Linking secure channel…
+        </motion.span>
       </div>
     );
   }
 
-  const emitReady = (ready: boolean) =>
-    socket.emit("lobby:ready", { roomId: state.roomId, ready });
   const emitSettings = (settings: Partial<RoomSettings>) =>
     socket.emit("lobby:settings", { roomId: state.roomId, settings });
   const emitStart = () => socket.emit("lobby:start", { roomId: state.roomId });
   const emitKick = (playerId: string) =>
     socket.emit("host:kick", { roomId: state.roomId, playerId });
+  const emitAddBot = (fillTo?: number) =>
+    socket.emit("lobby:addBot", { roomId: state.roomId, fillTo });
+  const emitRemoveBot = () =>
+    socket.emit("lobby:removeBot", { roomId: state.roomId });
   const emitNight = (type: NightActionType, targetId: string) =>
     socket.emit("night:action", { roomId: state.roomId, type, targetId });
   const emitVote = (targetId: string) =>
@@ -97,9 +124,10 @@ export function GameClient({ roomId }: { roomId: string }) {
   const nightTheme = state.phase === "night";
 
   return (
-    <div
+    <motion.div
       data-phase={state.phase}
-      className={`min-h-screen ${nightTheme ? "bg-[#060910]" : ""}`}
+      animate={{ backgroundColor: nightTheme ? "#060910" : "#0b141e" }}
+      className="min-h-screen"
     >
       <header className="flex items-center justify-between px-4 py-4 md:px-8">
         <span className="font-display text-sm font-extrabold tracking-[0.2em]">
@@ -113,77 +141,99 @@ export function GameClient({ roomId }: { roomId: string }) {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
-        {state.phase === "lobby" && (
-          <LobbyView
-            state={state}
-            onReady={emitReady}
-            onStart={emitStart}
-            onSettings={emitSettings}
-            onKick={emitKick}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={state.phase}
+            variants={phaseSwap}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            {state.phase === "lobby" && (
+              <LobbyView
+                state={state}
+                onStart={emitStart}
+                onSettings={emitSettings}
+                onKick={emitKick}
+                onAddBot={emitAddBot}
+                onRemoveBot={emitRemoveBot}
+              />
+            )}
 
-        {state.phase === "reveal" && state.you?.role && (
-          <RoleRevealCard role={state.you.role} />
-        )}
+            {state.phase === "reveal" && state.you?.role && (
+              <RoleRevealCard role={state.you.role} />
+            )}
 
-        {state.phase === "night" && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-            <NightActionPanel state={state} onAct={emitNight} />
-            <div className="space-y-4">
-              <GlassPanel className="p-4">
-                <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                  Night log
-                </h3>
-                <ul className="mt-2 space-y-1 text-sm text-ink-steel">
-                  {state.logs.slice(-6).map((l) => (
-                    <li key={l.id}>{l.text}</li>
-                  ))}
-                </ul>
-              </GlassPanel>
-              <ChatPanel state={state} onSend={emitChat} />
-            </div>
-          </div>
-        )}
+            {state.phase === "night" && (
+              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                <NightActionPanel state={state} onAct={emitNight} />
+                <div className="space-y-4">
+                  <GlassPanel className="p-4">
+                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                      Night log
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-sm text-ink-steel">
+                      {state.logs.slice(-6).map((l) => (
+                        <li key={l.id}>{l.text}</li>
+                      ))}
+                    </ul>
+                  </GlassPanel>
+                  <ChatPanel state={state} socket={socket} onSend={emitChat} />
+                </div>
+              </div>
+            )}
 
-        {state.phase === "day" && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-            <VotePanel state={state} onVote={emitVote} />
-            <div className="space-y-4">
-              <GlassPanel className="max-h-48 overflow-y-auto p-4">
-                <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                  Announcements
-                </h3>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {state.logs.map((l) => (
-                    <li key={l.id} className="text-ink-steel">
-                      {l.text}
-                    </li>
-                  ))}
-                </ul>
-              </GlassPanel>
-              {state.detectiveResult && (
-                <GlassPanel className="p-4">
-                  <p className="font-mono text-[10px] uppercase text-crimson-glow">
-                    Case file
-                  </p>
-                  <p className="mt-1">
-                    Subject is aligned with the{" "}
-                    <strong className="uppercase">{state.detectiveResult.faction}</strong>.
-                  </p>
-                </GlassPanel>
-              )}
-              <ChatPanel state={state} onSend={emitChat} />
-            </div>
-          </div>
-        )}
+            {state.phase === "day" && (
+              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                <VotePanel
+                  state={state}
+                  onVote={emitVote}
+                  onSkipDay={() =>
+                    socket.emit("host:skipDay", { roomId: state.roomId })
+                  }
+                />
+                <div className="space-y-4">
+                  <GlassPanel className="max-h-48 overflow-y-auto p-4">
+                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                      Announcements
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {state.logs.map((l) => (
+                        <li key={l.id} className="text-ink-steel">
+                          {l.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </GlassPanel>
+                  {state.detectiveResult && (
+                    <GlassPanel className="p-4">
+                      <p className="font-mono text-[10px] uppercase text-crimson-glow">
+                        Case file
+                      </p>
+                      <p className="mt-1">
+                        Subject is aligned with the{" "}
+                        <strong className="uppercase">
+                          {state.detectiveResult.faction}
+                        </strong>
+                        .
+                      </p>
+                    </GlassPanel>
+                  )}
+                  <ChatPanel state={state} socket={socket} onSend={emitChat} />
+                </div>
+              </div>
+            )}
 
-        {state.phase === "gameover" && (
-          <GameOverScreen
-            state={state}
-            onReturn={() => socket.emit("lobby:return", { roomId: state.roomId })}
-          />
-        )}
+            {state.phase === "gameover" && (
+              <GameOverScreen
+                state={state}
+                onReturn={() =>
+                  socket.emit("lobby:return", { roomId: state.roomId })
+                }
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {afk && state.you?.isHost && (
@@ -200,6 +250,6 @@ export function GameClient({ roomId }: { roomId: string }) {
           onDismiss={() => setAfk(null)}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

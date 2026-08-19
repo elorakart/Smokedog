@@ -4,6 +4,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "@/lib/types";
+import { RoomError } from "@/lib/room-code";
 import { GameRuntime, type IoServer } from "./game-runtime";
 
 export function attachSocketServer(
@@ -29,6 +30,13 @@ export function attachSocketServer(
     const remember = (playerId: string) => {
       socket.data.playerId = playerId;
     };
+    socket.join("lobby-browser");
+
+    socket.on("lobbies:list", (payload) => {
+      socket.emit("lobbies:list", {
+        lobbies: runtime.listOpenLobbies(payload?.query),
+      });
+    });
 
     socket.on("room:create", (payload) => {
       try {
@@ -63,6 +71,7 @@ export function attachSocketServer(
         runtime.emitRoom(room);
       } catch (err) {
         socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
           message: err instanceof Error ? err.message : "Could not join room",
         });
       }
@@ -79,6 +88,7 @@ export function attachSocketServer(
         runtime.emitRoom(room);
       } catch (err) {
         socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
           message: err instanceof Error ? err.message : "Could not rejoin",
         });
       }
@@ -103,7 +113,32 @@ export function attachSocketServer(
         runtime.startGame(payload.roomId, socket.data.playerId);
       } catch (err) {
         socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
           message: err instanceof Error ? err.message : "Could not start",
+        });
+      }
+    });
+
+    socket.on("lobby:addBot", (payload) => {
+      try {
+        if (!socket.data.playerId) return;
+        runtime.addBots(payload.roomId, socket.data.playerId, payload.fillTo);
+      } catch (err) {
+        socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
+          message: err instanceof Error ? err.message : "Could not add auto players",
+        });
+      }
+    });
+
+    socket.on("lobby:removeBot", (payload) => {
+      try {
+        if (!socket.data.playerId) return;
+        runtime.removeBot(payload.roomId, socket.data.playerId);
+      } catch (err) {
+        socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
+          message: err instanceof Error ? err.message : "Could not remove auto player",
         });
       }
     });
@@ -146,6 +181,32 @@ export function attachSocketServer(
     socket.on("host:resume", (payload) => {
       if (!socket.data.playerId) return;
       runtime.resume(payload.roomId, socket.data.playerId);
+    });
+
+    socket.on("host:skipDay", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.skipDay(payload.roomId, socket.data.playerId);
+    });
+
+    socket.on("voice:join", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.joinVoice(payload.roomId, socket.data.playerId, payload.channel);
+    });
+
+    socket.on("voice:leave", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.leaveVoice(payload.roomId, socket.data.playerId, payload.channel);
+    });
+
+    socket.on("voice:signal", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.relayVoiceSignal(
+        payload.roomId,
+        socket.data.playerId,
+        payload.channel,
+        payload.targetId,
+        payload.signal
+      );
     });
 
     socket.on("lobby:return", (payload) => {

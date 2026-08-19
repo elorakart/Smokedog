@@ -7,14 +7,25 @@ import type {
   GameLog,
   NightAction,
   NightActionType,
+  OpenLobby,
   Phase,
   Player,
   PublicGameState,
   PublicPlayer,
   RoomSettings,
   ServerToClientEvents,
+  VoiceSignalPayload,
 } from "@/lib/types";
+import { generateRoomCode, RoomError, validateRoomCode } from "@/lib/room-code";
 import { getGameModule } from "@/lib/games/registry";
+import {
+  nextBotName,
+  nextBotAvatarId,
+  pickBotNightAction,
+  pickBotVoteTarget,
+  botNightDelayMs,
+  botDayDelayMs,
+} from "@/lib/games/mafia-city/bot-ai";
 import {
   factionOf,
   isMafiaRole,
@@ -29,11 +40,11 @@ import {
   validNightTargets,
   winCheck,
 } from "@/lib/games/mafia-city/resolve";
+import { canAccessChannel } from "@/lib/chat-access";
 
 export type IoServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
 const REVEAL_SECONDS = 5;
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 interface Room {
   id: string;
@@ -53,14 +64,9 @@ interface Room {
   timer: ReturnType<typeof setTimeout> | null;
   detectiveByPlayer: Record<string, { targetId: string; faction: "town" | "mafia" }>;
   afkWarnedPlayerIds: string[];
-}
-
-function generateCode(): string {
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
-  return code;
+  botTimers: ReturnType<typeof setTimeout>[];
+  createdAt: number;
+  voiceParticipants: Record<ChatChannel, Set<string>>;
 }
 
 function log(room: Room, text: string) {
@@ -70,6 +76,16 @@ function log(room: Room, text: string) {
 
 function living(room: Room): Player[] {
   return room.players.filter((p) => p.alive);
+}
+
+function emptyVoiceChannels(): Record<ChatChannel, Set<string>> {
+  return { town: new Set(), mafia: new Set(), graveyard: new Set() };
+}
+
+function dayVoteStats(room: Room) {
+  const eligible = living(room).filter((p) => !p.blackmailed);
+  const votesIn = eligible.filter((p) => room.votes[p.id]).length;
+  return { eligible, votesIn, votesNeeded: eligible.length };
 }
 
 export class GameRuntime {
@@ -96,6 +112,8 @@ export class GameRuntime {
   }
 
   private toPublicPlayer(room: Room, p: Player, viewerId: string, revealAll: boolean): PublicPlayer {
+    const viewer = room.players.find((x) => x.id === viewerId);
+    const viewerIsHost = !!viewer?.isHost;
     const showRole =
       revealAll || p.id === viewerId || room.phase === "gameover";
     return {
@@ -108,7 +126,8 @@ export class GameRuntime {
       afkCount: p.afkCount,
       blackmailed: p.blackmailed && room.phase === "day",
       role: showRole ? p.role : undefined,
-      connected: !!p.socketId,
+      connected: p.isBot || !!p.socketId,
+      isBot: viewerIsHost ? !!p.isBot : false,
     };
   }
 
@@ -151,18 +170,50 @@ export class GameRuntime {
       detectiveResult: you ? room.detectiveByPlayer[you.id] ?? null : null,
       afkWarnedPlayerIds: you?.isHost ? room.afkWarnedPlayerIds : [],
       chat: this.visibleChat(room, you),
+      canSkipDay: this.canSkipDay(room),
+      dayVotesIn: dayVoteStats(room).votesIn,
+      dayVotesNeeded: dayVoteStats(room).votesNeeded,
+      voiceParticipants: this.publicVoiceParticipants(room),
+      autoPlayerCount: you?.isHost
+        ? room.players.filter((p) => p.isBot).length
+        : 0,
     };
   }
 
+  private canSkipDay(room: Room): boolean {
+    if (room.phase !== "day" || room.paused) return false;
+    const { eligible, votesIn } = dayVoteStats(room);
+    if (eligible.length === 0) return true;
+    return votesIn >= eligible.length;
+  }
+
+  private publicVoiceParticipants(
+    room: Room
+  ): Partial<Record<ChatChannel, string[]>> {
+    const out: Partial<Record<ChatChannel, string[]>> = {};
+    for (const channel of ["town", "mafia", "graveyard"] as ChatChannel[]) {
+      const ids = [...room.voiceParticipants[channel]];
+      if (ids.length > 0) out[channel] = ids;
+    }
+    return out;
+  }
+
   private visibleChat(room: Room, you: Player | null): ChatMessage[] {
-    return room.chat.filter((m) => {
-      if (m.channel === "town") return true;
-      if (m.channel === "graveyard") return !!you && !you.alive;
-      if (m.channel === "mafia") {
-        return !!you && you.alive && isMafiaRole(you.role);
-      }
-      return false;
-    }).slice(-50);
+    return room.chat
+      .filter((m) => {
+        if (m.channel === "town") return room.phase === "day";
+        if (m.channel === "graveyard") return !!you && !you.alive;
+        if (m.channel === "mafia") {
+          return (
+            !!you &&
+            you.alive &&
+            isMafiaRole(you.role) &&
+            room.phase === "night"
+          );
+        }
+        return false;
+      })
+      .slice(-50);
   }
 
   emitRoom(room: Room) {
@@ -170,12 +221,95 @@ export class GameRuntime {
       if (!player.socketId) continue;
       this.io.to(player.socketId).emit("room:state", this.sanitize(room, player.id));
     }
+    this.broadcastLobbies();
+  }
+
+  listOpenLobbies(query = ""): OpenLobby[] {
+    const q = query.trim().toUpperCase();
+    const rows: OpenLobby[] = [];
+    for (const room of this.rooms.values()) {
+      if (room.phase !== "lobby") continue;
+      const mod = getGameModule(room.gameId);
+      const openSlots = mod.maxPlayers - room.players.length;
+      if (openSlots <= 0) continue;
+      const host = room.players.find((p) => p.isHost) ?? room.players[0];
+      if (!host) continue;
+      const listing: OpenLobby = {
+        roomId: room.id,
+        gameId: room.gameId,
+        hostName: host.name,
+        hostAvatarId: host.avatarId,
+        playerCount: room.players.length,
+        maxPlayers: mod.maxPlayers,
+        openSlots,
+        botCount: room.players.filter((p) => p.isBot).length,
+        humanCount: room.players.filter((p) => !p.isBot).length,
+      };
+      if (
+        q &&
+        !listing.roomId.includes(q) &&
+        !listing.hostName.toUpperCase().includes(q)
+      ) {
+        continue;
+      }
+      rows.push(listing);
+    }
+    return rows.sort((a, b) => b.openSlots - a.openSlots || a.roomId.localeCompare(b.roomId));
+  }
+
+  broadcastLobbies() {
+    this.io.to("lobby-browser").emit("lobbies:list", {
+      lobbies: this.listOpenLobbies(),
+    });
   }
 
   private clearTimer(room: Room) {
     if (room.timer) {
       clearTimeout(room.timer);
       room.timer = null;
+    }
+    this.clearBotTimers(room);
+  }
+
+  private clearBotTimers(room: Room) {
+    for (const t of room.botTimers) clearTimeout(t);
+    room.botTimers = [];
+  }
+
+  private delayBot(room: Room, ms: number, fn: () => void) {
+    const t = setTimeout(() => {
+      room.botTimers = room.botTimers.filter((x) => x !== t);
+      fn();
+    }, ms);
+    room.botTimers.push(t);
+  }
+
+  private scheduleBots(room: Room) {
+    this.clearBotTimers(room);
+    if (room.paused) return;
+    if (room.phase === "night") {
+      for (const bot of living(room).filter((p) => p.isBot)) {
+        const wait = botNightDelayMs(bot.role);
+        this.delayBot(room, wait, () => {
+          if (room.phase !== "night" || room.paused || !bot.alive) return;
+          const action = pickBotNightAction(room.players, bot);
+          if (!action) return;
+          this.submitNightAction(room.id, bot.id, action.type, action.targetId);
+        });
+      }
+    }
+    if (room.phase === "day") {
+      for (const bot of living(room).filter((p) => p.isBot && !p.blackmailed)) {
+        const wait = botDayDelayMs();
+        this.delayBot(room, wait, () => {
+          if (room.phase !== "day" || room.paused || !bot.alive || bot.blackmailed) {
+            return;
+          }
+          const targetId = pickBotVoteTarget(room.players, bot, room.votes);
+          if (!targetId) return;
+          this.submitVote(room.id, bot.id, targetId);
+        });
+      }
     }
   }
 
@@ -211,6 +345,47 @@ export class GameRuntime {
     }
   }
 
+  private voiceSocketIds(room: Room, channel: ChatChannel): string[] {
+    const ids = room.voiceParticipants[channel];
+    const sockets: string[] = [];
+    for (const playerId of ids) {
+      const p = room.players.find((x) => x.id === playerId);
+      if (p?.socketId) sockets.push(p.socketId);
+    }
+    return sockets;
+  }
+
+  private broadcastVoiceParticipants(room: Room, channel: ChatChannel) {
+    const participantIds = [...room.voiceParticipants[channel]];
+    for (const socketId of this.voiceSocketIds(room, channel)) {
+      this.io.to(socketId).emit("voice:participants", { channel, participantIds });
+    }
+  }
+
+  private removeFromAllVoice(room: Room, playerId: string) {
+    for (const channel of ["town", "mafia", "graveyard"] as ChatChannel[]) {
+      if (!room.voiceParticipants[channel].delete(playerId)) continue;
+      this.broadcastVoiceParticipants(room, channel);
+    }
+  }
+
+  private clearVoiceChannels(room: Room, ...channels: ChatChannel[]) {
+    for (const channel of channels) {
+      if (room.voiceParticipants[channel].size === 0) continue;
+      room.voiceParticipants[channel].clear();
+      this.broadcastVoiceParticipants(room, channel);
+    }
+  }
+
+  private finishDayPhase(room: Room) {
+    this.clearTimer(room);
+    this.resolveDayPhase(room);
+    if (this.maybeWin(room)) return;
+    room.cycle += 1;
+    for (const p of room.players) p.blackmailed = false;
+    this.startNight(room);
+  }
+
   createRoom(opts: {
     socketId: string;
     playerId: string;
@@ -219,8 +394,8 @@ export class GameRuntime {
     gameId?: string;
   }): Room {
     const mod = getGameModule(opts.gameId);
-    let code = generateCode();
-    while (this.rooms.has(code)) code = generateCode();
+    let code = generateRoomCode();
+    while (this.rooms.has(code)) code = generateRoomCode();
 
     const player: Player = {
       id: opts.playerId,
@@ -229,9 +404,10 @@ export class GameRuntime {
       avatarId: opts.avatarId,
       alive: true,
       isHost: true,
-      ready: false,
+      ready: true,
       afkCount: 0,
       blackmailed: false,
+      isBot: false,
     };
 
     const room: Room = {
@@ -252,6 +428,9 @@ export class GameRuntime {
       timer: null,
       detectiveByPlayer: {},
       afkWarnedPlayerIds: [],
+      botTimers: [],
+      createdAt: Date.now(),
+      voiceParticipants: emptyVoiceChannels(),
     };
 
     this.rooms.set(code, room);
@@ -266,8 +445,17 @@ export class GameRuntime {
     name: string;
     avatarId: number;
   }): Room {
-    const room = this.getRoom(opts.roomId);
-    if (!room) throw new Error("Room not found");
+    const parsed = validateRoomCode(opts.roomId);
+    if (!parsed.ok) {
+      throw new RoomError("INVALID_CODE", parsed.message);
+    }
+    const room = this.getRoom(parsed.code);
+    if (!room) {
+      throw new RoomError(
+        "NOT_FOUND",
+        `No lobby exists for code ${parsed.code}. Check the party code and try again.`
+      );
+    }
     const mod = getGameModule(room.gameId);
 
     const existing = room.players.find((p) => p.id === opts.playerId);
@@ -275,19 +463,23 @@ export class GameRuntime {
       existing.socketId = opts.socketId;
       existing.name = opts.name.trim().slice(0, 18) || existing.name;
       existing.avatarId = opts.avatarId;
+      if (room.phase === "lobby") existing.ready = true;
       this.playerRoom.set(opts.playerId, room.id);
       this.joinMafiaRoom(existing, room.id);
       return room;
     }
 
     if (room.phase !== "lobby") {
-      throw new Error("Game already in progress");
+      throw new RoomError(
+        "IN_PROGRESS",
+        "That lobby already started a match. Ask the host for a new code."
+      );
     }
     if (room.players.length >= mod.maxPlayers) {
-      throw new Error("Room is full");
+      throw new RoomError("FULL", "That lobby is full.");
     }
     if (room.players.some((p) => p.name.toLowerCase() === opts.name.trim().toLowerCase())) {
-      throw new Error("That display name is taken in this room");
+      throw new RoomError("NAME_TAKEN", "That display name is taken in this room.");
     }
 
     room.players.push({
@@ -297,20 +489,33 @@ export class GameRuntime {
       avatarId: opts.avatarId,
       alive: true,
       isHost: false,
-      ready: false,
+      ready: true,
       afkCount: 0,
       blackmailed: false,
+      isBot: false,
     });
     this.playerRoom.set(opts.playerId, room.id);
     return room;
   }
 
   rejoin(opts: { roomId: string; socketId: string; playerId: string }): Room {
-    const room = this.getRoom(opts.roomId);
-    if (!room) throw new Error("Room not found");
+    const parsed = validateRoomCode(opts.roomId);
+    if (!parsed.ok) {
+      throw new RoomError("INVALID_CODE", parsed.message);
+    }
+    const room = this.getRoom(parsed.code);
+    if (!room) {
+      throw new RoomError(
+        "NOT_FOUND",
+        `No lobby exists for code ${parsed.code}. It may have closed.`
+      );
+    }
     const player = room.players.find((p) => p.id === opts.playerId);
-    if (!player) throw new Error("Player not in this room");
+    if (!player || player.isBot) {
+      throw new RoomError("NOT_IN_ROOM", "You are not in this lobby. Join with the party code from the hub.");
+    }
     player.socketId = opts.socketId;
+    if (room.phase === "lobby") player.ready = true;
     this.playerRoom.set(opts.playerId, room.id);
     this.joinMafiaRoom(player, room.id);
     this.io.sockets.sockets.get(opts.socketId)?.join(room.id);
@@ -321,7 +526,7 @@ export class GameRuntime {
     const room = this.getRoom(roomId);
     if (!room || room.phase !== "lobby") return;
     const p = room.players.find((x) => x.id === playerId);
-    if (p) p.ready = ready;
+    if (p && !p.isBot) p.ready = ready;
     this.emitRoom(room);
   }
 
@@ -340,6 +545,63 @@ export class GameRuntime {
     } else if (typeof patch.vigilanteBullets === "number") {
       room.settings.vigilanteBullets = Math.min(3, Math.max(1, patch.vigilanteBullets));
     }
+    this.emitRoom(room);
+  }
+
+  addBots(roomId: string, playerId: string, fillTo?: number) {
+    const room = this.getRoom(roomId);
+    if (!room || room.phase !== "lobby") {
+      throw new RoomError("NOT_LOBBY", "Bots can only be added in the lobby.");
+    }
+    if (!this.requireHost(room, playerId)) {
+      throw new RoomError("NOT_HOST", "Only the host can add bots.");
+    }
+    const mod = getGameModule(room.gameId);
+    if (fillTo != null) {
+      const target = Math.min(mod.maxPlayers, fillTo);
+      while (room.players.length < target) {
+        this.pushBot(room);
+      }
+    } else {
+      if (room.players.length >= mod.maxPlayers) {
+        throw new RoomError("FULL", "Lobby is full.");
+      }
+      this.pushBot(room);
+    }
+    this.emitRoom(room);
+  }
+
+  private pushBot(room: Room) {
+    const name = nextBotName(room.players.map((p) => p.name));
+    const avatarId = nextBotAvatarId(room.players.map((p) => p.avatarId));
+    room.players.push({
+      id: `bot-${randomUUID()}`,
+      socketId: null,
+      name,
+      avatarId,
+      alive: true,
+      isHost: false,
+      ready: true,
+      afkCount: 0,
+      blackmailed: false,
+      isBot: true,
+    });
+  }
+
+  removeBot(roomId: string, playerId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || room.phase !== "lobby") {
+      throw new RoomError("NOT_LOBBY", "Auto players can only be removed in the lobby.");
+    }
+    if (!this.requireHost(room, playerId)) {
+      throw new RoomError("NOT_HOST", "Only the host can remove auto players.");
+    }
+    const idx = [...room.players].reverse().findIndex((p) => p.isBot);
+    if (idx === -1) {
+      throw new RoomError("NO_BOTS", "No auto players to remove.");
+    }
+    const removeAt = room.players.length - 1 - idx;
+    room.players.splice(removeAt, 1);
     this.emitRoom(room);
   }
 
@@ -391,6 +653,7 @@ export class GameRuntime {
     room.nightActions = [];
     room.votes = {};
     room.detectiveByPlayer = {};
+    this.clearVoiceChannels(room, "town", "graveyard");
     for (const p of room.players) {
       if (room.cycle > 1) {
         // blackmail lasts one day; clear at next night start after it was applied
@@ -398,12 +661,15 @@ export class GameRuntime {
     }
     log(room, `Night ${room.cycle} falls over the city.`);
     this.setPhase(room, "night", room.settings.nightSeconds);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
   private startDay(room: Room) {
+    this.clearVoiceChannels(room, "mafia");
     log(room, `Day ${room.cycle} — argue, accuse, survive.`);
     this.setPhase(room, "day", room.settings.daySeconds);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
@@ -451,8 +717,12 @@ export class GameRuntime {
           auto: true,
         });
       }
-      player.afkCount += 1;
-      if (player.afkCount >= 2 && !room.afkWarnedPlayerIds.includes(player.id)) {
+      player.afkCount += player.isBot ? 0 : 1;
+      if (
+        !player.isBot &&
+        player.afkCount >= 2 &&
+        !room.afkWarnedPlayerIds.includes(player.id)
+      ) {
         room.afkWarnedPlayerIds.push(player.id);
         this.io.to(room.id).emit("host:afkWarning", {
           playerId: player.id,
@@ -475,6 +745,7 @@ export class GameRuntime {
         if (p) {
           log(room, `${p.name} was found at dawn. ${d.reason}.`);
           this.leaveMafiaRooms(p, room.id);
+          this.removeFromAllVoice(room, p.id);
         }
       }
     }
@@ -513,6 +784,7 @@ export class GameRuntime {
     const role = target.role ? ROLE_META[target.role].label : "Unknown";
     log(room, `The city lynches ${target.name}. They were the ${role}.`);
     this.leaveMafiaRooms(target, room.id);
+    this.removeFromAllVoice(room, target.id);
   }
 
   private onTimeout(roomId: string) {
@@ -529,11 +801,7 @@ export class GameRuntime {
       return;
     }
     if (room.phase === "day") {
-      this.resolveDayPhase(room);
-      if (this.maybeWin(room)) return;
-      room.cycle += 1;
-      for (const p of room.players) p.blackmailed = false;
-      this.startNight(room);
+      this.finishDayPhase(room);
     }
   }
 
@@ -578,12 +846,69 @@ export class GameRuntime {
 
     const lynchedId = tallyLynch(room.players, room.votes);
     if (lynchedId) {
-      this.resolveDayPhase(room);
-      if (this.maybeWin(room)) return;
-      room.cycle += 1;
-      for (const p of room.players) p.blackmailed = false;
-      this.startNight(room);
+      this.finishDayPhase(room);
     }
+  }
+
+  skipDay(roomId: string, hostId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || !this.requireHost(room, hostId)) return;
+    if (room.phase !== "day" || room.paused || !this.canSkipDay(room)) return;
+    log(room, "The host ends the day early.");
+    this.finishDayPhase(room);
+  }
+
+  joinVoice(roomId: string, playerId: string, channel: ChatChannel) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player?.socketId) return;
+    if (
+      !canAccessChannel(channel, {
+        alive: player.alive,
+        role: player.role,
+        blackmailed: player.blackmailed,
+        phase: room.phase,
+      })
+    ) {
+      this.io.to(player.socketId).emit("voice:error", {
+        message: "This voice channel is closed right now.",
+      });
+      return;
+    }
+    this.removeFromAllVoice(room, playerId);
+    room.voiceParticipants[channel].add(playerId);
+    this.broadcastVoiceParticipants(room, channel);
+    this.emitRoom(room);
+  }
+
+  leaveVoice(roomId: string, playerId: string, channel: ChatChannel) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    if (!room.voiceParticipants[channel].delete(playerId)) return;
+    this.broadcastVoiceParticipants(room, channel);
+    this.emitRoom(room);
+  }
+
+  relayVoiceSignal(
+    roomId: string,
+    fromId: string,
+    channel: ChatChannel,
+    targetId: string,
+    signal: VoiceSignalPayload
+  ) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    const from = room.players.find((p) => p.id === fromId);
+    const target = room.players.find((p) => p.id === targetId);
+    if (!from?.socketId || !target?.socketId) return;
+    if (!room.voiceParticipants[channel].has(fromId)) return;
+    if (!room.voiceParticipants[channel].has(targetId)) return;
+    this.io.to(target.socketId).emit("voice:signal", {
+      channel,
+      fromId,
+      signal,
+    });
   }
 
   sendChat(
@@ -601,9 +926,15 @@ export class GameRuntime {
 
     if (channel === "graveyard" && player.alive) return;
     if (channel === "town" && !player.alive) return;
-    if (channel === "town" && player.blackmailed && room.phase === "day") return;
-    if (channel === "mafia") {
-      if (!isMafiaRole(player.role) || !player.alive || room.phase !== "night") return;
+    if (
+      !canAccessChannel(channel, {
+        alive: player.alive,
+        role: player.role,
+        blackmailed: player.blackmailed,
+        phase: room.phase,
+      })
+    ) {
+      return;
     }
 
     const message: ChatMessage = {
@@ -648,6 +979,7 @@ export class GameRuntime {
       target.alive = false;
       log(room, `${target.name} was removed from the city.`);
       this.leaveMafiaRooms(target, room.id);
+      this.removeFromAllVoice(room, target.id);
     }
     room.afkWarnedPlayerIds = room.afkWarnedPlayerIds.filter((id) => id !== targetId);
     this.emitRoom(room);
@@ -676,6 +1008,7 @@ export class GameRuntime {
     room.phaseEndsAt = Date.now() + ms;
     log(room, "The host resumed the game.");
     this.schedule(room);
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 
@@ -687,7 +1020,7 @@ export class GameRuntime {
     for (const p of room.players) {
       p.role = undefined;
       p.alive = true;
-      p.ready = false;
+      p.ready = true;
       p.afkCount = 0;
       p.blackmailed = false;
       p.bulletsLeft = undefined;
@@ -703,6 +1036,7 @@ export class GameRuntime {
     room.nightActions = [];
     room.detectiveByPlayer = {};
     room.afkWarnedPlayerIds = [];
+    room.voiceParticipants = emptyVoiceChannels();
     this.emitRoom(room);
   }
 
@@ -710,10 +1044,13 @@ export class GameRuntime {
     const found = this.playerBySocket(socketId);
     if (!found) return;
     const { room, player } = found;
+    this.removeFromAllVoice(room, player.id);
     player.socketId = null;
 
     if (player.isHost) {
-      const next = room.players.find((p) => p.socketId && p.id !== player.id);
+      const next = room.players.find(
+        (p) => !p.isBot && p.socketId && p.id !== player.id
+      );
       if (next) {
         player.isHost = false;
         next.isHost = true;
@@ -729,6 +1066,7 @@ export class GameRuntime {
     if (!anyoneConnected && room.phase === "lobby") {
       this.clearTimer(room);
       this.rooms.delete(room.id);
+      this.broadcastLobbies();
       return;
     }
     this.emitRoom(room);

@@ -1,6 +1,7 @@
 "use client";
 
 import { MicOff, WifiOff } from "lucide-react";
+import { motion } from "framer-motion";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
@@ -18,8 +19,9 @@ function tags(p: PublicPlayer) {
           <MicOff size={10} className="mr-1" /> Muted
         </StatusChip>
       )}
-      {p.afkCount >= 2 && p.alive && <StatusChip tone="afk">AFK</StatusChip>}
-      {!p.connected && <StatusChip tone="neutral"><WifiOff size={10} /></StatusChip>}
+      {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
+      {p.afkCount >= 2 && p.alive && !p.isBot && <StatusChip tone="afk">AFK</StatusChip>}
+      {!p.connected && !p.isBot && <StatusChip tone="neutral"><WifiOff size={10} /></StatusChip>}
     </div>
   );
 }
@@ -48,7 +50,7 @@ export function PlayerGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {state.players.map((p) => {
+      {state.players.map((p, i) => {
         const disabled =
           !selectable ||
           !p.alive ||
@@ -61,6 +63,12 @@ export function PlayerGrid({
             onClick={() => onSelect?.(p.id)}
             className={`text-left ${disabled ? "cursor-default" : ""}`}
           >
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.35 }}
+              whileHover={disabled ? undefined : { y: -4, scale: 1.02 }}
+            >
             <GlassPanel
               className={`p-3 transition ${
                 selectedId === p.id ? "ring-2 ring-crimson shadow-glow" : ""
@@ -82,6 +90,7 @@ export function PlayerGrid({
                 </p>
               ) : null}
             </GlassPanel>
+            </motion.div>
           </button>
         );
       })}
@@ -143,17 +152,23 @@ export function NightActionPanel({
 export function VotePanel({
   state,
   onVote,
+  onSkipDay,
 }: {
   state: PublicGameState;
   onVote: (targetId: string) => void;
+  onSkipDay?: () => void;
 }) {
   const muted = !!state.you?.blackmailed;
   const dead = !state.you?.alive;
+  const isHost = !!state.you?.isHost;
   return (
     <div>
       <h3 className="font-display text-xl font-bold">Lynch vote</h3>
       <p className="mt-1 text-sm text-ink-steel">
         Majority of the living hangs a suspect. Ties spare the city.
+      </p>
+      <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+        Votes in: {state.dayVotesIn}/{state.dayVotesNeeded}
       </p>
       {muted && (
         <p className="mt-2 font-mono text-xs uppercase text-amber-200">
@@ -169,6 +184,18 @@ export function VotePanel({
           showVotes
         />
       </div>
+      {isHost && onSkipDay && (
+        <button
+          type="button"
+          disabled={!state.canSkipDay || state.paused}
+          onClick={onSkipDay}
+          className="mt-4 w-full rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-crimson-glow disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {state.canSkipDay
+            ? "Skip day — resolve outcome"
+            : "Skip day — waiting for all votes"}
+        </button>
+      )}
     </div>
   );
 }

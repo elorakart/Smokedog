@@ -48,9 +48,12 @@ export function GameOverScreen({
             </div>
             <div>
               <p className="font-display font-semibold">{p.name}</p>
-              <StatusChip tone={p.role && ROLE_META[p.role].faction === "mafia" ? "mafia" : "town"}>
-                {p.role ? ROLE_META[p.role].label : "—"}
-              </StatusChip>
+              <div className="mt-1 flex flex-wrap gap-1">
+                <StatusChip tone={p.role && ROLE_META[p.role].faction === "mafia" ? "mafia" : "town"}>
+                  {p.role ? ROLE_META[p.role].label : "—"}
+                </StatusChip>
+                {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
+              </div>
             </div>
           </GlassPanel>
         ))}

@@ -52,7 +52,13 @@ export function GameHud({
         {state.roomId} <Copy size={12} />
       </button>
       {state.phase !== "lobby" && state.phase !== "gameover" && (
-        <div className="rounded-sm border border-white/10 bg-surface/80 px-3 py-2 font-mono text-sm tracking-widest text-crimson-glow">
+        <div
+          className={`rounded-sm border bg-surface/80 px-3 py-2 font-mono text-sm tracking-widest ${
+            remaining <= 5 && !state.paused
+              ? "animate-pulse border-crimson text-crimson-glow"
+              : "border-white/10 text-crimson-glow"
+          }`}
+        >
           {state.paused ? "PAUSED" : format(remaining)}
         </div>
       )}

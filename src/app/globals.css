@@ -27,3 +27,17 @@ body {
 input[type="range"] {
   accent-color: #e61919;
 }
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 6s ease-in-out infinite;
+}

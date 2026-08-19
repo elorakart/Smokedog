@@ -40,6 +40,7 @@ export interface Player {
   afkCount: number;
   blackmailed: boolean;
   bulletsLeft?: number;
+  isBot: boolean;
 }
 
 export interface ChatMessage {
@@ -75,6 +76,7 @@ export interface PublicPlayer {
   blackmailed: boolean;
   role?: Role;
   connected: boolean;
+  isBot: boolean;
 }
 
 export interface PublicGameState {
@@ -103,6 +105,28 @@ export interface PublicGameState {
   detectiveResult: { targetId: string; faction: Faction } | null;
   afkWarnedPlayerIds: string[];
   chat: ChatMessage[];
+  canSkipDay: boolean;
+  dayVotesIn: number;
+  dayVotesNeeded: number;
+  voiceParticipants: Partial<Record<ChatChannel, string[]>>;
+  autoPlayerCount: number;
+}
+
+export type VoiceSignalPayload =
+  | { type: "offer"; sdp: RTCSessionDescriptionInit }
+  | { type: "answer"; sdp: RTCSessionDescriptionInit }
+  | { type: "ice"; candidate: RTCIceCandidateInit | null };
+
+export interface OpenLobby {
+  roomId: string;
+  gameId: string;
+  hostName: string;
+  hostAvatarId: number;
+  playerCount: number;
+  maxPlayers: number;
+  openSlots: number;
+  botCount: number;
+  humanCount: number;
 }
 
 export interface GameModule {
@@ -134,6 +158,8 @@ export type ClientToServerEvents = {
     settings: Partial<RoomSettings>;
   }) => void;
   "lobby:start": (payload: { roomId: string }) => void;
+  "lobby:addBot": (payload: { roomId: string; fillTo?: number }) => void;
+  "lobby:removeBot": (payload: { roomId: string }) => void;
   "night:action": (payload: {
     roomId: string;
     type: NightActionType;
@@ -149,6 +175,16 @@ export type ClientToServerEvents = {
   "host:pause": (payload: { roomId: string }) => void;
   "host:resume": (payload: { roomId: string }) => void;
   "lobby:return": (payload: { roomId: string }) => void;
+  "lobbies:list": (payload?: { query?: string }) => void;
+  "host:skipDay": (payload: { roomId: string }) => void;
+  "voice:join": (payload: { roomId: string; channel: ChatChannel }) => void;
+  "voice:leave": (payload: { roomId: string; channel: ChatChannel }) => void;
+  "voice:signal": (payload: {
+    roomId: string;
+    channel: ChatChannel;
+    targetId: string;
+    signal: VoiceSignalPayload;
+  }) => void;
 };
 
 export type ServerToClientEvents = {
@@ -169,5 +205,16 @@ export type ServerToClientEvents = {
     afkCount: number;
   }) => void;
   "game:over": (payload: { winner: Faction; recap: PublicPlayer[] }) => void;
-  "room:error": (payload: { message: string }) => void;
+  "room:error": (payload: { message: string; code?: string }) => void;
+  "lobbies:list": (payload: { lobbies: OpenLobby[] }) => void;
+  "voice:participants": (payload: {
+    channel: ChatChannel;
+    participantIds: string[];
+  }) => void;
+  "voice:signal": (payload: {
+    channel: ChatChannel;
+    fromId: string;
+    signal: VoiceSignalPayload;
+  }) => void;
+  "voice:error": (payload: { message: string }) => void;
 };
