@@ -1,7 +1,8 @@
 "use client";
 
 import confetti from "canvas-confetti";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitives";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
@@ -27,6 +28,8 @@ export function GameOverScreen({
     (state.winner === "mafia" && state.you?.faction === "mafia");
 
   const won = isFiveAlive ? youWonFiveAlive : wonMafia;
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const chronicle = state.chronicle ?? [];
 
   useEffect(() => {
     if (!won) return;
@@ -96,6 +99,34 @@ export function GameOverScreen({
           : "The Mafia owns the night"}
       </h1>
       <p className="mt-3 text-ink-steel">Match recap — every dossier unsealed.</p>
+
+      {chronicle.length > 0 && (
+        <GlassPanel className="mt-6 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setChronicleOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="font-mono text-[10px] uppercase tracking-widest text-crimson-glow">
+              City chronicle ({chronicle.length} entries)
+            </span>
+            {chronicleOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {chronicleOpen && (
+            <ul className="border-t border-white/10 px-4 py-3 text-sm text-ink-steel">
+              {chronicle.map((entry) => (
+                <li key={entry.id} className="border-b border-white/5 py-2 last:border-0">
+                  <span className="font-mono text-[10px] uppercase">
+                    {entry.phase === "night" ? "Night" : "Day"} {entry.cycle}
+                  </span>
+                  <p>{entry.summary}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </GlassPanel>
+      )}
+
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {(state.recap ?? state.players).map((p) => (
           <GlassPanel key={p.id} className="flex items-center gap-3 p-3">

@@ -1,13 +1,20 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
 import type { Role } from "@/lib/types";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
 
-export function RoleRevealCard({ role }: { role: Role }) {
+export function RoleRevealCard({
+  role,
+  phaseEndsAt,
+}: {
+  role: Role;
+  phaseEndsAt?: number | null;
+}) {
   const [flipped, setFlipped] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const meta = ROLE_META[role];
 
   useEffect(() => {
@@ -15,10 +22,22 @@ export function RoleRevealCard({ role }: { role: Role }) {
     return () => clearTimeout(t);
   }, [role]);
 
+  useEffect(() => {
+    if (!phaseEndsAt) return;
+    const tick = () =>
+      setRemaining(Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000)));
+    tick();
+    const t = setInterval(tick, 250);
+    return () => clearInterval(t);
+  }, [phaseEndsAt]);
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center">
       <p className="mb-6 font-mono text-xs uppercase tracking-[0.3em] text-crimson-glow">
         Identity sealed
+        {remaining != null && remaining > 0 && (
+          <span className="ml-2 text-ink-steel">— {remaining}s</span>
+        )}
       </p>
       <button type="button" onClick={() => setFlipped(true)}>
         <motion.div

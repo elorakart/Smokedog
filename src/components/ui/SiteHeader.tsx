@@ -9,10 +9,10 @@ function ArenaBrand() {
   return (
     <Link
       href="/"
-      className="flex items-center gap-3 transition hover:opacity-90"
+      className="flex shrink-0 items-center gap-2 transition hover:opacity-90 sm:gap-3"
     >
       <motion.div
-        className="flex h-8 w-8 items-center justify-center rounded-[4px] bg-crimson shadow-glow"
+        className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-crimson shadow-glow sm:h-8 sm:w-8"
         animate={{
           boxShadow: [
             "0 0 12px rgba(230,25,25,0.35)",
@@ -22,11 +22,11 @@ function ArenaBrand() {
         }}
         transition={{ duration: 2.8, repeat: Infinity }}
       >
-        <span className="font-display text-sm font-extrabold tracking-[0.1em]">
+        <span className="font-display text-xs font-extrabold tracking-[0.1em] sm:text-sm">
           SA
         </span>
       </motion.div>
-      <span className="font-display text-xl font-extrabold tracking-[0.18em]">
+      <span className="font-display text-base font-extrabold tracking-[0.12em] sm:text-xl sm:tracking-[0.18em]">
         SMOKEDOG&apos;s Arena
       </span>
     </Link>
@@ -56,7 +56,7 @@ export function SiteHeader({
     ) : null);
 
   const className =
-    "relative flex items-center justify-between px-6 py-5 md:px-10";
+    "relative flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-5 md:px-10";
 
   if (animate) {
     return (
@@ -66,7 +66,13 @@ export function SiteHeader({
         className={className}
       >
         <ArenaBrand />
-        {trailing && <div className="flex items-center gap-3">{trailing}</div>}
+        {trailing && (
+          <div className="w-full min-w-0 overflow-x-auto sm:w-auto sm:overflow-visible">
+            <div className="flex min-w-max items-center justify-end gap-2 sm:min-w-0 sm:flex-wrap">
+              {trailing}
+            </div>
+          </div>
+        )}
       </motion.header>
     );
   }
@@ -74,7 +80,13 @@ export function SiteHeader({
   return (
     <header className={className}>
       <ArenaBrand />
-      {trailing && <div className="flex items-center gap-3">{trailing}</div>}
+      {trailing && (
+        <div className="w-full min-w-0 overflow-x-auto sm:w-auto sm:overflow-visible">
+          <div className="flex min-w-max items-center justify-end gap-2 sm:min-w-0 sm:flex-wrap">
+            {trailing}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

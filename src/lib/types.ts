@@ -18,6 +18,8 @@ export type Phase =
   | "fivealive_turn"
   | "fivealive_bomb";
 
+export type DaySubPhase = "discussion" | "vote";
+
 export type ChatChannel = "town" | "mafia" | "graveyard";
 
 export type NightActionType =
@@ -28,11 +30,62 @@ export type NightActionType =
   | "vigilante_shoot"
   | "blackmail";
 
+export type RoleDistribution = {
+  villager: number;
+  doctor: number;
+  detective: number;
+  bodyguard: number;
+  vigilante: number;
+  mafia_boss: number;
+  mafia_goon: number;
+  blackmailer: number;
+};
+
 export interface RoomSettings {
   nightSeconds: number;
   daySeconds: number;
   vigilanteBullets: number | null;
+  roleDistribution?: RoleDistribution | null;
 }
+
+export type PhaseAnnouncement = {
+  id: string;
+  tone: "info" | "good" | "bad";
+  title: string;
+  detail?: string;
+  at: number;
+};
+
+export type MafiaNightIntel = {
+  blackmailTargetId?: string;
+  blackmailTargetName?: string;
+  bossTargetId?: string;
+  bossTargetName?: string;
+  goonTargetId?: string;
+  goonTargetName?: string;
+};
+
+export type ChronicleEntry = {
+  id: string;
+  cycle: number;
+  phase: "night" | "day";
+  summary: string;
+  at: number;
+};
+
+export type DetectiveLogEntry = {
+  id: string;
+  targetId: string;
+  targetName: string;
+  faction: Faction;
+  at: number;
+  cycle: number;
+};
+
+export const REVEAL_SECONDS = 20;
+export const DAY_VOTE_SECONDS = 15;
+export const SKIP_VOTE_ID = "__skip__";
+export const AFK_GRACE_MS = 10000;
 
 export interface Player {
   id: string;
@@ -121,6 +174,16 @@ export interface PublicGameState {
   dayVotesNeeded: number;
   voiceParticipants: Partial<Record<ChatChannel, string[]>>;
   autoPlayerCount: number;
+  daySubPhase?: DaySubPhase;
+  announcement?: PhaseAnnouncement | null;
+  mafiaTeam?: PublicPlayer[];
+  mafiaNightIntel?: MafiaNightIntel;
+  detectiveLog?: DetectiveLogEntry[];
+  chronicle?: ChronicleEntry[];
+  afkGraceEndsAt?: number | null;
+  afkGracePlayerId?: string | null;
+  roleDistributionPreview?: RoleDistribution | null;
+  deadVillagerVote?: boolean;
   // Optional per-game state for 5 Alive.
   fiveAlive?: FiveAlivePublicState;
 }
@@ -202,6 +265,10 @@ export type ClientToServerEvents = {
     roomId: string;
     settings: Partial<RoomSettings>;
   }) => void;
+  "host:settings": (payload: {
+    roomId: string;
+    settings: Partial<RoomSettings>;
+  }) => void;
   "lobby:start": (payload: { roomId: string }) => void;
   "lobby:addBot": (payload: { roomId: string; fillTo?: number }) => void;
   "lobby:removeBot": (payload: { roomId: string }) => void;
@@ -211,6 +278,7 @@ export type ClientToServerEvents = {
     targetId: string;
   }) => void;
   "day:vote": (payload: { roomId: string; targetId: string }) => void;
+  "day:voteSkip": (payload: { roomId: string }) => void;
   "fivealive:playCard": (payload: {
     roomId: string;
     cardId?: string | null;
@@ -242,6 +310,11 @@ export type ClientToServerEvents = {
     channel: ChatChannel;
     targetId: string;
     signal: VoiceSignalPayload;
+  }) => void;
+  "voice:speaking": (payload: {
+    roomId: string;
+    channel: ChatChannel;
+    speaking: boolean;
   }) => void;
 };
 
@@ -280,5 +353,10 @@ export type ServerToClientEvents = {
     channel: ChatChannel;
     fromId: string;
     fromName: string;
+  }) => void;
+  "voice:speaking": (payload: {
+    channel: ChatChannel;
+    playerId: string;
+    speaking: boolean;
   }) => void;
 };

@@ -6,6 +6,7 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
 import type { NightActionType, PublicGameState, PublicPlayer } from "@/lib/types";
+import { SKIP_VOTE_ID } from "@/lib/types";
 import { nightActionFor } from "@/lib/games/mafia-city/roles";
 import { NIGHT_ACTION_LOCKED, NIGHT_ACTION_PROMPTS } from "@/lib/action-prompt";
 
@@ -36,6 +37,7 @@ export function PlayerGrid({
   showVotes,
   onInviteVoice,
   voiceParticipantIds,
+  speakingIds,
 }: {
   state: PublicGameState;
   selectable?: boolean;
@@ -45,14 +47,17 @@ export function PlayerGrid({
   showVotes?: boolean;
   onInviteVoice?: (id: string) => void;
   voiceParticipantIds?: string[];
+  speakingIds?: string[];
 }) {
   const voteCounts: Record<string, number> = {};
   if (showVotes) {
     for (const t of Object.values(state.votes)) {
+      if (t === SKIP_VOTE_ID) continue;
       voteCounts[t] = (voteCounts[t] ?? 0) + 1;
     }
   }
   const inVoice = new Set(voiceParticipantIds ?? []);
+  const speaking = new Set(speakingIds ?? []);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -94,7 +99,7 @@ export function PlayerGrid({
                 >
                   <div
                     className={`aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
-                      selected ? "ring-crimson" : "ring-transparent"
+                      selected ? "ring-crimson" : speaking.has(p.id) ? "ring-emerald-400" : inVoice.has(p.id) ? "ring-emerald-400/50" : "ring-transparent"
                     }`}
                   >
                     <PlayerAvatar
@@ -166,6 +171,19 @@ export function NightActionPanel({
   return (
     <div>
       <h3 className="font-display text-xl font-bold">{NIGHT_ACTION_PROMPTS[type]}</h3>
+      {state.mafiaNightIntel && (
+        <div className="mt-2 rounded-sm border border-crimson/30 bg-crimson/5 px-3 py-2 text-xs text-ink-steel">
+          {state.mafiaNightIntel.bossTargetName && (
+            <p>Boss target: {state.mafiaNightIntel.bossTargetName}</p>
+          )}
+          {state.mafiaNightIntel.goonTargetName && (
+            <p>Goon target: {state.mafiaNightIntel.goonTargetName}</p>
+          )}
+          {state.mafiaNightIntel.blackmailTargetName && (
+            <p>Blackmail: {state.mafiaNightIntel.blackmailTargetName}</p>
+          )}
+        </div>
+      )}
       {state.submittedNightAction && target ? (
         <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
           {NIGHT_ACTION_LOCKED[type](target.name)}
@@ -179,7 +197,6 @@ export function NightActionPanel({
         <PlayerGrid
           state={state}
           selectable
-          allowSelf={type === "doctor_protect" || type === "bodyguard_protect"}
           selectedId={state.nightActionTargetId}
           onSelect={(id) => onAct(type, id)}
           onInviteVoice={onInviteVoice}
@@ -193,24 +210,55 @@ export function NightActionPanel({
 export function VotePanel({
   state,
   onVote,
+  onSkipVote,
   onSkipDay,
   onInviteVoice,
+  speakingIds,
 }: {
   state: PublicGameState;
   onVote: (targetId: string) => void;
+  onSkipVote?: () => void;
   onSkipDay?: () => void;
   onInviteVoice?: (id: string) => void;
+  speakingIds?: string[];
 }) {
   const muted = !!state.you?.blackmailed;
-  const dead = !state.you?.alive;
+  const deadVillager = !!state.deadVillagerVote;
+  const canParticipate =
+    (!!state.you?.alive && !muted) || deadVillager;
   const isHost = !!state.you?.isHost;
   const votedId = state.you ? state.votes[state.you.id] : null;
+  const votedSkip = votedId === SKIP_VOTE_ID;
   const votedName = state.players.find((p) => p.id === votedId)?.name;
+  const isDiscussion = state.daySubPhase === "discussion";
+  const skipVoteCount = Object.values(state.votes).filter(
+    (v) => v === SKIP_VOTE_ID
+  ).length;
+
+  if (isDiscussion) {
+    return (
+      <div>
+        <h3 className="font-display text-xl font-bold">Day discussion</h3>
+        <p className="mt-1 text-sm text-ink-steel">
+          Debate suspects on town voice and chat. Voting opens in the final 15
+          seconds.
+        </p>
+        <PlayerGrid
+          state={state}
+          onInviteVoice={onInviteVoice}
+          voiceParticipantIds={state.voiceParticipants.town}
+          speakingIds={speakingIds}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <h3 className="font-display text-xl font-bold">Lynch vote</h3>
       <p className="mt-1 text-sm text-ink-steel">
-        Majority of the living hangs a suspect. Ties spare the city.
+        Majority of the living hangs a suspect, or skip to spare the city. Town
+        voice is closed during voting.
       </p>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Votes in: {state.dayVotesIn}/{state.dayVotesNeeded}
@@ -220,22 +268,47 @@ export function VotePanel({
           Blackmailed — you cannot vote or speak
         </p>
       )}
-      {votedName && !muted && (
+      {deadVillager && (
+        <p className="mt-2 font-mono text-xs uppercase text-sky-200">
+          Dead villager — you may still cast a vote
+        </p>
+      )}
+      {votedSkip && (
+        <p className="mt-2 font-mono text-xs uppercase text-emerald-300">
+          You voted to skip the lynch
+        </p>
+      )}
+      {votedName && !muted && !votedSkip && (
         <p className="mt-2 font-mono text-xs uppercase text-emerald-300">
           You voted to lynch {votedName}
+        </p>
+      )}
+      {skipVoteCount > 0 && (
+        <p className="mt-1 font-mono text-[10px] uppercase text-ink-steel">
+          Skip votes: {skipVoteCount}
         </p>
       )}
       <div className="mt-4">
         <PlayerGrid
           state={state}
-          selectable={!muted && !dead}
-          selectedId={votedId}
+          selectable={canParticipate}
+          selectedId={votedSkip ? null : votedId}
           onSelect={onVote}
           showVotes
-          onInviteVoice={onInviteVoice}
           voiceParticipantIds={state.voiceParticipants.town}
+          speakingIds={speakingIds}
         />
       </div>
+      {canParticipate && onSkipVote && (
+        <button
+          type="button"
+          onClick={onSkipVote}
+          disabled={!!votedId}
+          className="mt-4 w-full rounded-sm border border-white/15 bg-white/[0.04] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-sky-400/40 hover:text-sky-200 disabled:opacity-40"
+        >
+          Skip lynch — no one hangs today
+        </button>
+      )}
       {isHost && onSkipDay && (
         <button
           type="button"

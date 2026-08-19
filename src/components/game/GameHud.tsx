@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CopyToast } from "@/components/ui/CopyToast";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import type { Phase, PublicGameState } from "@/lib/types";
+import { MidGameSettings } from "@/components/game/mafia/MidGameSettings";
 
 function format(seconds: number) {
   const s = Math.max(0, seconds);
@@ -18,12 +19,14 @@ export function GameHud({
   onPause,
   onResume,
   onQuit,
+  onSettings,
   quitting = false,
 }: {
   state: PublicGameState;
   onPause: () => void;
   onResume: () => void;
   onQuit: () => void;
+  onSettings?: (settings: Partial<import("@/lib/types").RoomSettings>) => void;
   quitting?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
@@ -40,64 +43,80 @@ export function GameHud({
     lobby: "LOBBY",
     reveal: "REVEAL",
     night: `NIGHT ${state.cycle}`,
-    day: `DAY ${state.cycle}`,
+    day:
+      state.daySubPhase === "vote"
+        ? `VOTE ${state.cycle}`
+        : `DAY ${state.cycle}`,
     fivealive_turn: `TURN ${state.cycle}`,
     fivealive_bomb: "BOMB RESOLUTION",
     gameover: "DEBRIEF",
   };
 
   const { copy, copied } = useCopyToClipboard();
+  const showMidGameSettings =
+    state.gameId === "mafia-city" &&
+    state.you?.isHost &&
+    onSettings &&
+    state.phase !== "lobby" &&
+    state.phase !== "gameover";
 
   return (
     <>
       <CopyToast show={copied} message="Room code copied" />
-      <div className="flex flex-wrap items-center justify-end gap-3">
-      <button
-        type="button"
-        onClick={() => copy(state.roomId)}
-        className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-surface/80 px-3 py-2 font-mono text-xs tracking-[0.2em]"
-      >
-        {state.roomId} <Copy size={12} />
-      </button>
-      {state.phase !== "lobby" && state.phase !== "gameover" && (
-        <div
-          className={`rounded-sm border bg-surface/80 px-3 py-2 font-mono text-sm tracking-widest ${
-            remaining <= 10 && !state.paused
-              ? "animate-pulse border-crimson text-crimson-glow"
-              : "border-white/10 text-crimson-glow"
-          }`}
-        >
-          {state.paused ? "PAUSED" : format(remaining)}
-        </div>
-      )}
-      <div className="rounded-sm border border-white/10 bg-surface/80 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em]">
-        {phaseLabel[state.phase]}
-      </div>
-      {state.you?.isHost && state.phase !== "lobby" && state.phase !== "gameover" && (
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
         <button
           type="button"
-          onClick={state.paused ? onResume : onPause}
-          className="inline-flex items-center gap-1 rounded-sm border border-crimson/40 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson-glow"
+          onClick={() => copy(state.roomId)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-white/10 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
         >
-          {state.paused ? <Play size={12} /> : <Pause size={12} />}
-          {state.paused ? "Resume" : "Pause"}
+          {state.roomId} <Copy size={11} className="sm:h-3 sm:w-3" />
         </button>
-      )}
-      {state.you?.isHost && (
-        <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-          <Shield size={12} /> Host
-        </span>
-      )}
-      <button
-        type="button"
-        disabled={quitting}
-        onClick={onQuit}
-        className="inline-flex items-center gap-1 rounded-sm border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50"
-      >
-        <LogOut size={12} />
-        {quitting ? "Leaving…" : "Quit"}
-      </button>
-    </div>
+        {state.phase !== "lobby" && state.phase !== "gameover" && (
+          <div
+            className={`shrink-0 rounded-sm border bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest sm:px-3 sm:py-2 sm:text-sm ${
+              remaining <= 10 && !state.paused
+                ? "animate-pulse border-crimson text-crimson-glow"
+                : "border-white/10 text-crimson-glow"
+            }`}
+          >
+            {state.paused ? "PAUSED" : format(remaining)}
+          </div>
+        )}
+        <div className="shrink-0 rounded-sm border border-white/10 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
+          {phaseLabel[state.phase]}
+        </div>
+        {showMidGameSettings && (
+          <MidGameSettings settings={state.settings} onUpdate={onSettings} />
+        )}
+        {state.you?.isHost &&
+          state.phase !== "lobby" &&
+          state.phase !== "gameover" && (
+            <button
+              type="button"
+              onClick={state.paused ? onResume : onPause}
+              className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-crimson-glow sm:px-3 sm:py-2 sm:text-[10px]"
+            >
+              {state.paused ? <Play size={11} /> : <Pause size={11} />}
+              <span className="hidden xs:inline sm:inline">
+                {state.paused ? "Resume" : "Pause"}
+              </span>
+            </button>
+          )}
+        {state.you?.isHost && (
+          <span className="hidden shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-ink-steel sm:inline-flex sm:text-[10px]">
+            <Shield size={11} /> Host
+          </span>
+        )}
+        <button
+          type="button"
+          disabled={quitting}
+          onClick={onQuit}
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-white/10 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50 sm:px-3 sm:py-2 sm:text-[10px]"
+        >
+          <LogOut size={11} />
+          {quitting ? "Leaving…" : "Quit"}
+        </button>
+      </div>
     </>
   );
 }

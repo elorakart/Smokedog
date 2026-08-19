@@ -8,6 +8,7 @@ import { GlassPanel } from "@/components/ui/primitives";
 import {
   availableChannels,
   canAccessChannel,
+  canUseTownVoice,
   CHANNEL_LABELS,
 } from "@/lib/chat-access";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
@@ -35,9 +36,10 @@ export function ChatPanel({
             role: you.role,
             blackmailed: you.blackmailed,
             phase: state.phase,
+            daySubPhase: state.daySubPhase,
           }
         : null,
-    [you, state.phase]
+    [you, state.phase, state.daySubPhase]
   );
 
   const tabs = useMemo(() => {
@@ -57,6 +59,16 @@ export function ChatPanel({
 
   const canUseActive =
     !!channelOpts && canAccessChannel(active, channelOpts);
+  const canUseVoice =
+    !!channelOpts &&
+    (active === "town"
+      ? canUseTownVoice(channelOpts)
+      : canAccessChannel(active, channelOpts));
+  const playerNames = useMemo(
+    () =>
+      Object.fromEntries(state.players.map((p) => [p.id, p.name])),
+    [state.players]
+  );
   const messages = state.chat.filter((m) => m.channel === active);
   const voiceInChannel = state.voiceParticipants[active] ?? [];
   const [text, setText] = useState("");
@@ -66,7 +78,8 @@ export function ChatPanel({
     state.roomId,
     you?.id,
     canUseActive ? active : null,
-    enableVoice && canUseActive
+    enableVoice && canUseVoice,
+    playerNames
   );
 
   useEffect(() => {
@@ -80,9 +93,15 @@ export function ChatPanel({
     if (!enableVoice || !joinVoiceRequest) return;
     if (active !== joinVoiceRequest.channel) return;
     void voice.join();
-    // Only fire when a new invite-accept arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinVoiceRequest?.nonce, active]);
+
+  useEffect(() => {
+    if (!enableVoice || !canUseVoice) return;
+    if (active === "mafia" && state.phase === "night" && !voice.joined) {
+      void voice.join();
+    }
+  }, [enableVoice, canUseVoice, active, state.phase, voice.joined, voice]);
 
   const submit = () => {
     if (!text.trim() || !canUseActive) return;
@@ -129,7 +148,7 @@ export function ChatPanel({
               {!voice.joined ? (
                 <button
                   type="button"
-                  disabled={!canUseActive}
+                  disabled={!canUseVoice}
                   onClick={() => void voice.join()}
                   className="inline-flex items-center gap-1 rounded-sm border border-emerald-400/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300 disabled:opacity-40"
                 >
@@ -155,8 +174,14 @@ export function ChatPanel({
                 </>
               )}
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+            <span className="max-w-[55%] truncate text-right font-mono text-[10px] uppercase tracking-widest text-ink-steel">
               {voiceInChannel.length} in voice
+              {voice.participantLabels.length > 0 && (
+                <span className="block normal-case tracking-normal text-ink-steel/80">
+                  {voice.participantLabels.slice(0, 3).join(", ")}
+                  {voice.participantLabels.length > 3 ? "…" : ""}
+                </span>
+              )}
             </span>
           </div>
 

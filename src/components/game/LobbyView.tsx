@@ -5,7 +5,118 @@ import { motion } from "framer-motion";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitives";
 import { popIn, stagger } from "@/components/ui/motion";
-import type { PublicGameState, RoomSettings } from "@/lib/types";
+import type { PublicGameState, RoleDistribution, RoomSettings } from "@/lib/types";
+import { defaultRoleDistribution } from "@/lib/games/mafia-city/balance";
+import { ROLE_META } from "@/lib/games/mafia-city/roles";
+
+function RoleDistributionEditor({
+  dist,
+  playerCount,
+  onChange,
+}: {
+  dist: RoleDistribution;
+  playerCount: number;
+  onChange: (dist: RoleDistribution) => void;
+}) {
+  const specialKeys = (
+    Object.keys(dist) as (keyof RoleDistribution)[]
+  ).filter((k) => k !== "villager");
+
+  const bump = (key: keyof RoleDistribution, delta: number) => {
+    const next = { ...dist };
+    if (key === "mafia_boss" && delta < 0 && next.mafia_boss <= 1) return;
+    next[key] = Math.max(key === "mafia_boss" ? 1 : 0, next[key] + delta);
+    const assigned = specialKeys.reduce((s, k) => s + next[k], 0);
+    next.villager = Math.max(0, playerCount - assigned);
+    if (assigned + next.villager !== playerCount) return;
+    onChange(next);
+  };
+
+  const entries = (
+    Object.entries(dist) as [keyof RoleDistribution, number][]
+  ).filter(([, n]) => n > 0);
+
+  return (
+    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+          Role lineup ({playerCount} seats)
+        </p>
+        <button
+          type="button"
+          onClick={() => onChange(defaultRoleDistribution(playerCount))}
+          className="font-mono text-[10px] uppercase tracking-widest text-crimson-glow"
+        >
+          Reset
+        </button>
+      </div>
+      <ul className="mt-2 space-y-1">
+        {specialKeys.map((role) => (
+          <li
+            key={role}
+            className="flex items-center justify-between gap-2 text-xs text-ink-steel"
+          >
+            <span>{ROLE_META[role].label}</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => bump(role, -1)}
+                className="h-6 w-6 rounded-sm border border-white/10 font-mono text-sm"
+              >
+                −
+              </button>
+              <span className="w-4 text-center font-mono">{dist[role]}</span>
+              <button
+                type="button"
+                onClick={() => bump(role, 1)}
+                className="h-6 w-6 rounded-sm border border-white/10 font-mono text-sm"
+              >
+                +
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 font-mono text-[10px] text-ink-steel">
+        {dist.villager}× Villager (auto-filled)
+      </p>
+      <ul className="mt-2 grid grid-cols-2 gap-1 text-xs text-ink-steel">
+        {entries.map(([role, count]) => (
+          <li key={role}>
+            {count}× {ROLE_META[role].label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RoleDistributionPreview({
+  dist,
+  playerCount,
+}: {
+  dist: RoleDistribution;
+  playerCount: number;
+}) {
+  const entries = (
+    Object.entries(dist) as [keyof RoleDistribution, number][]
+  ).filter(([, n]) => n > 0);
+
+  return (
+    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-3">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+        Role lineup ({playerCount} seats)
+      </p>
+      <ul className="mt-2 grid grid-cols-2 gap-1 text-xs text-ink-steel">
+        {entries.map(([role, count]) => (
+          <li key={role}>
+            {count}× {ROLE_META[role].label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function AutoPlayerControls({
   state,
@@ -97,6 +208,14 @@ function LobbySidebar({
         <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-ink-steel">
           {state.players.length}/12 operators seated
         </p>
+        {state.roleDistributionPreview && (
+          <RoleDistributionPreview
+            dist={
+              state.settings.roleDistribution ?? state.roleDistributionPreview
+            }
+            playerCount={state.players.length}
+          />
+        )}
         <div className="mt-6 rounded-sm border border-white/10 bg-white/5 px-4 py-3 text-center">
           <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
             Awaiting host
@@ -120,7 +239,7 @@ function LobbySidebar({
       <input
         type="range"
         min={15}
-        max={90}
+        max={120}
         value={state.settings.nightSeconds}
         onChange={(e) => onSettings({ nightSeconds: Number(e.target.value) })}
         className="mt-2 w-full"
@@ -131,11 +250,20 @@ function LobbySidebar({
       <input
         type="range"
         min={20}
-        max={180}
+        max={200}
         value={state.settings.daySeconds}
         onChange={(e) => onSettings({ daySeconds: Number(e.target.value) })}
         className="mt-2 w-full"
       />
+      {state.roleDistributionPreview && (
+        <RoleDistributionEditor
+          dist={
+            state.settings.roleDistribution ?? state.roleDistributionPreview
+          }
+          playerCount={state.players.length}
+          onChange={(roleDistribution) => onSettings({ roleDistribution })}
+        />
+      )}
       <label className="mt-4 block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Vigilante bullets
       </label>

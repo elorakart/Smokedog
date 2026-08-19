@@ -115,6 +115,15 @@ export function attachSocketServer(
       );
     });
 
+    socket.on("host:settings", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.updateSettings(
+        payload.roomId,
+        socket.data.playerId,
+        payload.settings
+      );
+    });
+
     socket.on("lobby:start", (payload) => {
       try {
         if (!socket.data.playerId) return;
@@ -164,6 +173,11 @@ export function attachSocketServer(
     socket.on("day:vote", (payload) => {
       if (!socket.data.playerId) return;
       runtime.submitVote(payload.roomId, socket.data.playerId, payload.targetId);
+    });
+
+    socket.on("day:voteSkip", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitVoteSkip(payload.roomId, socket.data.playerId);
     });
 
     socket.on("fivealive:playCard", (payload) => {
@@ -235,6 +249,16 @@ export function attachSocketServer(
         payload.channel,
         payload.targetId,
         payload.signal
+      );
+    });
+
+    socket.on("voice:speaking", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.relayVoiceSpeaking(
+        payload.roomId,
+        socket.data.playerId,
+        payload.channel,
+        payload.speaking
       );
     });
 

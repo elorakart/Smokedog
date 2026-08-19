@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Clock, Users } from "lucide-react";
 import { OpenLobbies } from "@/components/hub/OpenLobbies";
 import { ProfileModal } from "@/components/hub/ProfileModal";
+import { GameRulesModal } from "@/components/game/mafia/GameRulesModal";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
@@ -28,6 +29,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"create" | "join" | null>(null);
   const [joiningCode, setJoiningCode] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const setPendingGameId = (gameId: string) => {
     createGameIdRef.current = gameId;
@@ -148,6 +150,7 @@ export default function HomePage() {
         </motion.p>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="relative">
           <motion.button
             variants={fadeUp}
             type="button"
@@ -195,6 +198,14 @@ export default function HomePage() {
             </span>
           </div>
           </motion.button>
+          <button
+            type="button"
+            onClick={() => setRulesOpen(true)}
+            className="absolute bottom-8 right-8 z-10 rounded-sm border border-white/20 bg-void/60 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink backdrop-blur-sm transition hover:border-crimson/40 hover:text-crimson-glow md:bottom-12 md:right-12"
+          >
+            More info
+          </button>
+          </div>
 
           <motion.button
             variants={fadeUp}
@@ -279,6 +290,8 @@ export default function HomePage() {
           </div>
         </motion.article>
       </motion.main>
+
+      <GameRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
 
       <ProfileModal
         open={modal}

@@ -9,26 +9,35 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun1.l.google.com:19302" },
 ];
 
+const SPEAK_THRESHOLD = 0.02;
+
 export function useVoiceChat(
   socket: GameSocket | null,
   roomId: string,
   playerId: string | undefined,
   channel: ChatChannel | null,
-  enabled: boolean
+  enabled: boolean,
+  playerNames?: Record<string, string>
 ) {
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);
   const [participants, setParticipants] = useState<string[]>([]);
+  const [speakingIds, setSpeakingIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudioRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
   const channelRef = useRef<ChatChannel | null>(null);
+  const speakingRef = useRef<Set<string>>(new Set());
+  const rafRef = useRef<number | null>(null);
 
   const cleanupPeer = useCallback((peerId: string) => {
     peersRef.current.get(peerId)?.close();
     peersRef.current.delete(peerId);
+    analysersRef.current.delete(peerId);
+    speakingRef.current.delete(peerId);
     const audio = remoteAudioRef.current.get(peerId);
     if (audio) {
       audio.srcObject = null;
@@ -38,24 +47,89 @@ export function useVoiceChat(
   }, []);
 
   const cleanupAll = useCallback(() => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
     for (const id of [...peersRef.current.keys()]) cleanupPeer(id);
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     setJoined(false);
     setParticipants([]);
+    setSpeakingIds([]);
+    speakingRef.current.clear();
   }, [cleanupPeer]);
 
-  const attachRemote = useCallback((peerId: string, stream: MediaStream) => {
-    let audio = remoteAudioRef.current.get(peerId);
-    if (!audio) {
-      audio = document.createElement("audio");
-      audio.autoplay = true;
-      audio.dataset.peer = peerId;
-      document.body.appendChild(audio);
-      remoteAudioRef.current.set(peerId, audio);
+  const attachAnalyser = useCallback(
+    (peerId: string, stream: MediaStream, audioCtx: AudioContext) => {
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analysersRef.current.set(peerId, analyser);
+    },
+    []
+  );
+
+  const attachRemote = useCallback(
+    (peerId: string, stream: MediaStream) => {
+      let audio = remoteAudioRef.current.get(peerId);
+      if (!audio) {
+        audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.dataset.peer = peerId;
+        document.body.appendChild(audio);
+        remoteAudioRef.current.set(peerId, audio);
+      }
+      audio.srcObject = stream;
+      try {
+        const ctx = new AudioContext();
+        attachAnalyser(peerId, stream, ctx);
+      } catch {
+        /* analyser unavailable */
+      }
+    },
+    [attachAnalyser]
+  );
+
+  const emitSpeaking = useCallback(
+    (speaking: boolean) => {
+      if (!socket || !channelRef.current || !playerId) return;
+      socket.emit("voice:speaking", {
+        roomId,
+        channel: channelRef.current,
+        speaking,
+      });
+    },
+    [socket, roomId, playerId]
+  );
+
+  const monitorLevels = useCallback(() => {
+    const nextSpeaking = new Set<string>();
+    const data = new Uint8Array(256);
+
+    if (playerId && localStreamRef.current && !muted) {
+      const localAnalyser = analysersRef.current.get("__local__");
+      if (localAnalyser) {
+        localAnalyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+        if (avg > SPEAK_THRESHOLD) nextSpeaking.add(playerId);
+      }
     }
-    audio.srcObject = stream;
-  }, []);
+
+    for (const [peerId, analyser] of analysersRef.current) {
+      if (peerId === "__local__") continue;
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+      if (avg > SPEAK_THRESHOLD) nextSpeaking.add(peerId);
+    }
+
+    const prevLocal = speakingRef.current.has(playerId ?? "");
+    const nextLocal = playerId ? nextSpeaking.has(playerId) : false;
+    if (playerId && prevLocal !== nextLocal) emitSpeaking(nextLocal);
+
+    speakingRef.current = nextSpeaking;
+    setSpeakingIds([...nextSpeaking]);
+    rafRef.current = requestAnimationFrame(monitorLevels);
+  }, [emitSpeaking, muted, playerId]);
 
   const createPeer = useCallback(
     (peerId: string, initiator: boolean) => {
@@ -164,15 +238,28 @@ export function useVoiceChat(
       void handleSignal(payload.fromId, payload.signal);
     };
 
+    const onSpeaking = (payload: {
+      channel: ChatChannel;
+      playerId: string;
+      speaking: boolean;
+    }) => {
+      if (payload.channel !== channelRef.current) return;
+      if (payload.speaking) speakingRef.current.add(payload.playerId);
+      else speakingRef.current.delete(payload.playerId);
+      setSpeakingIds([...speakingRef.current]);
+    };
+
     const onError = ({ message }: { message: string }) => setError(message);
 
     socket.on("voice:participants", onParticipants);
     socket.on("voice:signal", onSignal);
+    socket.on("voice:speaking", onSpeaking);
     socket.on("voice:error", onError);
 
     return () => {
       socket.off("voice:participants", onParticipants);
       socket.off("voice:signal", onSignal);
+      socket.off("voice:speaking", onSpeaking);
       socket.off("voice:error", onError);
     };
   }, [
@@ -191,6 +278,14 @@ export function useVoiceChat(
       t.enabled = !muted;
     });
   }, [joined, muted]);
+
+  useEffect(() => {
+    if (!joined) return;
+    rafRef.current = requestAnimationFrame(monitorLevels);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [joined, monitorLevels]);
 
   useEffect(() => {
     return () => {
@@ -224,13 +319,19 @@ export function useVoiceChat(
       });
       localStreamRef.current = stream;
       channelRef.current = channel;
+      try {
+        const ctx = new AudioContext();
+        attachAnalyser("__local__", stream, ctx);
+      } catch {
+        /* analyser unavailable */
+      }
       socket.emit("voice:join", { roomId, channel });
       setJoined(true);
     } catch {
       setError("Microphone access denied");
       cleanupAll();
     }
-  }, [socket, channel, enabled, joined, leave, roomId, cleanupAll]);
+  }, [socket, channel, enabled, joined, leave, roomId, cleanupAll, attachAnalyser]);
 
   useEffect(() => {
     if (!enabled && joined) leave();
@@ -240,11 +341,17 @@ export function useVoiceChat(
     if (joined && channel && channelRef.current !== channel) leave();
   }, [channel, joined, leave]);
 
+  const participantLabels = participants.map(
+    (id) => playerNames?.[id] ?? "Operator"
+  );
+
   return {
     joined,
     muted,
     setMuted,
     participants,
+    participantLabels,
+    speakingIds,
     error,
     join,
     leave,

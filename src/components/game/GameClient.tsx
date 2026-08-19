@@ -13,6 +13,10 @@ import { loadProfile } from "@/lib/profile";
 import { getSocket, type GameSocket } from "@/lib/socket/client";
 import { AfkHostModal } from "@/components/game/AfkHostModal";
 import { ActionPrompt } from "@/components/game/ActionPrompt";
+import { ActionDialog } from "@/components/game/mafia/ActionDialog";
+import { PhaseResultPopup } from "@/components/game/mafia/PhaseResultPopup";
+import { DetectivePanel } from "@/components/game/mafia/DetectivePanel";
+import { SpectatorBanner } from "@/components/game/mafia/SpectatorBanner";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
@@ -24,7 +28,9 @@ import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { phaseSwap } from "@/components/ui/motion";
-import { availableChannels, CHANNEL_LABELS } from "@/lib/chat-access";
+import { availableChannels, canUseTownVoice, CHANNEL_LABELS } from "@/lib/chat-access";
+import { pendingPlayerAction } from "@/lib/action-prompt";
+import { isMafiaRole } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
 import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
 import { FiveAliveBombPanel } from "@/components/game/five-alive/FiveAliveBombPanel";
@@ -47,9 +53,25 @@ export function GameClient({ roomId }: { roomId: string }) {
   const [returningToLobby, setReturningToLobby] = useState(false);
   const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
   const [quitting, setQuitting] = useState(false);
+  const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState<
+    string | null
+  >(null);
+  const [dismissedActionKey, setDismissedActionKey] = useState<string | null>(
+    null
+  );
+  const [mafiaVoiceWarning, setMafiaVoiceWarning] = useState(false);
+  const [afkTick, setAfkTick] = useState(0);
   const quittingRef = useRef(false);
   const quitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishLeaveRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    if (!state?.afkGraceEndsAt || state.afkGracePlayerId !== state.you?.id) {
+      return;
+    }
+    const t = setInterval(() => setAfkTick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, [state?.afkGraceEndsAt, state?.afkGracePlayerId, state?.you?.id]);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -137,6 +159,28 @@ export function GameClient({ roomId }: { roomId: string }) {
     if (state.phase === "lobby") setReturningToLobby(false);
   }, [state?.phase, state]);
 
+  useEffect(() => {
+    if (!state || state.gameId !== "mafia-city" || state.phase !== "night") {
+      setMafiaVoiceWarning(false);
+      return;
+    }
+    if (!state.you?.role || !isMafiaRole(state.you.role)) return;
+    if (!state.phaseEndsAt) return;
+    const endsAt = state.phaseEndsAt;
+    const check = () => {
+      const remaining = endsAt - Date.now();
+      setMafiaVoiceWarning(remaining > 0 && remaining <= 10000);
+    };
+    check();
+    const t = setInterval(check, 500);
+    return () => clearInterval(t);
+  }, [
+    state?.gameId,
+    state?.phase,
+    state?.phaseEndsAt,
+    state?.you?.role,
+  ]);
+
   if (error && !state) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -177,6 +221,8 @@ export function GameClient({ roomId }: { roomId: string }) {
 
   const emitSettings = (settings: Partial<RoomSettings>) =>
     socket.emit("lobby:settings", { roomId: state.roomId, settings });
+  const emitHostSettings = (settings: Partial<RoomSettings>) =>
+    socket.emit("host:settings", { roomId: state.roomId, settings });
   const emitStart = () => {
     if (startingGame) return;
     setStartingGame(true);
@@ -192,6 +238,8 @@ export function GameClient({ roomId }: { roomId: string }) {
     socket.emit("night:action", { roomId: state.roomId, type, targetId });
   const emitVote = (targetId: string) =>
     socket.emit("day:vote", { roomId: state.roomId, targetId });
+  const emitVoteSkip = () =>
+    socket.emit("day:voteSkip", { roomId: state.roomId });
   const emitFiveAlivePlay = (payload: {
     cardId?: string | null;
     wildValue?: number;
@@ -214,7 +262,29 @@ export function GameClient({ roomId }: { roomId: string }) {
       role: state.you.role,
       blackmailed: state.you.blackmailed,
       phase: state.phase,
+      daySubPhase: state.daySubPhase,
     }).find((c) => c === "town" || c === "mafia");
+
+  const townVoiceOpen =
+    !!state.you &&
+    canUseTownVoice({
+      alive: state.you.alive,
+      role: state.you.role,
+      blackmailed: state.you.blackmailed,
+      phase: state.phase,
+      daySubPhase: state.daySubPhase,
+    });
+
+  const pendingAction =
+    state.gameId === "mafia-city" ? pendingPlayerAction(state) : null;
+  const actionKey = pendingAction
+    ? `${state.phase}-${state.daySubPhase}-${pendingAction.title}`
+    : null;
+  const showActionDialog =
+    !!pendingAction && actionKey !== dismissedActionKey;
+  const showAnnouncement =
+    !!state.announcement &&
+    state.announcement.id !== dismissedAnnouncementId;
 
   const emitVoiceInvite = (targetId: string) => {
     if (!voiceChannel) return;
@@ -251,10 +321,50 @@ export function GameClient({ roomId }: { roomId: string }) {
             onPause={() => socket.emit("host:pause", { roomId: state.roomId })}
             onResume={() => socket.emit("host:resume", { roomId: state.roomId })}
             onQuit={() => setQuitConfirmOpen(true)}
+            onSettings={
+              state.gameId === "mafia-city" && state.you?.isHost
+                ? emitHostSettings
+                : undefined
+            }
             quitting={quitting}
           />
         }
       />
+
+      {showAnnouncement && state.announcement && (
+        <PhaseResultPopup
+          announcement={state.announcement}
+          onDismiss={() =>
+            setDismissedAnnouncementId(state.announcement!.id)
+          }
+        />
+      )}
+      {showActionDialog && pendingAction && (
+        <ActionDialog
+          title={pendingAction.title}
+          detail={pendingAction.detail}
+          onDismiss={() => setDismissedActionKey(actionKey)}
+        />
+      )}
+      {mafiaVoiceWarning && (
+        <div className="mx-auto mb-4 max-w-6xl px-4 md:px-8">
+          <div className="rounded-sm border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+            Day breaks in under 10 seconds — mafia voice will close at dawn.
+          </div>
+        </div>
+      )}
+      {state.afkGracePlayerId === state.you?.id && state.afkGraceEndsAt && (
+        <div className="mx-auto mb-4 max-w-6xl px-4 md:px-8">
+          <div className="animate-pulse rounded-sm border border-crimson bg-crimson/15 px-4 py-3 text-sm text-crimson-glow">
+            AFK warning — take action within{" "}
+            {Math.max(
+              0,
+              Math.ceil((state.afkGraceEndsAt - Date.now()) / 1000)
+            )}
+            s or you will be eliminated.{afkTick ? "" : ""}
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
         {voiceInvite && state.gameId !== "five-alive" && (
@@ -323,7 +433,10 @@ export function GameClient({ roomId }: { roomId: string }) {
             )}
 
             {state.phase === "reveal" && state.you?.role && (
-              <RoleRevealCard role={state.you.role} />
+              <RoleRevealCard
+                role={state.you.role}
+                phaseEndsAt={state.phaseEndsAt}
+              />
             )}
 
             {state.gameId === "five-alive" && state.phase === "fivealive_turn" && (
@@ -384,12 +497,16 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "night" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                {!state.you?.alive && <SpectatorBanner />}
                 <NightActionPanel
                   state={state}
                   onAct={emitNight}
                   onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
                 />
                 <div className="space-y-4">
+                  {state.detectiveLog && (
+                    <DetectivePanel log={state.detectiveLog} />
+                  )}
                   <GlassPanel className="p-4">
                     <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
                       Night log
@@ -412,15 +529,26 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "day" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                {!state.you?.alive && !state.deadVillagerVote && (
+                  <SpectatorBanner />
+                )}
                 <VotePanel
                   state={state}
                   onVote={emitVote}
+                  onSkipVote={emitVoteSkip}
                   onSkipDay={() =>
                     socket.emit("host:skipDay", { roomId: state.roomId })
                   }
-                  onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
+                  onInviteVoice={
+                    townVoiceOpen && voiceChannel
+                      ? emitVoiceInvite
+                      : undefined
+                  }
                 />
                 <div className="space-y-4">
+                  {state.detectiveLog && (
+                    <DetectivePanel log={state.detectiveLog} />
+                  )}
                   <div data-lenis-prevent className="max-h-48 overflow-y-auto">
                     <GlassPanel className="p-4">
                     <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
