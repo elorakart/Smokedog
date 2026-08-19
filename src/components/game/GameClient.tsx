@@ -22,6 +22,7 @@ import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { SiteHeader } from "@/components/ui/SiteHeader";
 import { phaseSwap } from "@/components/ui/motion";
 import { availableChannels, CHANNEL_LABELS } from "@/lib/chat-access";
 import { Mic } from "lucide-react";
@@ -44,6 +45,8 @@ export function GameClient({ roomId }: { roomId: string }) {
   } | null>(null);
   const [startingGame, setStartingGame] = useState(false);
   const [returningToLobby, setReturningToLobby] = useState(false);
+  const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
+  const [quitting, setQuitting] = useState(false);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -62,6 +65,8 @@ export function GameClient({ roomId }: { roomId: string }) {
       setError(message);
       setStartingGame(false);
       setReturningToLobby(false);
+      setQuitting(false);
+      setQuitConfirmOpen(false);
       if (message.toLowerCase().includes("kicked")) router.replace("/");
       if (code === "NOT_FOUND" || code === "NOT_IN_ROOM") {
         setState(null);
@@ -79,8 +84,13 @@ export function GameClient({ roomId }: { roomId: string }) {
       setVoiceInvite({ channel: payload.channel, fromName: payload.fromName });
     };
 
+    const onLeft = () => {
+      router.replace("/");
+    };
+
     s.on("room:state", onState);
     s.on("room:error", onErr);
+    s.on("room:left", onLeft);
     s.on("host:afkWarning", onAfk);
     s.on("voice:invite", onInvite);
 
@@ -93,6 +103,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     return () => {
       s.off("room:state", onState);
       s.off("room:error", onErr);
+      s.off("room:left", onLeft);
       s.off("host:afkWarning", onAfk);
       s.off("voice:invite", onInvite);
       s.off("connect", join);
@@ -107,32 +118,39 @@ export function GameClient({ roomId }: { roomId: string }) {
 
   if (error && !state) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
-        >
-          <GlassPanel className="p-8 text-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
-              Channel closed
-            </p>
-            <p className="mt-3 text-ink">{error}</p>
-            <PrimaryButton className="mt-6" onClick={() => router.replace("/")}>
-              Back to hub
-            </PrimaryButton>
-          </GlassPanel>
-        </motion.div>
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader animate={false} />
+        <div className="flex flex-1 items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md"
+          >
+            <GlassPanel className="p-8 text-center">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
+                Channel closed
+              </p>
+              <p className="mt-3 text-ink">{error}</p>
+              <PrimaryButton className="mt-6" onClick={() => router.replace("/")}>
+                Back to hub
+              </PrimaryButton>
+            </GlassPanel>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
   if (!state || !socket) {
     return (
-      <LoadingScreen
-        message="Linking secure channel…"
-        submessage="Connecting to the game server"
-      />
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader animate={false} />
+        <LoadingScreen
+          embedded
+          message="Linking secure channel…"
+          submessage="Connecting to the game server"
+        />
+      </div>
     );
   }
 
@@ -168,6 +186,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     socket.emit("chat:send", { roomId: state.roomId, channel, text });
 
   const voiceChannel =
+    state.gameId !== "five-alive" &&
     state.you &&
     availableChannels({
       alive: state.you.alive,
@@ -193,19 +212,21 @@ export function GameClient({ roomId }: { roomId: string }) {
       animate={{ backgroundColor: nightTheme ? "#060910" : "#0b141e" }}
       className="min-h-screen"
     >
-      <header className="flex items-center justify-between px-4 py-4 md:px-8">
-        <span className="font-display text-sm font-extrabold tracking-[0.2em]">
-          SMOKEDOG
-        </span>
-        <GameHud
-          state={state}
-          onPause={() => socket.emit("host:pause", { roomId: state.roomId })}
-          onResume={() => socket.emit("host:resume", { roomId: state.roomId })}
-        />
-      </header>
+      <SiteHeader
+        animate={false}
+        right={
+          <GameHud
+            state={state}
+            onPause={() => socket.emit("host:pause", { roomId: state.roomId })}
+            onResume={() => socket.emit("host:resume", { roomId: state.roomId })}
+            onQuit={() => setQuitConfirmOpen(true)}
+            quitting={quitting}
+          />
+        }
+      />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
-        {voiceInvite && (
+        {voiceInvite && state.gameId !== "five-alive" && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-emerald-400/40 bg-emerald-400/10 px-4 py-3">
             <p className="text-sm text-emerald-100">
               <span className="font-semibold">{voiceInvite.fromName}</span> wants
@@ -297,7 +318,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     state={state}
                     socket={socket}
                     onSend={emitChat}
-                    joinVoiceRequest={joinVoiceRequest}
+                    enableVoice={false}
                   />
                 </div>
               </div>
@@ -324,7 +345,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     state={state}
                     socket={socket}
                     onSend={emitChat}
-                    joinVoiceRequest={joinVoiceRequest}
+                    enableVoice={false}
                   />
                 </div>
               </div>
@@ -421,6 +442,45 @@ export function GameClient({ roomId }: { roomId: string }) {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {quitConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 p-4 backdrop-blur-[20px]"
+          data-lenis-prevent
+        >
+          <GlassPanel className="w-full max-w-md p-8">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-crimson-glow">
+              Leave session
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-bold">Quit this game?</h2>
+            <p className="mt-3 text-sm text-ink-steel">
+              {state.phase === "lobby"
+                ? "You will leave the lobby and return to the hub."
+                : "You will leave the match and return to the hub. Other players can keep playing."}
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              <PrimaryButton
+                disabled={quitting}
+                onClick={() => {
+                  if (quitting) return;
+                  setQuitting(true);
+                  socket.emit("room:leave", { roomId: state.roomId });
+                }}
+              >
+                {quitting ? "Leaving…" : "Yes, quit"}
+              </PrimaryButton>
+              <button
+                type="button"
+                disabled={quitting}
+                onClick={() => setQuitConfirmOpen(false)}
+                className="rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </GlassPanel>
+        </div>
+      )}
 
       {afk && state.you?.isHost && (
         <AfkHostModal

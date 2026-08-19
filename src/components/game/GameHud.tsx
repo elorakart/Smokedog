@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Pause, Play, Shield } from "lucide-react";
+import { Copy, LogOut, Pause, Play, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Phase, PublicGameState } from "@/lib/types";
 
@@ -15,10 +15,14 @@ export function GameHud({
   state,
   onPause,
   onResume,
+  onQuit,
+  quitting = false,
 }: {
   state: PublicGameState;
   onPause: () => void;
   onResume: () => void;
+  onQuit: () => void;
+  quitting?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -82,6 +86,15 @@ export function GameHud({
           <Shield size={12} /> Host
         </span>
       )}
+      <button
+        type="button"
+        disabled={quitting}
+        onClick={onQuit}
+        className="inline-flex items-center gap-1 rounded-sm border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50"
+      >
+        <LogOut size={12} />
+        {quitting ? "Leaving…" : "Quit"}
+      </button>
     </div>
   );
 }

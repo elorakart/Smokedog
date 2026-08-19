@@ -6,12 +6,18 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 export function LoadingScreen({
   message = "Linking secure channel…",
   submessage,
+  embedded = false,
 }: {
   message?: string;
   submessage?: string;
+  embedded?: boolean;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6">
+    <div
+      className={`flex flex-col items-center justify-center gap-4 p-6 ${
+        embedded ? "flex-1" : "min-h-screen"
+      }`}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}

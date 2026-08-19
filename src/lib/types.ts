@@ -196,6 +196,7 @@ export type ClientToServerEvents = {
     avatarId: number;
   }) => void;
   "room:rejoin": (payload: { roomId: string; playerId: string }) => void;
+  "room:leave": (payload: { roomId: string }) => void;
   "lobby:ready": (payload: { roomId: string; ready: boolean }) => void;
   "lobby:settings": (payload: {
     roomId: string;
@@ -263,6 +264,7 @@ export type ServerToClientEvents = {
   }) => void;
   "game:over": (payload: { winner: Faction; recap: PublicPlayer[] }) => void;
   "room:error": (payload: { message: string; code?: string }) => void;
+  "room:left": () => void;
   "lobbies:list": (payload: { lobbies: OpenLobby[] }) => void;
   "voice:participants": (payload: {
     channel: ChatChannel;

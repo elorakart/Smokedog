@@ -70,56 +70,64 @@ export function PlayerGrid({
           p.id !== state.you?.id &&
           !inVoice.has(p.id);
         return (
-          <div key={p.id} className="text-left">
+          <div key={p.id} className="min-w-0">
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04, duration: 0.35 }}
-              whileHover={disabled ? undefined : { y: -4, scale: 1.02 }}
+              className="h-full"
             >
-            <GlassPanel
-              className={`p-3 transition ${
-                selected ? "ring-2 ring-crimson shadow-glow" : ""
-              } ${!p.alive ? "opacity-50" : ""}`}
-            >
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onSelect?.(p.id)}
-                className={`mx-auto block ${disabled ? "cursor-default" : ""}`}
+              <GlassPanel
+                className={`flex h-full flex-col p-3 transition ${
+                  selected ? "ring-2 ring-crimson shadow-glow" : ""
+                } ${!p.alive ? "opacity-50" : ""} ${
+                  !disabled ? "hover:-translate-y-1 hover:shadow-spotlight" : ""
+                }`}
               >
-                <div
-                  className={`overflow-hidden rounded-full ring-2 transition ${
-                    selected
-                      ? "ring-crimson shadow-glow"
-                      : "ring-transparent"
-                  }`}
-                >
-                  <PlayerAvatar id={p.avatarId} className="h-auto w-full" size={160} />
-                </div>
-              </button>
-              <p className="mt-2 truncate text-center font-display text-sm font-semibold">{p.name}</p>
-              {p.role && state.phase === "gameover" && (
-                <p className="font-mono text-[10px] uppercase text-ink-steel">
-                  {ROLE_META[p.role].label}
-                </p>
-              )}
-              {tags(p)}
-              {showVotes && voteCounts[p.id] ? (
-                <p className="mt-1 font-mono text-xs text-crimson-glow">
-                  {voteCounts[p.id]} vote{voteCounts[p.id] > 1 ? "s" : ""}
-                </p>
-              ) : null}
-              {canInvite && (
                 <button
                   type="button"
-                  onClick={() => onInviteVoice(p.id)}
-                  className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-emerald-400/30 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300"
+                  disabled={disabled}
+                  onClick={() => onSelect?.(p.id)}
+                  className={`mx-auto w-full max-w-[6.5rem] ${
+                    disabled ? "cursor-default" : ""
+                  }`}
                 >
-                  <Mic size={10} /> Invite voice
+                  <div
+                    className={`aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
+                      selected ? "ring-crimson" : "ring-transparent"
+                    }`}
+                  >
+                    <PlayerAvatar
+                      id={p.avatarId}
+                      size={128}
+                      className="h-full w-full"
+                    />
+                  </div>
                 </button>
-              )}
-            </GlassPanel>
+                <p className="mt-2 truncate text-center font-display text-sm font-semibold">
+                  {p.name}
+                </p>
+                {p.role && state.phase === "gameover" && (
+                  <p className="font-mono text-[10px] uppercase text-ink-steel">
+                    {ROLE_META[p.role].label}
+                  </p>
+                )}
+                {tags(p)}
+                {showVotes && voteCounts[p.id] ? (
+                  <p className="mt-1 font-mono text-xs text-crimson-glow">
+                    {voteCounts[p.id]} vote{voteCounts[p.id] > 1 ? "s" : ""}
+                  </p>
+                ) : null}
+                {canInvite && (
+                  <button
+                    type="button"
+                    onClick={() => onInviteVoice(p.id)}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-emerald-400/30 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300"
+                  >
+                    <Mic size={10} /> Invite voice
+                  </button>
+                )}
+              </GlassPanel>
             </motion.div>
           </div>
         );

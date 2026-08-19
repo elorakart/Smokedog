@@ -18,11 +18,13 @@ export function ChatPanel({
   socket,
   onSend,
   joinVoiceRequest,
+  enableVoice = true,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
   onSend: (channel: ChatChannel, text: string) => void;
   joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
+  enableVoice?: boolean;
 }) {
   const you = state.you;
   const channelOpts = useMemo(
@@ -64,18 +66,18 @@ export function ChatPanel({
     state.roomId,
     you?.id,
     canUseActive ? active : null,
-    canUseActive
+    enableVoice && canUseActive
   );
 
   useEffect(() => {
-    if (!joinVoiceRequest) return;
+    if (!enableVoice || !joinVoiceRequest) return;
     if (tabs.some((t) => t.id === joinVoiceRequest.channel)) {
       setTab(joinVoiceRequest.channel);
     }
-  }, [joinVoiceRequest, tabs]);
+  }, [enableVoice, joinVoiceRequest, tabs]);
 
   useEffect(() => {
-    if (!joinVoiceRequest) return;
+    if (!enableVoice || !joinVoiceRequest) return;
     if (active !== joinVoiceRequest.channel) return;
     void voice.join();
     // Only fire when a new invite-accept arrives.
@@ -120,46 +122,50 @@ export function ChatPanel({
         ))}
       </div>
 
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-        <div className="flex items-center gap-2">
-          {!voice.joined ? (
-            <button
-              type="button"
-              disabled={!canUseActive}
-              onClick={() => void voice.join()}
-              className="inline-flex items-center gap-1 rounded-sm border border-emerald-400/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300 disabled:opacity-40"
-            >
-              <Mic size={12} /> Join voice
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => voice.setMuted((m) => !m)}
-                className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 font-mono text-[10px] uppercase tracking-widest"
-              >
-                {voice.muted ? <MicOff size={12} /> : <Mic size={12} />}
-                {voice.muted ? "Unmute" : "Mute"}
-              </button>
-              <button
-                type="button"
-                onClick={voice.leave}
-                className="inline-flex items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson-glow"
-              >
-                <PhoneOff size={12} /> Leave
-              </button>
-            </>
-          )}
-        </div>
-        <span className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-          {voiceInChannel.length} in voice
-        </span>
-      </div>
+      {enableVoice && (
+        <>
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+            <div className="flex items-center gap-2">
+              {!voice.joined ? (
+                <button
+                  type="button"
+                  disabled={!canUseActive}
+                  onClick={() => void voice.join()}
+                  className="inline-flex items-center gap-1 rounded-sm border border-emerald-400/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300 disabled:opacity-40"
+                >
+                  <Mic size={12} /> Join voice
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => voice.setMuted((m) => !m)}
+                    className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 font-mono text-[10px] uppercase tracking-widest"
+                  >
+                    {voice.muted ? <MicOff size={12} /> : <Mic size={12} />}
+                    {voice.muted ? "Unmute" : "Mute"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={voice.leave}
+                    className="inline-flex items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson-glow"
+                  >
+                    <PhoneOff size={12} /> Leave
+                  </button>
+                </>
+              )}
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+              {voiceInChannel.length} in voice
+            </span>
+          </div>
 
-      {voice.error && (
-        <p className="border-b border-white/10 px-3 py-2 text-xs text-amber-200">
-          {voice.error}
-        </p>
+          {voice.error && (
+            <p className="border-b border-white/10 px-3 py-2 text-xs text-amber-200">
+              {voice.error}
+            </p>
+          )}
+        </>
       )}
 
       <div data-lenis-prevent className="flex-1 space-y-2 overflow-y-auto p-3">

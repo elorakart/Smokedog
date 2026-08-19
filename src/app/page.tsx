@@ -7,6 +7,7 @@ import { ArrowRight, Clock, Users } from "lucide-react";
 import { OpenLobbies } from "@/components/hub/OpenLobbies";
 import { ProfileModal } from "@/components/hub/ProfileModal";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { SiteHeader } from "@/components/ui/SiteHeader";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { fadeUp, stagger } from "@/components/ui/motion";
 import {
@@ -122,40 +123,7 @@ export default function HomePage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(230,25,25,0.12),transparent_55%)]" />
-      <motion.header
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative flex items-center justify-between px-6 py-5 md:px-10"
-      >
-        <div className="flex items-center gap-3">
-          <motion.div
-            className="flex h-8 w-8 items-center justify-center rounded-[4px] bg-crimson shadow-glow"
-            animate={{
-              boxShadow: [
-                "0 0 12px rgba(230,25,25,0.35)",
-                "0 0 28px rgba(230,25,25,0.7)",
-                "0 0 12px rgba(230,25,25,0.35)",
-              ],
-            }}
-            transition={{ duration: 2.8, repeat: Infinity }}
-          >
-            <span className="font-display text-sm font-extrabold tracking-[0.1em]">
-              SA
-            </span>
-          </motion.div>
-          <span className="font-display text-xl font-extrabold tracking-[0.18em]">
-            SMOKEDOG&apos;s Arena
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden font-mono text-[10px] uppercase tracking-widest text-ink-steel sm:block">
-            Operator Access
-          </span>
-          <div className="overflow-hidden rounded-full ring-1 ring-white/10">
-            <PlayerAvatar id={profile?.avatarId ?? 0} size={36} />
-          </div>
-        </div>
-      </motion.header>
+      <SiteHeader avatarId={profile?.avatarId ?? 0} />
 
       <motion.main
         variants={stagger}

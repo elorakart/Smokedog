@@ -1450,7 +1450,7 @@ export class GameRuntime {
 
   joinVoice(roomId: string, playerId: string, channel: ChatChannel) {
     const room = this.getRoom(roomId);
-    if (!room) return;
+    if (!room || room.gameId === "five-alive") return;
     const player = room.players.find((p) => p.id === playerId);
     if (!player?.socketId) return;
     if (
@@ -1479,7 +1479,7 @@ export class GameRuntime {
     targetId: string
   ) {
     const room = this.getRoom(roomId);
-    if (!room) return;
+    if (!room || room.gameId === "five-alive") return;
     const from = room.players.find((p) => p.id === fromId);
     const target = room.players.find((p) => p.id === targetId);
     if (!from?.socketId || !target?.socketId || target.isBot || from.id === target.id) {
@@ -1527,7 +1527,7 @@ export class GameRuntime {
     signal: VoiceSignalPayload
   ) {
     const room = this.getRoom(roomId);
-    if (!room) return;
+    if (!room || room.gameId === "five-alive") return;
     const from = room.players.find((p) => p.id === fromId);
     const target = room.players.find((p) => p.id === targetId);
     if (!from?.socketId || !target?.socketId) return;
@@ -1585,6 +1585,90 @@ export class GameRuntime {
     } else {
       this.io.to(room.id).emit("chat:message", message);
     }
+  }
+
+  private fiveAliveHandlePlayerDeparted(room: Room, playerId: string) {
+    const five = room.fiveAlive;
+    if (!five) return;
+
+    if (room.phase === "fivealive_turn" && five.turnPlayerId === playerId) {
+      log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Someone"} left — turn skipped.`);
+      this.fiveAliveAdvanceToNextTurn(room, playerId);
+      return;
+    }
+
+    if (room.phase === "fivealive_bomb" && five.bombAwaitingPlayerId === playerId) {
+      const idx = five.bombResponderIds.indexOf(playerId);
+      const nextAwaiting = five.bombResponderIds[idx + 1] ?? null;
+      five.bombAwaitingPlayerId = nextAwaiting;
+      if (!nextAwaiting) {
+        const actorId = five.bombActorId;
+        five.bombActorId = null;
+        five.bombResponderIds = [];
+        five.bombAwaitingPlayerId = null;
+        if (actorId) {
+          this.fiveAliveAdvanceToNextTurn(room, actorId);
+        } else {
+          this.fiveAliveMaybeWin(room);
+        }
+      }
+    }
+  }
+
+  leaveRoom(roomId: string, playerId: string) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player || player.isBot) return;
+
+    const socketId = player.socketId;
+    this.removeFromAllVoice(room, player.id);
+    this.leaveMafiaRooms(player, room.id);
+
+    if (room.gameId === "five-alive" && room.fiveAlive && room.phase !== "lobby") {
+      this.fiveAliveHandlePlayerDeparted(room, player.id);
+    }
+
+    if (room.phase !== "lobby" && player.alive) {
+      player.alive = false;
+      if (room.gameId === "five-alive") {
+        player.lives = 0;
+      }
+      log(room, `${player.name} left the game.`);
+      this.maybeWin(room);
+    } else if (room.phase === "lobby") {
+      log(room, `${player.name} left the lobby.`);
+    }
+
+    if (player.isHost) {
+      const next = room.players.find((p) => p.id !== player.id && !p.isBot);
+      if (next) {
+        next.isHost = true;
+        log(room, `${next.name} is now the host.`);
+      }
+    }
+
+    room.players = room.players.filter((p) => p.id !== playerId);
+    room.afkWarnedPlayerIds = room.afkWarnedPlayerIds.filter(
+      (id) => id !== playerId
+    );
+    this.playerRoom.delete(playerId);
+
+    if (socketId) {
+      this.io.to(socketId).emit("room:left");
+      this.io.sockets.sockets.get(socketId)?.leave(room.id);
+    }
+
+    const humansRemaining = room.players.filter((p) => !p.isBot);
+    if (humansRemaining.length === 0) {
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      this.rooms.delete(room.id);
+      this.broadcastLobbies();
+      return;
+    }
+
+    this.emitRoom(room);
   }
 
   kick(roomId: string, hostId: string, targetId: string) {
