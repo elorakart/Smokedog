@@ -317,7 +317,7 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.phase === "night" && (
+            {state.gameId === "mafia-city" && state.phase === "night" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <NightActionPanel
                   state={state}
@@ -345,7 +345,7 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.phase === "day" && (
+            {state.gameId === "mafia-city" && state.phase === "day" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <VotePanel
                   state={state}
