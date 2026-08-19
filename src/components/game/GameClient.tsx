@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
@@ -47,6 +47,9 @@ export function GameClient({ roomId }: { roomId: string }) {
   const [returningToLobby, setReturningToLobby] = useState(false);
   const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
   const [quitting, setQuitting] = useState(false);
+  const quittingRef = useRef(false);
+  const quitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishLeaveRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const profile = loadProfile();
@@ -62,6 +65,10 @@ export function GameClient({ roomId }: { roomId: string }) {
       setState(next);
     };
     const onErr = ({ message, code }: { message: string; code?: string }) => {
+      if (quittingRef.current) {
+        finishLeaveRef.current();
+        return;
+      }
       setError(message);
       setStartingGame(false);
       setReturningToLobby(false);
@@ -84,8 +91,17 @@ export function GameClient({ roomId }: { roomId: string }) {
       setVoiceInvite({ channel: payload.channel, fromName: payload.fromName });
     };
 
-    const onLeft = () => {
+    finishLeaveRef.current = () => {
+      if (quitTimeoutRef.current) {
+        clearTimeout(quitTimeoutRef.current);
+        quitTimeoutRef.current = null;
+      }
+      quittingRef.current = false;
       router.replace("/");
+    };
+
+    const onLeft = () => {
+      finishLeaveRef.current();
     };
 
     s.on("room:state", onState);
@@ -95,12 +111,17 @@ export function GameClient({ roomId }: { roomId: string }) {
     s.on("voice:invite", onInvite);
 
     const join = () => {
+      if (quittingRef.current) return;
       s.emit("room:rejoin", { roomId, playerId: profile.playerId });
     };
     if (s.connected) join();
     s.on("connect", join);
 
     return () => {
+      if (quitTimeoutRef.current) {
+        clearTimeout(quitTimeoutRef.current);
+        quitTimeoutRef.current = null;
+      }
       s.off("room:state", onState);
       s.off("room:error", onErr);
       s.off("room:left", onLeft);
@@ -202,6 +223,16 @@ export function GameClient({ roomId }: { roomId: string }) {
       channel: voiceChannel,
       targetId,
     });
+  };
+
+  const confirmQuit = () => {
+    if (quitting || !socket) return;
+    setQuitting(true);
+    quittingRef.current = true;
+    socket.emit("room:leave", { roomId: state.roomId });
+    quitTimeoutRef.current = setTimeout(() => {
+      finishLeaveRef.current();
+    }, 2500);
   };
 
   const nightTheme = state.phase === "night";
@@ -459,14 +490,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                 : "You will leave the match and return to the hub. Other players can keep playing."}
             </p>
             <div className="mt-6 flex flex-col gap-2">
-              <PrimaryButton
-                disabled={quitting}
-                onClick={() => {
-                  if (quitting) return;
-                  setQuitting(true);
-                  socket.emit("room:leave", { roomId: state.roomId });
-                }}
-              >
+              <PrimaryButton disabled={quitting} onClick={confirmQuit}>
                 {quitting ? "Leaving…" : "Yes, quit"}
               </PrimaryButton>
               <button

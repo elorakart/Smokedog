@@ -95,8 +95,11 @@ export function attachSocketServer(
     });
 
     socket.on("room:leave", (payload) => {
-      if (!socket.data.playerId) return;
-      runtime.leaveRoom(payload.roomId, socket.data.playerId);
+      if (socket.data.playerId) {
+        runtime.leaveRoom(payload.roomId, socket.data.playerId);
+      }
+      socket.leave(payload.roomId);
+      socket.emit("room:left");
     });
 
     socket.on("lobby:ready", (payload) => {

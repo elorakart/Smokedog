@@ -1655,7 +1655,6 @@ export class GameRuntime {
     this.playerRoom.delete(playerId);
 
     if (socketId) {
-      this.io.to(socketId).emit("room:left");
       this.io.sockets.sockets.get(socketId)?.leave(room.id);
     }
 
