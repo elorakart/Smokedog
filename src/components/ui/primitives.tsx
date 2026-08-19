@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export function GlassPanel({
   children,
@@ -45,13 +46,18 @@ export function StatusChip({
 export function PrimaryButton({
   children,
   className = "",
+  loading = false,
+  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean }) {
   return (
     <button
       {...props}
-      className={`rounded-sm bg-crimson px-5 py-3 font-display text-sm font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 hover:shadow-[0_0_32px_rgba(230,25,25,0.55)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm bg-crimson px-5 py-3 font-display text-sm font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 hover:shadow-[0_0_32px_rgba(230,25,25,0.55)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
     >
+      {loading && <LoadingSpinner size={16} className="text-white" />}
       {children}
     </button>
   );

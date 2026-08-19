@@ -21,6 +21,7 @@ import { FiveAliveLobbyView } from "@/components/game/FiveAliveLobbyView";
 import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { phaseSwap } from "@/components/ui/motion";
 import { availableChannels, CHANNEL_LABELS } from "@/lib/chat-access";
 import { Mic } from "lucide-react";
@@ -41,6 +42,8 @@ export function GameClient({ roomId }: { roomId: string }) {
     nonce: number;
     channel: ChatChannel;
   } | null>(null);
+  const [startingGame, setStartingGame] = useState(false);
+  const [returningToLobby, setReturningToLobby] = useState(false);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -57,6 +60,8 @@ export function GameClient({ roomId }: { roomId: string }) {
     };
     const onErr = ({ message, code }: { message: string; code?: string }) => {
       setError(message);
+      setStartingGame(false);
+      setReturningToLobby(false);
       if (message.toLowerCase().includes("kicked")) router.replace("/");
       if (code === "NOT_FOUND" || code === "NOT_IN_ROOM") {
         setState(null);
@@ -94,6 +99,12 @@ export function GameClient({ roomId }: { roomId: string }) {
     };
   }, [roomId, router]);
 
+  useEffect(() => {
+    if (!state) return;
+    if (state.phase !== "lobby") setStartingGame(false);
+    if (state.phase === "lobby") setReturningToLobby(false);
+  }, [state?.phase, state]);
+
   if (error && !state) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -118,20 +129,20 @@ export function GameClient({ roomId }: { roomId: string }) {
 
   if (!state || !socket) {
     return (
-      <div className="flex min-h-screen items-center justify-center font-mono text-xs uppercase tracking-widest text-ink-steel">
-        <motion.span
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.6, repeat: Infinity }}
-        >
-          Linking secure channel…
-        </motion.span>
-      </div>
+      <LoadingScreen
+        message="Linking secure channel…"
+        submessage="Connecting to the game server"
+      />
     );
   }
 
   const emitSettings = (settings: Partial<RoomSettings>) =>
     socket.emit("lobby:settings", { roomId: state.roomId, settings });
-  const emitStart = () => socket.emit("lobby:start", { roomId: state.roomId });
+  const emitStart = () => {
+    if (startingGame) return;
+    setStartingGame(true);
+    socket.emit("lobby:start", { roomId: state.roomId });
+  };
   const emitKick = (playerId: string) =>
     socket.emit("host:kick", { roomId: state.roomId, playerId });
   const emitAddBot = (fillTo?: number) =>
@@ -239,6 +250,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                   <FiveAliveLobbyView
                     state={state}
                     onStart={emitStart}
+                    starting={startingGame}
                     onSettings={emitSettings}
                     onKick={emitKick}
                     onAddBot={emitAddBot}
@@ -248,6 +260,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                   <LobbyView
                     state={state}
                     onStart={emitStart}
+                    starting={startingGame}
                     onSettings={emitSettings}
                     onKick={emitKick}
                     onAddBot={emitAddBot}
@@ -397,9 +410,12 @@ export function GameClient({ roomId }: { roomId: string }) {
             {state.phase === "gameover" && (
               <GameOverScreen
                 state={state}
-                onReturn={() =>
-                  socket.emit("lobby:return", { roomId: state.roomId })
-                }
+                returning={returningToLobby}
+                onReturn={() => {
+                  if (returningToLobby) return;
+                  setReturningToLobby(true);
+                  socket.emit("lobby:return", { roomId: state.roomId });
+                }}
               />
             )}
           </motion.div>

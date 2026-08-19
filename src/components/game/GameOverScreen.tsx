@@ -10,9 +10,11 @@ import type { PublicGameState } from "@/lib/types";
 export function GameOverScreen({
   state,
   onReturn,
+  returning = false,
 }: {
   state: PublicGameState;
   onReturn: () => void;
+  returning?: boolean;
 }) {
   const isFiveAlive = state.gameId === "five-alive";
   const fiveAliveWinner =
@@ -70,8 +72,13 @@ export function GameOverScreen({
         </div>
 
         {state.you?.isHost && (
-          <PrimaryButton className="mt-8" onClick={onReturn}>
-            Return to Lobby
+          <PrimaryButton
+            className="mt-8"
+            loading={returning}
+            disabled={returning}
+            onClick={onReturn}
+          >
+            {returning ? "Returning…" : "Return to Lobby"}
           </PrimaryButton>
         )}
       </div>
@@ -110,8 +117,13 @@ export function GameOverScreen({
         ))}
       </div>
       {state.you?.isHost && (
-        <PrimaryButton className="mt-8" onClick={onReturn}>
-          Return to Lobby
+        <PrimaryButton
+          className="mt-8"
+          loading={returning}
+          disabled={returning}
+          onClick={onReturn}
+        >
+          {returning ? "Returning…" : "Return to Lobby"}
         </PrimaryButton>
       )}
     </div>

@@ -71,6 +71,7 @@ function AutoPlayerControls({
 export function FiveAliveLobbyView({
   state,
   onStart,
+  starting = false,
   onSettings,
   onKick,
   onAddBot,
@@ -78,6 +79,7 @@ export function FiveAliveLobbyView({
 }: {
   state: PublicGameState;
   onStart: () => void;
+  starting?: boolean;
   onSettings: (settings: Partial<RoomSettings>) => void;
   onKick: (playerId: string) => void;
   onAddBot: (fillTo?: number) => void;
@@ -198,8 +200,13 @@ export function FiveAliveLobbyView({
           </p>
         </div>
 
-        <PrimaryButton className="mt-6 w-full" disabled={!canStart} onClick={onStart}>
-          Start Game
+        <PrimaryButton
+          className="mt-6 w-full"
+          loading={starting}
+          disabled={!canStart || starting}
+          onClick={onStart}
+        >
+          {starting ? "Starting…" : "Start Game"}
         </PrimaryButton>
         {!canStart && host && (
           <p className="mt-2 text-center font-mono text-[10px] text-ink-steel">

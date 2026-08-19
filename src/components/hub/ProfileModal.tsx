@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { AVATAR_COUNT } from "@/lib/profile";
@@ -22,6 +23,7 @@ export function ProfileModal({
   error,
   initialCode,
   initialMode,
+  pending = null,
   onClose,
   onCreate,
   onJoin,
@@ -33,6 +35,7 @@ export function ProfileModal({
   error?: string | null;
   initialCode?: string;
   initialMode?: "create" | "join";
+  pending?: "create" | "join" | null;
   onClose: () => void;
   onCreate: (name: string, avatarId: number) => void;
   onJoin: (name: string, avatarId: number, code: string) => void;
@@ -64,8 +67,12 @@ export function ProfileModal({
 
   const displayError = localError || error;
   const ready = name.trim().length >= 2;
+  const isPending = pending !== null;
+  const pendingLabel =
+    pending === "create" ? "Creating party…" : pending === "join" ? "Joining party…" : null;
 
   const submitJoin = () => {
+    if (isPending) return;
     const check = validateRoomCode(code);
     if (!check.ok) {
       setLocalError(check.message);
@@ -102,7 +109,8 @@ export function ProfileModal({
             <GlassPanel className="relative p-8">
               <button
                 onClick={onClose}
-                className="absolute right-4 top-4 text-ink-steel hover:text-ink"
+                disabled={isPending}
+                className="absolute right-4 top-4 text-ink-steel hover:text-ink disabled:opacity-40"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -126,6 +134,7 @@ export function ProfileModal({
               <input
                 value={name}
                 maxLength={18}
+                disabled={isPending}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your alias"
                 className="mt-2 w-full rounded-sm border-b border-crimson/60 bg-void px-3 py-3 text-ink outline-none focus:border-crimson"
@@ -138,6 +147,7 @@ export function ProfileModal({
                   <button
                     key={i}
                     type="button"
+                    disabled={isPending}
                     onClick={() => setAvatarId(i)}
                     className={`overflow-hidden rounded-full ring-2 transition hover:scale-105 ${
                       avatarId === i
@@ -153,6 +163,7 @@ export function ProfileModal({
               <div className="mt-8 flex gap-2">
                 <button
                   type="button"
+                  disabled={isPending}
                   onClick={() => {
                     setMode("create");
                     setLocalError(null);
@@ -167,6 +178,7 @@ export function ProfileModal({
                 </button>
                 <button
                   type="button"
+                  disabled={isPending}
                   onClick={() => {
                     setMode("join");
                     setLocalError(null);
@@ -185,6 +197,7 @@ export function ProfileModal({
                 <input
                   value={code}
                   maxLength={6}
+                  disabled={isPending}
                   onChange={(e) => {
                     setCode(e.target.value.toUpperCase());
                     setLocalError(null);
@@ -195,6 +208,20 @@ export function ProfileModal({
                   }`}
                 />
               )}
+
+              <AnimatePresence>
+                {isPending && pendingLabel && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-widest text-ink-steel"
+                  >
+                    <LoadingSpinner size={14} />
+                    {pendingLabel}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <AnimatePresence>
                 {displayError && (
@@ -212,13 +239,19 @@ export function ProfileModal({
 
               <PrimaryButton
                 className="mt-6 w-full"
+                loading={isPending}
                 disabled={mode === "create" ? !ready : !name.trim()}
                 onClick={() => {
+                  if (isPending) return;
                   if (mode === "create") onCreate(name.trim(), avatarId);
                   else submitJoin();
                 }}
               >
-                {mode === "create" ? "Create Party" : "Join Party"}
+                {isPending
+                  ? pendingLabel ?? "Processing…"
+                  : mode === "create"
+                    ? "Create Party"
+                    : "Join Party"}
               </PrimaryButton>
             </GlassPanel>
           </motion.div>

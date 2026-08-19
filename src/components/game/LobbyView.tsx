@@ -72,6 +72,7 @@ function LobbySidebar({
   state,
   host,
   onStart,
+  starting = false,
   onSettings,
   onAddBot,
   onRemoveBot,
@@ -79,6 +80,7 @@ function LobbySidebar({
   state: PublicGameState;
   host: boolean;
   onStart: () => void;
+  starting?: boolean;
   onSettings: (settings: Partial<RoomSettings>) => void;
   onAddBot: (fillTo?: number) => void;
   onRemoveBot: () => void;
@@ -156,8 +158,13 @@ function LobbySidebar({
       <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-ink-steel">
         {state.players.length}/12 seated · Roles scale with lobby size
       </p>
-      <PrimaryButton className="mt-6 w-full" disabled={!canStart} onClick={onStart}>
-        Start Game
+      <PrimaryButton
+        className="mt-6 w-full"
+        loading={starting}
+        disabled={!canStart || starting}
+        onClick={onStart}
+      >
+        {starting ? "Starting…" : "Start Game"}
       </PrimaryButton>
       {!canStart && (
         <p className="mt-2 text-center font-mono text-[10px] text-ink-steel">
@@ -171,6 +178,7 @@ function LobbySidebar({
 export function LobbyView({
   state,
   onStart,
+  starting = false,
   onSettings,
   onKick,
   onAddBot,
@@ -178,6 +186,7 @@ export function LobbyView({
 }: {
   state: PublicGameState;
   onStart: () => void;
+  starting?: boolean;
   onSettings: (settings: Partial<RoomSettings>) => void;
   onKick: (playerId: string) => void;
   onAddBot: (fillTo?: number) => void;
@@ -255,6 +264,7 @@ export function LobbyView({
         state={state}
         host={host}
         onStart={onStart}
+        starting={starting}
         onSettings={onSettings}
         onAddBot={onAddBot}
         onRemoveBot={onRemoveBot}

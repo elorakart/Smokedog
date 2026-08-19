@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Clock, Users } from "lucide-react";
 import { OpenLobbies } from "@/components/hub/OpenLobbies";
 import { ProfileModal } from "@/components/hub/ProfileModal";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { fadeUp, stagger } from "@/components/ui/motion";
 import {
@@ -24,6 +25,8 @@ export default function HomePage() {
   const createGameIdRef = useRef<string>("mafia-city");
   const [profile, setProfile] = useState(() => loadProfile());
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<"create" | "join" | null>(null);
+  const [joiningCode, setJoiningCode] = useState<string | null>(null);
 
   const setPendingGameId = (gameId: string) => {
     createGameIdRef.current = gameId;
@@ -53,10 +56,16 @@ export default function HomePage() {
     const socket = getSocket(playerId);
     socket.off("room:error");
     socket.off("room:state");
-    socket.on("room:error", ({ message }) => setError(message));
+    socket.on("room:error", ({ message }) => {
+      setPending(null);
+      setJoiningCode(null);
+      setError(message);
+    });
     socket.on("room:state", (state) => {
       const requested = createGameIdRef.current;
       if (requested && state.gameId !== requested) {
+        setPending(null);
+        setJoiningCode(null);
         setError(
           `Server started ${state.gameId} instead of ${requested}. The game server may need a redeploy — try again in a minute.`
         );
@@ -69,7 +78,10 @@ export default function HomePage() {
   };
 
   const onCreate = (name: string, avatarId: number) => {
+    if (pending) return;
     setError(null);
+    setPending("create");
+    setJoiningCode(null);
     const p = persist(name, avatarId);
     const socket = bindErrors(p.playerId);
     socket.emit("room:create", {
@@ -81,7 +93,10 @@ export default function HomePage() {
   };
 
   const onJoin = (name: string, avatarId: number, code: string) => {
+    if (pending) return;
     setError(null);
+    setPending("join");
+    setJoiningCode(code);
     const p = persist(name, avatarId);
     const socket = bindErrors(p.playerId);
     socket.emit("room:join", {
@@ -93,6 +108,7 @@ export default function HomePage() {
   };
 
   const joinWithProfile = (code: string) => {
+    if (pending) return;
     const p = loadProfile();
     if (!p?.name) {
       setPrefillCode(code);
@@ -260,7 +276,10 @@ export default function HomePage() {
 
         <OpenLobbies
           onJoin={joinWithProfile}
+          joiningCode={joiningCode}
+          joinPending={pending === "join"}
           onNeedProfile={(code) => {
+            if (pending) return;
             setError(null);
             setPrefillCode(code ?? "");
             setModalMode("join");
@@ -301,13 +320,25 @@ export default function HomePage() {
         error={error}
         initialCode={prefillCode}
         initialMode={modalMode}
+        pending={pending}
         onClose={() => {
           setModal(false);
           setError(null);
+          setPending(null);
+          setJoiningCode(null);
         }}
         onCreate={onCreate}
         onJoin={onJoin}
       />
+
+      {pending && !modal && (
+        <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
+          <div className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-surface/95 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink shadow-lg backdrop-blur-md">
+            <LoadingSpinner size={14} />
+            {pending === "create" ? "Creating party…" : "Joining party…"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

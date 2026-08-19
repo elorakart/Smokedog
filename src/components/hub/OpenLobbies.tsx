@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, Search, Users } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitives";
 import { fadeUp } from "@/components/ui/motion";
@@ -13,9 +14,13 @@ import type { OpenLobby } from "@/lib/types";
 export function OpenLobbies({
   onJoin,
   onNeedProfile,
+  joiningCode = null,
+  joinPending = false,
 }: {
   onJoin: (code: string) => void;
   onNeedProfile: (code?: string) => void;
+  joiningCode?: string | null;
+  joinPending?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [lobbies, setLobbies] = useState<OpenLobby[]>([]);
@@ -47,6 +52,7 @@ export function OpenLobbies({
   }, [lobbies, query]);
 
   const join = (code: string) => {
+    if (joinPending) return;
     const profile = loadProfile();
     if (!profile?.name || profile.name.trim().length < 2) {
       onNeedProfile(code);
@@ -97,14 +103,27 @@ export function OpenLobbies({
         </label>
         <PrimaryButton
           className="sm:w-auto"
-          disabled={!firstOpen}
+          loading={joinPending && !!firstOpen && joiningCode === firstOpen.roomId}
+          disabled={!firstOpen || joinPending}
           onClick={() => firstOpen && join(firstOpen.roomId)}
         >
-          Quick join
+          {joinPending && firstOpen && joiningCode === firstOpen.roomId
+            ? "Joining…"
+            : "Quick join"}
         </PrimaryButton>
       </div>
 
       <div className="mt-4 space-y-2">
+        {loading &&
+          Array.from({ length: 3 }, (_, i) => (
+            <GlassPanel key={`skeleton-${i}`} className="flex animate-pulse items-center gap-4 p-4">
+              <div className="size-11 rounded-full bg-white/10" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 rounded bg-white/10" />
+                <div className="h-3 w-40 rounded bg-white/10" />
+              </div>
+            </GlassPanel>
+          ))}
         {filtered.length === 0 && !loading && (
           <GlassPanel className="p-6 text-center font-mono text-xs uppercase tracking-widest text-ink-steel">
             {query
@@ -151,10 +170,18 @@ export function OpenLobbies({
                 <StatusChip>{lobby.openSlots} open</StatusChip>
                 <button
                   type="button"
+                  disabled={joinPending}
                   onClick={() => join(lobby.roomId)}
-                  className="rounded-sm bg-crimson px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110"
+                  className="inline-flex min-w-[72px] items-center justify-center gap-2 rounded-sm bg-crimson px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Join
+                  {joinPending && joiningCode === lobby.roomId ? (
+                    <>
+                      <LoadingSpinner size={12} className="text-white" />
+                      Joining
+                    </>
+                  ) : (
+                    "Join"
+                  )}
                 </button>
               </div>
             </GlassPanel>
