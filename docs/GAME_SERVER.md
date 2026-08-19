@@ -27,7 +27,9 @@ If Oracle fails or players cannot connect:
 3. **Redeploy** the Vercel production deployment (or push any commit to `main`).
 4. Confirm health: open  
    `https://game-production-22ef.up.railway.app/health`  
-   → should return `{"ok":true,"service":"smokedog-game"}`
+   → should return `{"ok":true,"service":"smokedog-game","games":["mafia-city","five-alive"],...}`
+
+If `games` is missing or only lists `mafia-city`, the game server is on an old build — **Redeploy** the Railway **game** service from the dashboard (or run `railway up --service game` with a linked project).
 
 No code changes required. Active lobbies on Oracle will be lost; Railway starts fresh rooms.
 
@@ -112,7 +114,11 @@ npx vercel --prod --yes
 
 **Railway (game server):**
 
+Requires `RAILWAY_TOKEN` in GitHub repo secrets (workflow: `.github/workflows/deploy-game-server.yml`) or manual deploy:
+
 ```bash
+railway login
+railway link --project <your-project>
 railway up --service game --detach
 ```
 

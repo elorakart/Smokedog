@@ -1,0 +1,48 @@
+name: Deploy game server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/games/**"
+      - "src/server/**"
+      - "src/lib/types.ts"
+      - "railway.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-game-server.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli@5.41.2
+
+      - name: Deploy to Railway
+        id: deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "RAILWAY_TOKEN secret is not set — skipping Railway deploy."
+            echo "Redeploy manually from the Railway dashboard or add the secret."
+            exit 0
+          fi
+          echo "skipped=false" >> "$GITHUB_OUTPUT"
+          railway up --service game --detach
+
+      - name: Verify health
+        if: steps.deploy.outputs.skipped == 'false'
+        run: |
+          sleep 30
+          body="$(curl -fsS https://game-production-22ef.up.railway.app/health)"
+          echo "$body"
+          echo "$body" | grep -q '"five-alive"' || {
+            echo "Health check missing five-alive — deploy may still be rolling out."
+            exit 1
+          }
