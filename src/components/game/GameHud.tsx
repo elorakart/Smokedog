@@ -35,6 +35,8 @@ export function GameHud({
     reveal: "REVEAL",
     night: `NIGHT ${state.cycle}`,
     day: `DAY ${state.cycle}`,
+    fivealive_turn: `TURN ${state.cycle}`,
+    fivealive_bomb: "BOMB RESOLUTION",
     gameover: "DEBRIEF",
   };
 

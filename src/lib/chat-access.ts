@@ -18,7 +18,13 @@ export function canAccessChannel(
 ): boolean {
   if (channel === "graveyard") return !opts.alive;
   if (channel === "town") {
-    return opts.alive && opts.phase === "day" && !opts.blackmailed;
+    return (
+      opts.alive &&
+      (opts.phase === "day" ||
+        opts.phase === "fivealive_turn" ||
+        opts.phase === "fivealive_bomb") &&
+      !opts.blackmailed
+    );
   }
   if (channel === "mafia") {
     return (

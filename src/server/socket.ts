@@ -158,6 +158,17 @@ export function attachSocketServer(
       runtime.submitVote(payload.roomId, socket.data.playerId, payload.targetId);
     });
 
+    socket.on("fivealive:playCard", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitFiveAlivePlayCard(
+        payload.roomId,
+        socket.data.playerId,
+        payload.cardId,
+        payload.wildValue,
+        payload.pass
+      );
+    });
+
     socket.on("chat:send", (payload) => {
       if (!socket.data.playerId) return;
       runtime.sendChat(

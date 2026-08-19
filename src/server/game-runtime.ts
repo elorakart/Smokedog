@@ -42,9 +42,18 @@ import {
 } from "@/lib/games/mafia-city/resolve";
 import { canAccessChannel } from "@/lib/chat-access";
 
+import {
+  buildFiveAliveDeck,
+  cardLabel,
+  type FiveAliveCardInstance,
+  isNumber0,
+  shuffle,
+} from "@/lib/games/5-alive/cards";
+
 export type IoServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
 const REVEAL_SECONDS = 5;
+const FIVE_ALIVE_HAND_SIZE = 10;
 
 interface Room {
   id: string;
@@ -61,6 +70,23 @@ interface Room {
   logs: GameLog[];
   chat: ChatMessage[];
   winner: "town" | "mafia" | null;
+  fiveAlive?: {
+    drawDeck: FiveAliveCardInstance[];
+    discardPile: FiveAliveCardInstance[];
+    centerPile: FiveAliveCardInstance[];
+    handsByPlayerId: Record<string, FiveAliveCardInstance[]>;
+
+    runningTotal: number;
+    direction: 1 | -1;
+    turnPlayerId: string | null;
+
+    skipNext: boolean;
+    pendingDrawCount: number;
+
+    bombAwaitingPlayerId: string | null;
+    bombActorId: string | null;
+    bombResponderIds: string[];
+  };
   timer: ReturnType<typeof setTimeout> | null;
   detectiveByPlayer: Record<string, { targetId: string; faction: "town" | "mafia" }>;
   afkWarnedPlayerIds: string[];
@@ -126,6 +152,7 @@ export class GameRuntime {
       afkCount: p.afkCount,
       blackmailed: p.blackmailed && room.phase === "day",
       role: showRole ? p.role : undefined,
+      lives: p.lives,
       connected: p.isBot || !!p.socketId,
       isBot: viewerIsHost ? !!p.isBot : false,
     };
@@ -136,6 +163,7 @@ export class GameRuntime {
       ? room.players.find((p) => p.id === viewerId) ?? null
       : null;
     const revealAll = room.phase === "gameover";
+    const five = room.gameId === "five-alive" ? room.fiveAlive : undefined;
     return {
       roomId: room.id,
       gameId: room.gameId,
@@ -182,6 +210,19 @@ export class GameRuntime {
       autoPlayerCount: you?.isHost
         ? room.players.filter((p) => p.isBot).length
         : 0,
+      fiveAlive: five
+        ? {
+            runningTotal: five.runningTotal,
+            direction: five.direction,
+            turnPlayerId: five.turnPlayerId,
+            skipNext: five.skipNext,
+            pendingDrawCount: five.pendingDrawCount,
+            yourHand: five.handsByPlayerId[you?.id ?? ""] ?? [],
+            bombAwaitingPlayerId: five.bombAwaitingPlayerId,
+            bombActorId: five.bombActorId,
+            bombResponderIds: five.bombResponderIds,
+          }
+        : undefined,
     };
   }
 
@@ -206,7 +247,13 @@ export class GameRuntime {
   private visibleChat(room: Room, you: Player | null): ChatMessage[] {
     return room.chat
       .filter((m) => {
-        if (m.channel === "town") return room.phase === "day";
+        if (m.channel === "town") {
+          return (
+            room.phase === "day" ||
+            room.phase === "fivealive_turn" ||
+            room.phase === "fivealive_bomb"
+          );
+        }
         if (m.channel === "graveyard") return !!you && !you.alive;
         if (m.channel === "mafia") {
           return (
@@ -620,6 +667,11 @@ export class GameRuntime {
       throw new Error(`Need at least ${mod.minPlayers} players`);
     }
 
+    if (room.gameId === "five-alive") {
+      this.startFiveAlive(room);
+      return;
+    }
+
     const roles = mod.assignRoles(room.players.length, room.settings);
     const bullets = bulletsForLobby(room.players.length, room.settings);
     room.players.forEach((p, i) => {
@@ -654,6 +706,77 @@ export class GameRuntime {
     this.emitRoom(room);
   }
 
+  private startFiveAlive(room: Room) {
+    // Reset all Mafia-City-specific round state.
+    room.cycle = 1;
+    room.winner = null;
+    room.logs = [];
+    room.votes = {};
+    room.nightActions = [];
+    room.detectiveByPlayer = {};
+    room.afkWarnedPlayerIds = [];
+    room.fiveAlive = {
+      drawDeck: buildFiveAliveDeck(),
+      discardPile: [],
+      centerPile: [],
+      handsByPlayerId: {},
+      runningTotal: 0,
+      direction: 1,
+      turnPlayerId: null,
+      skipNext: false,
+      pendingDrawCount: 0,
+      bombAwaitingPlayerId: null,
+      bombActorId: null,
+      bombResponderIds: [],
+    };
+
+    const five = room.fiveAlive;
+    if (!five) return;
+
+    // Initialize lives and clear Mafia room voice/channel membership.
+    for (const p of room.players) {
+      p.role = undefined;
+      p.bulletsLeft = undefined;
+      p.blackmailed = false;
+      p.lives = 5;
+      p.alive = true;
+      p.ready = false;
+      p.afkCount = 0;
+      this.leaveMafiaRooms(p, room.id);
+    }
+
+    const drawFromDeck = (count: number) => {
+      const out: FiveAliveCardInstance[] = [];
+      while (out.length < count) {
+        if (five.drawDeck.length === 0) {
+          if (five.discardPile.length > 0) {
+            five.drawDeck = shuffle(five.discardPile);
+            five.discardPile = [];
+          } else {
+            // Should never happen during normal play, but keep the game from crashing.
+            five.drawDeck = buildFiveAliveDeck();
+          }
+        }
+        const drawn = five.drawDeck.pop();
+        if (drawn) out.push(drawn);
+      }
+      return out;
+    };
+
+    // Deal initial hands.
+    for (const p of room.players) {
+      five.handsByPlayerId[p.id] = drawFromDeck(FIVE_ALIVE_HAND_SIZE);
+    }
+
+    // Turn order: first seat in `room.players` order starts.
+    const first = room.players.find((p) => (p.lives ?? 0) > 0);
+    five.turnPlayerId = first?.id ?? null;
+
+    log(room, "5 Alive begins: keep the running total at or below 21.");
+    this.setPhase(room, "fivealive_turn", room.settings.daySeconds);
+    this.emitRoom(room);
+  }
+
   private startNight(room: Room) {
     room.nightActions = [];
     room.votes = {};
@@ -679,6 +802,9 @@ export class GameRuntime {
   }
 
   private maybeWin(room: Room): boolean {
+    if (room.gameId === "five-alive") {
+      return this.fiveAliveMaybeWin(room);
+    }
     const winner = winCheck(room.players);
     if (!winner) return false;
     room.winner = winner;
@@ -795,6 +921,10 @@ export class GameRuntime {
   private onTimeout(roomId: string) {
     const room = this.getRoom(roomId);
     if (!room || room.paused) return;
+    if (room.gameId === "five-alive") {
+      this.onTimeoutFiveAlive(roomId);
+      return;
+    }
     if (room.phase === "reveal") {
       this.startNight(room);
       return;
@@ -807,6 +937,378 @@ export class GameRuntime {
     }
     if (room.phase === "day") {
       this.finishDayPhase(room);
+    }
+  }
+
+  private fiveAliveMaybeWin(room: Room): boolean {
+    const five = room.fiveAlive;
+    if (!five) return false;
+    const livingIds = room.players
+      .filter((p) => (p.lives ?? 0) > 0 && p.alive)
+      .map((p) => p.id);
+    if (livingIds.length > 1) return false;
+
+    room.winner = "town";
+    this.setPhase(room, "gameover", null);
+    const recap = room.players.map((p) =>
+      this.toPublicPlayer(room, p, "", true)
+    );
+    this.io.to(room.id).emit("game:over", { winner: "town", recap });
+    this.emitRoom(room);
+    return true;
+  }
+
+  private fiveAliveDrawIntoHand(
+    room: Room,
+    playerId: string,
+    count: number
+  ) {
+    const five = room.fiveAlive;
+    if (!five || count <= 0) return;
+    if (!five.handsByPlayerId[playerId]) five.handsByPlayerId[playerId] = [];
+
+    const drawOne = (): FiveAliveCardInstance => {
+      if (five.drawDeck.length === 0) {
+        if (five.discardPile.length === 0) {
+          // Safety fallback; the deck should be large enough in practice.
+          five.drawDeck = buildFiveAliveDeck();
+        } else {
+          five.drawDeck = shuffle(five.discardPile);
+          five.discardPile = [];
+        }
+      }
+      const drawn = five.drawDeck.pop();
+      if (!drawn) {
+        five.drawDeck = buildFiveAliveDeck();
+        return five.drawDeck.pop() as FiveAliveCardInstance;
+      }
+      return drawn;
+    };
+
+    for (let i = 0; i < count; i++) {
+      five.handsByPlayerId[playerId].push(drawOne());
+    }
+  }
+
+  private fiveAliveRedealIfEmpty(room: Room, playerId: string) {
+    const five = room.fiveAlive;
+    if (!five) return;
+    const hand = five.handsByPlayerId[playerId] ?? [];
+    if (hand.length > 0) return;
+    five.handsByPlayerId[playerId] = [];
+    this.fiveAliveDrawIntoHand(room, playerId, FIVE_ALIVE_HAND_SIZE);
+  }
+
+  private fiveAliveClearCenterToDiscard(room: Room) {
+    const five = room.fiveAlive;
+    if (!five) return;
+    if (five.centerPile.length === 0) return;
+    five.discardPile.push(...five.centerPile);
+    five.centerPile = [];
+  }
+
+  private fiveAliveNextNormalPlayerId(
+    room: Room,
+    fromPlayerId: string
+  ): string | null {
+    const five = room.fiveAlive;
+    if (!five) return null;
+    const dir = five.direction;
+    const n = room.players.length;
+    const fromIdx = room.players.findIndex((p) => p.id === fromPlayerId);
+    if (fromIdx < 0) return null;
+
+    const steps = 1 + (five.skipNext ? 1 : 0);
+    let remaining = steps;
+    let idx = fromIdx;
+    while (remaining > 0) {
+      idx = (idx + dir + n) % n;
+      const candidate = room.players[idx];
+      if ((candidate.lives ?? 0) > 0 && candidate.alive) {
+        remaining -= 1;
+      }
+      // Safety: if somehow nobody else is living, return null.
+      if (remaining > 0 && idx === fromIdx) return null;
+    }
+    five.skipNext = false;
+    return room.players[idx]?.id ?? null;
+  }
+
+  private fiveAliveAdvanceToNextTurn(room: Room, fromPlayerId: string) {
+    const five = room.fiveAlive;
+    if (!five) return;
+
+    const nextId = this.fiveAliveNextNormalPlayerId(room, fromPlayerId);
+    if (!nextId) {
+      this.fiveAliveMaybeWin(room);
+      return;
+    }
+
+    // Apply pending draw to the next player before their turn begins.
+    if (five.pendingDrawCount > 0) {
+      this.fiveAliveDrawIntoHand(room, nextId, five.pendingDrawCount);
+      log(room, `${room.players.find((p) => p.id === nextId)?.name ?? "Someone"} draws ${five.pendingDrawCount}.`);
+      five.pendingDrawCount = 0;
+    }
+
+    five.turnPlayerId = nextId;
+    five.bombAwaitingPlayerId = null;
+    five.bombResponderIds = [];
+    five.bombActorId = null;
+    this.setPhase(room, "fivealive_turn", room.settings.daySeconds);
+    this.emitRoom(room);
+  }
+
+  private fiveAliveStartBombResolution(room: Room, actorId: string) {
+    const five = room.fiveAlive;
+    if (!five) return;
+    const living = room.players.filter((p) => (p.lives ?? 0) > 0 && p.alive);
+    if (living.length <= 1) return;
+
+    // Start responders from the next normal player after the bomb actor, in
+    // the current turn direction, then walk the table until all other living
+    // players have responded.
+    const n = room.players.length;
+    const actorIdx = room.players.findIndex((p) => p.id === actorId);
+    const dir = five.direction;
+
+    const responders: string[] = [];
+    let idx = actorIdx;
+    while (responders.length < living.length - 1) {
+      idx = (idx + dir + n) % n;
+      const candidate = room.players[idx];
+      if ((candidate.lives ?? 0) > 0 && candidate.alive && candidate.id !== actorId) {
+        responders.push(candidate.id);
+      }
+      // Safety break to avoid infinite loops.
+      if (idx === actorIdx && responders.length === living.length - 1) break;
+      if (idx === actorIdx && responders.length < living.length - 1) break;
+    }
+
+    five.bombActorId = actorId;
+    five.bombResponderIds = responders;
+    five.bombAwaitingPlayerId = responders[0] ?? null;
+    five.turnPlayerId = null;
+    five.skipNext = false;
+    // Bomb does not specify carrying forward pending draw/skip.
+    five.pendingDrawCount = 0;
+
+    this.setPhase(room, "fivealive_bomb", room.settings.daySeconds);
+    this.emitRoom(room);
+  }
+
+  private onTimeoutFiveAlive(roomId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "five-alive") return;
+    const five = room.fiveAlive;
+    if (!five) return;
+
+    if (room.phase === "fivealive_turn") {
+      const actorId = five.turnPlayerId;
+      const actorName =
+        room.players.find((p) => p.id === actorId)?.name ?? "Someone";
+      log(room, `${actorName} timed out. Turn skipped.`);
+      // Skip to next normal turn.
+      if (actorId) {
+        this.fiveAliveAdvanceToNextTurn(room, actorId);
+      } else {
+        this.fiveAliveMaybeWin(room);
+      }
+      return;
+    }
+
+    if (room.phase === "fivealive_bomb") {
+      const awaitingId = five.bombAwaitingPlayerId;
+      if (awaitingId) {
+        const p = room.players.find((x) => x.id === awaitingId);
+        if (p && p.alive) {
+          p.lives = Math.max(0, (p.lives ?? 0) - 1);
+          p.alive = (p.lives ?? 0) > 0;
+          this.fiveAliveRedealIfEmpty(room, p.id);
+        }
+      }
+
+      // Advance bomb awaiting to next responder (or finish).
+      const idx = five.bombResponderIds.indexOf(awaitingId ?? "");
+      const nextAwaiting = five.bombResponderIds[idx + 1] ?? null;
+      five.bombAwaitingPlayerId = nextAwaiting;
+      if (!nextAwaiting) {
+        const actorId = five.bombActorId;
+        five.bombActorId = null;
+        five.bombResponderIds = [];
+        five.bombAwaitingPlayerId = null;
+        if (actorId) {
+          this.fiveAliveAdvanceToNextTurn(room, actorId);
+        } else {
+          this.fiveAliveMaybeWin(room);
+        }
+      }
+      void this.fiveAliveMaybeWin(room);
+      this.emitRoom(room);
+    }
+  }
+
+  submitFiveAlivePlayCard(
+    roomId: string,
+    playerId: string,
+    cardId?: string | null,
+    wildValue?: number,
+    pass?: boolean
+  ) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "five-alive") return;
+    const five = room.fiveAlive;
+    if (!five) return;
+
+    const actor = room.players.find((p) => p.id === playerId);
+    if (!actor || !actor.alive || (actor.lives ?? 0) <= 0) return;
+    if (!five.handsByPlayerId[playerId]) five.handsByPlayerId[playerId] = [];
+
+    if (room.phase === "fivealive_turn") {
+      if (five.turnPlayerId !== playerId) return;
+      if (pass) return; // no “pass” on a normal turn by spec
+
+      const id = cardId ?? null;
+      if (!id) return;
+
+      const hand = five.handsByPlayerId[playerId] ?? [];
+      const idx = hand.findIndex((c) => c.id === id);
+      if (idx < 0) return;
+
+      const card = hand[idx] as FiveAliveCardInstance;
+      hand.splice(idx, 1);
+      five.centerPile.push(card);
+
+      const advanceAfterPlay = () => {
+        // Re-deal before advancing so the next player sees updated hands.
+        this.fiveAliveRedealIfEmpty(room, playerId);
+        if (this.fiveAliveMaybeWin(room)) return;
+        this.fiveAliveAdvanceToNextTurn(room, playerId);
+      };
+
+      const doBust = (reason: string) => {
+        actor.lives = Math.max(0, (actor.lives ?? 0) - 1);
+        actor.alive = (actor.lives ?? 0) > 0;
+        five.runningTotal = 0;
+        five.pendingDrawCount = 0;
+        five.skipNext = false;
+        this.fiveAliveClearCenterToDiscard(room);
+        log(room, `${actor.name} busts (${reason}) — lose 1 life, reset to 0.`);
+        this.fiveAliveRedealIfEmpty(room, playerId);
+        if (this.fiveAliveMaybeWin(room)) return;
+        this.fiveAliveAdvanceToNextTurn(room, playerId);
+      };
+
+      switch (card.type) {
+        case "number": {
+          const tentative = five.runningTotal + card.value;
+          if (tentative > 21) {
+            doBust(`>${21}`);
+            return;
+          }
+          five.runningTotal = tentative;
+          log(room, `${actor.name} plays ${cardLabel(card)} (total: ${five.runningTotal}).`);
+          advanceAfterPlay();
+          return;
+        }
+        case "eq21":
+          five.runningTotal = 21;
+          log(room, `${actor.name} plays =21 (total: 21).`);
+          advanceAfterPlay();
+          return;
+        case "reset0":
+          five.runningTotal = 0;
+          log(room, `${actor.name} plays =0 (total: 0).`);
+          advanceAfterPlay();
+          return;
+        case "skip":
+          five.skipNext = true;
+          log(room, `${actor.name} plays Skip.`);
+          advanceAfterPlay();
+          return;
+        case "reverse":
+          five.direction = five.direction === 1 ? -1 : 1;
+          log(room, `${actor.name} plays Reverse.`);
+          advanceAfterPlay();
+          return;
+        case "draw1":
+          five.pendingDrawCount = 1;
+          log(room, `${actor.name} plays Draw 1.`);
+          advanceAfterPlay();
+          return;
+        case "draw2":
+          five.pendingDrawCount = 2;
+          log(room, `${actor.name} plays Draw 2.`);
+          advanceAfterPlay();
+          return;
+        case "bomb":
+          // Bomb: running total unchanged; next we collect 0-defuses from everyone else.
+          log(room, `${actor.name} plays Bomb.`);
+          five.skipNext = false;
+          five.pendingDrawCount = 0;
+          this.fiveAliveRedealIfEmpty(room, playerId);
+          if (this.fiveAliveMaybeWin(room)) return;
+          this.fiveAliveStartBombResolution(room, playerId);
+          return;
+        case "wild": {
+          const v = wildValue;
+          if (typeof v !== "number" || !Number.isFinite(v))
+            return;
+          const clamped = Math.max(0, Math.min(21, Math.floor(v)));
+          five.runningTotal = clamped;
+          log(room, `${actor.name} plays Wild (total: ${five.runningTotal}).`);
+          advanceAfterPlay();
+          return;
+        }
+      }
+    }
+
+    if (room.phase === "fivealive_bomb") {
+      if (five.bombAwaitingPlayerId !== playerId) return;
+
+      if (pass) {
+        const hand = five.handsByPlayerId[playerId] ?? [];
+        const hasZero = hand.some((c) => isNumber0(c));
+        if (hasZero) return;
+        actor.lives = Math.max(0, (actor.lives ?? 0) - 1);
+        actor.alive = (actor.lives ?? 0) > 0;
+        log(room, `${actor.name} cannot defuse — lose 1 life.`);
+      } else {
+        const id = cardId ?? null;
+        if (!id) return;
+
+        const hand = five.handsByPlayerId[playerId] ?? [];
+        const idx = hand.findIndex((c) => c.id === id);
+        if (idx < 0) return;
+        const card = hand[idx] as FiveAliveCardInstance;
+        if (!isNumber0(card)) return;
+
+        hand.splice(idx, 1);
+        five.centerPile.push(card);
+        log(room, `${actor.name} defuses with 0.`);
+      }
+
+      // Redeal if they emptied their hand as part of the response.
+      this.fiveAliveRedealIfEmpty(room, playerId);
+      if (this.fiveAliveMaybeWin(room)) return;
+
+      const idx = five.bombResponderIds.indexOf(playerId);
+      const nextAwaiting = five.bombResponderIds[idx + 1] ?? null;
+      five.bombAwaitingPlayerId = nextAwaiting;
+
+      if (!nextAwaiting) {
+        const actorId = five.bombActorId;
+        five.bombActorId = null;
+        five.bombResponderIds = [];
+        five.bombAwaitingPlayerId = null;
+        if (actorId) {
+          this.fiveAliveAdvanceToNextTurn(room, actorId);
+        } else {
+          this.fiveAliveMaybeWin(room);
+        }
+      } else {
+        this.emitRoom(room);
+      }
     }
   }
 
@@ -1021,6 +1523,9 @@ export class GameRuntime {
 
     if (target.alive) {
       target.alive = false;
+      if (room.gameId === "five-alive") {
+        target.lives = 0;
+      }
       log(room, `${target.name} was removed from the city.`);
       this.leaveMafiaRooms(target, room.id);
       this.removeFromAllVoice(room, target.id);
@@ -1064,6 +1569,11 @@ export class GameRuntime {
     for (const p of room.players) {
       p.role = undefined;
       p.alive = true;
+      if (room.gameId === "five-alive") {
+        p.lives = 5;
+      } else {
+        p.lives = undefined;
+      }
       p.ready = true;
       p.afkCount = 0;
       p.blackmailed = false;
@@ -1080,6 +1590,7 @@ export class GameRuntime {
     room.nightActions = [];
     room.detectiveByPlayer = {};
     room.afkWarnedPlayerIds = [];
+    room.fiveAlive = undefined;
     room.voiceParticipants = emptyVoiceChannels();
     this.emitRoom(room);
   }

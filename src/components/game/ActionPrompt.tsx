@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Clock } from "lucide-react";
 import { pendingPlayerAction } from "@/lib/action-prompt";
+import { pendingFiveAliveActionPrompt } from "@/lib/action-prompt";
 import type { PublicGameState } from "@/lib/types";
 
 export function ActionPrompt({ state }: { state: PublicGameState }) {
@@ -16,9 +17,17 @@ export function ActionPrompt({ state }: { state: PublicGameState }) {
   const remaining = state.phaseEndsAt
     ? Math.ceil((state.phaseEndsAt - now) / 1000)
     : null;
-  const pending = pendingPlayerAction(state);
+  const pending =
+    state.gameId === "five-alive"
+      ? pendingFiveAliveActionPrompt(state)
+      : pendingPlayerAction(state);
   if (!pending) return null;
-  if (state.phase !== "night" && state.phase !== "day") return null;
+  if (state.gameId === "five-alive") {
+    if (state.phase !== "fivealive_turn" && state.phase !== "fivealive_bomb")
+      return null;
+  } else {
+    if (state.phase !== "night" && state.phase !== "day") return null;
+  }
 
   const closing = remaining != null && remaining > 0 && remaining <= 10;
   const urgent = closing;

@@ -17,12 +17,15 @@ import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
 import { LobbyView } from "@/components/game/LobbyView";
+import { FiveAliveLobbyView } from "@/components/game/FiveAliveLobbyView";
 import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { phaseSwap } from "@/components/ui/motion";
 import { availableChannels, CHANNEL_LABELS } from "@/lib/chat-access";
 import { Mic } from "lucide-react";
+import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
+import { FiveAliveBombPanel } from "@/components/game/five-alive/FiveAliveBombPanel";
 
 export function GameClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -139,6 +142,17 @@ export function GameClient({ roomId }: { roomId: string }) {
     socket.emit("night:action", { roomId: state.roomId, type, targetId });
   const emitVote = (targetId: string) =>
     socket.emit("day:vote", { roomId: state.roomId, targetId });
+  const emitFiveAlivePlay = (payload: {
+    cardId?: string | null;
+    wildValue?: number;
+    pass?: boolean;
+  }) =>
+    socket.emit("fivealive:playCard", {
+      roomId: state.roomId,
+      cardId: payload.cardId ?? null,
+      wildValue: payload.wildValue,
+      pass: payload.pass,
+    });
   const emitChat = (channel: ChatChannel, text: string) =>
     socket.emit("chat:send", { roomId: state.roomId, channel, text });
 
@@ -220,18 +234,87 @@ export function GameClient({ roomId }: { roomId: string }) {
             exit="exit"
           >
             {state.phase === "lobby" && (
-              <LobbyView
-                state={state}
-                onStart={emitStart}
-                onSettings={emitSettings}
-                onKick={emitKick}
-                onAddBot={emitAddBot}
-                onRemoveBot={emitRemoveBot}
-              />
+              <>
+                {state.gameId === "five-alive" ? (
+                  <FiveAliveLobbyView
+                    state={state}
+                    onStart={emitStart}
+                    onSettings={emitSettings}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                  />
+                ) : (
+                  <LobbyView
+                    state={state}
+                    onStart={emitStart}
+                    onSettings={emitSettings}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                  />
+                )}
+              </>
             )}
 
             {state.phase === "reveal" && state.you?.role && (
               <RoleRevealCard role={state.you.role} />
+            )}
+
+            {state.gameId === "five-alive" && state.phase === "fivealive_turn" && (
+              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                <FiveAliveTurnPanel
+                  state={state}
+                  onPlay={({ cardId, wildValue }) =>
+                    emitFiveAlivePlay({ cardId, wildValue })
+                  }
+                />
+                <div className="space-y-4">
+                  <GlassPanel className="p-4">
+                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                      Turn log
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-sm text-ink-steel">
+                      {state.logs.slice(-6).map((l) => (
+                        <li key={l.id}>{l.text}</li>
+                      ))}
+                    </ul>
+                  </GlassPanel>
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    joinVoiceRequest={joinVoiceRequest}
+                  />
+                </div>
+              </div>
+            )}
+
+            {state.gameId === "five-alive" && state.phase === "fivealive_bomb" && (
+              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                <FiveAliveBombPanel
+                  state={state}
+                  onRespond={(payload) => emitFiveAlivePlay(payload)}
+                />
+                <div className="space-y-4">
+                  <GlassPanel className="p-4">
+                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                      Bomb log
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-sm text-ink-steel">
+                      {state.logs.slice(-6).map((l) => (
+                        <li key={l.id}>{l.text}</li>
+                      ))}
+                    </ul>
+                  </GlassPanel>
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    joinVoiceRequest={joinVoiceRequest}
+                  />
+                </div>
+              </div>
             )}
 
             {state.phase === "night" && (

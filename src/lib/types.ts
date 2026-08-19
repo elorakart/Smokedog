@@ -9,8 +9,14 @@ export type Role =
   | "blackmailer";
 
 export type Faction = "town" | "mafia";
-
-export type Phase = "lobby" | "reveal" | "night" | "day" | "gameover";
+export type Phase =
+  | "lobby"
+  | "reveal"
+  | "night"
+  | "day"
+  | "gameover"
+  | "fivealive_turn"
+  | "fivealive_bomb";
 
 export type ChatChannel = "town" | "mafia" | "graveyard";
 
@@ -40,6 +46,8 @@ export interface Player {
   afkCount: number;
   blackmailed: boolean;
   bulletsLeft?: number;
+  // 5 Alive: remaining lives. Mafia City ignores this.
+  lives?: number;
   isBot: boolean;
 }
 
@@ -75,6 +83,8 @@ export interface PublicPlayer {
   afkCount: number;
   blackmailed: boolean;
   role?: Role;
+  // 5 Alive: remaining lives. Mafia City ignores this.
+  lives?: number;
   connected: boolean;
   isBot: boolean;
 }
@@ -111,6 +121,32 @@ export interface PublicGameState {
   dayVotesNeeded: number;
   voiceParticipants: Partial<Record<ChatChannel, string[]>>;
   autoPlayerCount: number;
+  // Optional per-game state for 5 Alive.
+  fiveAlive?: {
+    runningTotal: number;
+    direction: 1 | -1;
+    turnPlayerId: string | null;
+    skipNext: boolean;
+    pendingDrawCount: number;
+    yourHand: Array<{
+      id: string;
+      type:
+        | "number"
+        | "eq21"
+        | "reset0"
+        | "skip"
+        | "reverse"
+        | "draw1"
+        | "draw2"
+        | "bomb"
+        | "wild";
+      // Only present for `type === "number"`.
+      value?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    }>;
+    bombAwaitingPlayerId: string | null;
+    bombActorId: string | null;
+    bombResponderIds: string[];
+  };
 }
 
 export type VoiceSignalPayload =
@@ -167,6 +203,14 @@ export type ClientToServerEvents = {
     targetId: string;
   }) => void;
   "day:vote": (payload: { roomId: string; targetId: string }) => void;
+  "fivealive:playCard": (payload: {
+    roomId: string;
+    cardId?: string | null;
+    // For wild cards: desired running total (0..21).
+    wildValue?: number;
+    // For bomb forced responses when you cannot (or choose not) to play 0.
+    pass?: boolean;
+  }) => void;
   "chat:send": (payload: {
     roomId: string;
     channel: ChatChannel;

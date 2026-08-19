@@ -48,3 +48,32 @@ export function pendingPlayerAction(state: PublicGameState): {
 
   return null;
 }
+
+export function pendingFiveAliveActionPrompt(state: PublicGameState): {
+  title: string;
+  detail: string;
+} | null {
+  if (state.gameId !== "five-alive") return null;
+  const you = state.you;
+  if (!you?.alive) return null;
+  const five = state.fiveAlive;
+  if (!five) return null;
+
+  if (state.phase === "fivealive_turn") {
+    if (five.turnPlayerId !== you.id) return null;
+    return {
+      title: "Play a card",
+      detail: `Running total: ${five.runningTotal} (keep ≤ 21)`,
+    };
+  }
+
+  if (state.phase === "fivealive_bomb") {
+    if (five.bombAwaitingPlayerId !== you.id) return null;
+    return {
+      title: "Bomb response needed",
+      detail: `Play a number 0 (or pass to lose 1 life)`,
+    };
+  }
+
+  return null;
+}

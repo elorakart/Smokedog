@@ -20,6 +20,7 @@ export default function HomePage() {
   const [modal, setModal] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "join">("create");
   const [prefillCode, setPrefillCode] = useState("");
+  const [createGameId, setCreateGameId] = useState<string>("mafia-city");
   const [profile, setProfile] = useState(() => loadProfile());
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +63,7 @@ export default function HomePage() {
       playerId: p.playerId,
       name: p.name,
       avatarId: p.avatarId,
-      gameId: "mafia-city",
+      gameId: createGameId,
     });
   };
 
@@ -151,6 +152,7 @@ export default function HomePage() {
           type="button"
           onClick={() => {
             setError(null);
+            setCreateGameId("mafia-city");
             setPrefillCode("");
             setModalMode("create");
             setModal(true);
@@ -189,6 +191,51 @@ export default function HomePage() {
                 size={16}
                 className="transition group-hover:translate-x-1"
               />
+            </span>
+          </div>
+        </motion.button>
+
+        <motion.button
+          variants={fadeUp}
+          type="button"
+          onClick={() => {
+            setError(null);
+            setCreateGameId("five-alive");
+            setPrefillCode("");
+            setModalMode("create");
+            setModal(true);
+          }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.995 }}
+          className="group relative mt-8 w-full overflow-hidden rounded-lg text-left"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1516542076529-1ea3854896f2?auto=format&fit=crop&w=1600&q=80"
+            alt=""
+            className="h-[260px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-transparent" />
+          <div className="absolute inset-0 p-8 md:p-12">
+            <span className="rounded-sm bg-crimson px-3 py-1 font-mono text-[10px] uppercase tracking-widest">
+              Featured
+            </span>
+            <h2 className="mt-6 font-display text-4xl font-extrabold md:text-6xl">
+              5 Alive
+            </h2>
+            <p className="mt-3 max-w-lg text-ink">
+              Keep it under 21. Busts cost lives. Bombs demand instant 0s.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-6 font-mono text-xs uppercase tracking-wider text-ink-steel">
+              <span className="inline-flex items-center gap-2">
+                <Users size={14} /> 2–6 Players
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Clock size={14} /> Turn-based
+              </span>
+            </div>
+            <span className="mt-8 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-widest text-crimson-glow">
+              Play now{" "}
+              <ArrowRight size={16} className="transition group-hover:translate-x-1" />
             </span>
           </div>
         </motion.button>
