@@ -100,7 +100,7 @@ export default function HomePage() {
       >
         <div className="flex items-center gap-3">
           <motion.div
-            className="h-8 w-8 rounded-[4px] bg-crimson shadow-glow"
+            className="flex h-8 w-8 items-center justify-center rounded-[4px] bg-crimson shadow-glow"
             animate={{
               boxShadow: [
                 "0 0 12px rgba(230,25,25,0.35)",
@@ -109,9 +109,13 @@ export default function HomePage() {
               ],
             }}
             transition={{ duration: 2.8, repeat: Infinity }}
-          />
+          >
+            <span className="font-display text-sm font-extrabold tracking-[0.1em]">
+              SA
+            </span>
+          </motion.div>
           <span className="font-display text-xl font-extrabold tracking-[0.18em]">
-            SMOKEDOG
+            SMOKEDOG&apos;s Arena
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -147,25 +151,26 @@ export default function HomePage() {
           incoming.
         </motion.p>
 
-        <motion.button
-          variants={fadeUp}
-          type="button"
-          onClick={() => {
-            setError(null);
-            setCreateGameId("mafia-city");
-            setPrefillCode("");
-            setModalMode("create");
-            setModal(true);
-          }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.995 }}
-          className="group relative mt-10 w-full overflow-hidden rounded-lg text-left"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1600&q=80"
-            alt=""
-            className="h-[340px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105 md:h-[420px]"
-          />
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <motion.button
+            variants={fadeUp}
+            type="button"
+            onClick={() => {
+              setError(null);
+              setCreateGameId("mafia-city");
+              setPrefillCode("");
+              setModalMode("create");
+              setModal(true);
+            }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.995 }}
+            className="group relative w-full overflow-hidden rounded-lg text-left"
+          >
+            <img
+              src="https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1600&q=80"
+              alt=""
+              className="h-[260px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105 md:h-[420px]"
+            />
           <div className="absolute inset-0 bg-gradient-to-t from-void via-void/40 to-transparent" />
           <div className="absolute inset-0 p-8 md:p-12">
             <span className="rounded-sm bg-crimson px-3 py-1 font-mono text-[10px] uppercase tracking-widest">
@@ -193,27 +198,27 @@ export default function HomePage() {
               />
             </span>
           </div>
-        </motion.button>
+          </motion.button>
 
-        <motion.button
-          variants={fadeUp}
-          type="button"
-          onClick={() => {
-            setError(null);
-            setCreateGameId("five-alive");
-            setPrefillCode("");
-            setModalMode("create");
-            setModal(true);
-          }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.995 }}
-          className="group relative mt-8 w-full overflow-hidden rounded-lg text-left"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1516542076529-1ea3854896f2?auto=format&fit=crop&w=1600&q=80"
-            alt=""
-            className="h-[260px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105"
-          />
+          <motion.button
+            variants={fadeUp}
+            type="button"
+            onClick={() => {
+              setError(null);
+              setCreateGameId("five-alive");
+              setPrefillCode("");
+              setModalMode("create");
+              setModal(true);
+            }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.995 }}
+            className="group relative w-full overflow-hidden rounded-lg text-left"
+          >
+            <img
+              src="https://images.unsplash.com/photo-1516542076529-1ea3854896f2?auto=format&fit=crop&w=1600&q=80"
+              alt=""
+              className="h-[260px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105 md:h-[420px]"
+            />
           <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-transparent" />
           <div className="absolute inset-0 p-8 md:p-12">
             <span className="rounded-sm bg-crimson px-3 py-1 font-mono text-[10px] uppercase tracking-widest">
@@ -238,7 +243,8 @@ export default function HomePage() {
               <ArrowRight size={16} className="transition group-hover:translate-x-1" />
             </span>
           </div>
-        </motion.button>
+          </motion.button>
+        </div>
 
         <OpenLobbies
           onJoin={joinWithProfile}
