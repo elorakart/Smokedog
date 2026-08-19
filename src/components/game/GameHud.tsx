@@ -2,6 +2,8 @@
 
 import { Copy, LogOut, Pause, Play, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CopyToast } from "@/components/ui/CopyToast";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import type { Phase, PublicGameState } from "@/lib/types";
 
 function format(seconds: number) {
@@ -44,15 +46,15 @@ export function GameHud({
     gameover: "DEBRIEF",
   };
 
-  const copy = async () => {
-    await navigator.clipboard.writeText(state.roomId);
-  };
+  const { copy, copied } = useCopyToClipboard();
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3">
+    <>
+      <CopyToast show={copied} message="Room code copied" />
+      <div className="flex flex-wrap items-center justify-end gap-3">
       <button
         type="button"
-        onClick={copy}
+        onClick={() => copy(state.roomId)}
         className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-surface/80 px-3 py-2 font-mono text-xs tracking-[0.2em]"
       >
         {state.roomId} <Copy size={12} />
@@ -96,5 +98,6 @@ export function GameHud({
         {quitting ? "Leaving…" : "Quit"}
       </button>
     </div>
+    </>
   );
 }
