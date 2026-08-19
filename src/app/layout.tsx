@@ -20,8 +20,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SMOKEDOG — Mafia City",
-  description: "Real-time social deduction. Trust no one.",
+  title: "SMOKEDOG's Arena",
+  description: "Multiplayer games — Mafia City and 5 Alive.",
 };
 
 export default function RootLayout({

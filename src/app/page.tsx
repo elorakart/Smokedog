@@ -147,8 +147,7 @@ export default function HomePage() {
           Select Your Battlefield
         </motion.h1>
         <motion.p variants={fadeUp} className="mt-3 max-w-xl text-ink-steel">
-          A modular multiplayer platform. Mafia City is live. More operations
-          incoming.
+          A modular multiplayer platform. Mafia City and 5 Alive are live now.
         </motion.p>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
@@ -274,8 +273,8 @@ export default function HomePage() {
               More games on the way
             </h3>
             <p className="mt-2 max-w-lg text-sm text-ink-steel">
-              New operations are in development. Mafia City is live now — check
-              back for the next drop.
+              New operations are in development. Mafia City and 5 Alive are live
+              now — check back for the next drop.
             </p>
           </div>
         </motion.article>
