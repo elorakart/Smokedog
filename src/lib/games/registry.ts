@@ -7,23 +7,41 @@ const modules: Record<string, GameModule> = {
   [fiveAliveModule.id]: fiveAliveModule,
 };
 
-export function getGameModule(id = "mafia-city"): GameModule {
+export function resolveGameId(id?: string): string {
   const normalized = (id ?? "").trim().toLowerCase();
-  if (!normalized) return mafiaCityModule;
+  if (!normalized) return mafiaCityModule.id;
 
-  const mapped =
+  if (
     normalized === "5-alive" ||
     normalized === "5alive" ||
     normalized === "fivealive" ||
     normalized === "five-alive"
-      ? "five-alive"
-      : normalized === "mafia" || normalized === "mafia-city"
-        ? "mafia-city"
-        : normalized;
+  ) {
+    return fiveAliveModule.id;
+  }
 
-  return modules[mapped] ?? mafiaCityModule;
+  if (normalized === "mafia" || normalized === "mafia-city") {
+    return mafiaCityModule.id;
+  }
+
+  return normalized;
+}
+
+export function getGameModule(id = "mafia-city"): GameModule {
+  const resolved = resolveGameId(id);
+  const mod = modules[resolved];
+  if (!mod) {
+    throw new Error(
+      `Game "${id ?? resolved}" is not available on this game server yet. Ask the host to redeploy the backend.`
+    );
+  }
+  return mod;
 }
 
 export function listGames(): GameModule[] {
   return Object.values(modules);
+}
+
+export function listGameIds(): string[] {
+  return Object.keys(modules);
 }

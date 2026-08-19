@@ -8,10 +8,17 @@ import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { AVATAR_COUNT } from "@/lib/profile";
 import { validateRoomCode } from "@/lib/room-code";
 
+function gameLabel(gameId: string): string {
+  if (gameId === "five-alive") return "5 Alive";
+  if (gameId === "mafia-city") return "Mafia City";
+  return gameId;
+}
+
 export function ProfileModal({
   open,
   defaultName,
   defaultAvatar,
+  createGameId,
   error,
   initialCode,
   initialMode,
@@ -22,6 +29,7 @@ export function ProfileModal({
   open: boolean;
   defaultName: string;
   defaultAvatar: number;
+  createGameId?: string;
   error?: string | null;
   initialCode?: string;
   initialMode?: "create" | "join";
@@ -101,7 +109,16 @@ export function ProfileModal({
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-crimson-glow">
                 Operator Dossier
               </p>
-              <h2 className="mt-2 font-display text-2xl font-bold">Enter the city</h2>
+              <h2 className="mt-2 font-display text-2xl font-bold">
+                {mode === "create" && createGameId
+                  ? `Create ${gameLabel(createGameId)} party`
+                  : "Enter the city"}
+              </h2>
+              {mode === "create" && createGameId && (
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                  Game: {gameLabel(createGameId)}
+                </p>
+              )}
               <label className="mt-6 block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
                 Display name
               </label>

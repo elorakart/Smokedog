@@ -17,7 +17,7 @@ import type {
   VoiceSignalPayload,
 } from "@/lib/types";
 import { generateRoomCode, RoomError, validateRoomCode } from "@/lib/room-code";
-import { getGameModule } from "@/lib/games/registry";
+import { getGameModule, resolveGameId } from "@/lib/games/registry";
 import {
   nextBotName,
   nextBotAvatarId,
@@ -445,7 +445,13 @@ export class GameRuntime {
     avatarId: number;
     gameId?: string;
   }): Room {
+    const requestedId = resolveGameId(opts.gameId);
     const mod = getGameModule(opts.gameId);
+    if (mod.id !== requestedId) {
+      throw new Error(
+        `Could not start ${requestedId}. This game server may need a redeploy.`
+      );
+    }
     let code = generateRoomCode();
     while (this.rooms.has(code)) code = generateRoomCode();
 

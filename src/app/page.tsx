@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Clock, Users } from "lucide-react";
@@ -21,8 +21,14 @@ export default function HomePage() {
   const [modalMode, setModalMode] = useState<"create" | "join">("create");
   const [prefillCode, setPrefillCode] = useState("");
   const [createGameId, setCreateGameId] = useState<string>("mafia-city");
+  const createGameIdRef = useRef<string>("mafia-city");
   const [profile, setProfile] = useState(() => loadProfile());
   const [error, setError] = useState<string | null>(null);
+
+  const setPendingGameId = (gameId: string) => {
+    createGameIdRef.current = gameId;
+    setCreateGameId(gameId);
+  };
 
   useEffect(() => {
     setProfile(loadProfile());
@@ -49,6 +55,13 @@ export default function HomePage() {
     socket.off("room:state");
     socket.on("room:error", ({ message }) => setError(message));
     socket.on("room:state", (state) => {
+      const requested = createGameIdRef.current;
+      if (requested && state.gameId !== requested) {
+        setError(
+          `Server started ${state.gameId} instead of ${requested}. The game server may need a redeploy — try again in a minute.`
+        );
+        return;
+      }
       setError(null);
       router.push(`/room/${state.roomId}`);
     });
@@ -63,7 +76,7 @@ export default function HomePage() {
       playerId: p.playerId,
       name: p.name,
       avatarId: p.avatarId,
-      gameId: createGameId,
+      gameId: createGameIdRef.current,
     });
   };
 
@@ -156,7 +169,7 @@ export default function HomePage() {
             type="button"
             onClick={() => {
               setError(null);
-              setCreateGameId("mafia-city");
+              setPendingGameId("mafia-city");
               setPrefillCode("");
               setModalMode("create");
               setModal(true);
@@ -204,7 +217,7 @@ export default function HomePage() {
             type="button"
             onClick={() => {
               setError(null);
-              setCreateGameId("five-alive");
+              setPendingGameId("five-alive");
               setPrefillCode("");
               setModalMode("create");
               setModal(true);
@@ -284,6 +297,7 @@ export default function HomePage() {
         open={modal}
         defaultName={profile?.name ?? ""}
         defaultAvatar={profile?.avatarId ?? 0}
+        createGameId={createGameId}
         error={error}
         initialCode={prefillCode}
         initialMode={modalMode}
