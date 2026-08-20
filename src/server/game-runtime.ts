@@ -755,7 +755,7 @@ export class GameRuntime {
       room,
       "info",
       "Voting has started",
-      "Cast your lynch vote or skip. Town voice is now closed."
+      "Lynch votes are open. Town voice is now closed."
     );
     log(room, `Day ${room.cycle} — voting open for ${DAY_VOTE_SECONDS}s.`);
     room.phaseEndsAt = Date.now() + DAY_VOTE_SECONDS * 1000;

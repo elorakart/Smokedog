@@ -30,9 +30,12 @@ export function pendingPlayerAction(state: PublicGameState): {
   detail: string;
 } | null {
   const you = state.you;
-  if (!you?.alive) return null;
+  if (!you) return null;
+
+  const deadVillagerVote = !!state.deadVillagerVote;
 
   if (state.phase === "night") {
+    if (!you.alive) return null;
     const type = you.role
       ? (nightActionFor(you.role) as import("@/lib/types").NightActionType | null)
       : null;
@@ -47,7 +50,14 @@ export function pendingPlayerAction(state: PublicGameState): {
 
   if (state.phase === "day" && state.daySubPhase === "vote") {
     if (you.blackmailed) return null;
+    if (!you.alive && !deadVillagerVote) return null;
     if (state.votes[you.id]) return null;
+    if (!you.alive && deadVillagerVote) {
+      return {
+        title: "Dead villager vote",
+        detail: "You may still cast a lynch vote or skip",
+      };
+    }
     return {
       title: "Vote needed",
       detail: "Cast your lynch vote or skip before time runs out",

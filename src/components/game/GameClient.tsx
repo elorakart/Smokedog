@@ -31,6 +31,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { availableChannels, canUseTownVoice, CHANNEL_LABELS } from "@/lib/chat-access";
 import { pendingPlayerAction } from "@/lib/action-prompt";
+import { announcementForViewer } from "@/lib/announcement-for-viewer";
 import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
 import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
@@ -40,6 +41,7 @@ import { SpotItTable } from "@/components/game/spot-it/SpotItTable";
 import { BoardLobbyView } from "@/components/game/board/BoardLobbyView";
 import { TttBoard } from "@/components/game/tic-tac-toe/TttBoard";
 import { Connect4Board } from "@/components/game/connect-4/Connect4Board";
+import { SpectatorBanner } from "@/components/game/mafia/SpectatorBanner";
 
 export function GameClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -478,7 +480,7 @@ export function GameClient({ roomId }: { roomId: string }) {
 
       {showAnnouncement && state.announcement && (
         <PhaseResultPopup
-          announcement={state.announcement}
+          announcement={announcementForViewer(state.announcement, state)}
           onDismiss={() =>
             setDismissedAnnouncementId(state.announcement!.id)
           }
@@ -565,6 +567,13 @@ export function GameClient({ roomId }: { roomId: string }) {
           </div>
         )}
         <ActionPrompt state={state} />
+        {state.gameId === "mafia-city" &&
+          state.you &&
+          !state.you.alive &&
+          state.phase !== "lobby" &&
+          state.phase !== "gameover" && (
+            <SpectatorBanner canVoteDead={!!state.deadVillagerVote} />
+          )}
         {state.phase === "gameover" ? (
           <GameOverScreen
             state={state}
