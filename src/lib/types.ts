@@ -372,6 +372,14 @@ export type ServerToClientEvents = {
     targetId: string;
     targetName: string;
     faction: Faction;
+    cycle?: number;
+  }) => void;
+  /** Personal night-power outcome — shown before town phase announcements. */
+  "night:powerResult": (payload: {
+    id: string;
+    tone: "info" | "good" | "bad";
+    title: string;
+    detail: string;
   }) => void;
   "chat:message": (message: ChatMessage) => void;
   "host:afkWarning": (payload: {

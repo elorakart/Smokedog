@@ -69,16 +69,20 @@ export function GameClient({ roomId }: { roomId: string }) {
   );
   const [mafiaVoiceWarning, setMafiaVoiceWarning] = useState(false);
   const [afkTick, setAfkTick] = useState(0);
-  const [detectivePopup, setDetectivePopup] = useState<{
-    targetName: string;
-    faction: Faction;
-    cycle?: number;
+  const [personalNightPopup, setPersonalNightPopup] = useState<{
+    id: string;
+    tone: "info" | "good" | "bad";
+    title: string;
+    detail: string;
   } | null>(null);
-  const [pendingDetectivePopup, setPendingDetectivePopup] = useState<{
-    targetName: string;
-    faction: Faction;
-    cycle?: number;
-  } | null>(null);
+  const [pendingPersonalNightPopups, setPendingPersonalNightPopups] = useState<
+    {
+      id: string;
+      tone: "info" | "good" | "bad";
+      title: string;
+      detail: string;
+    }[]
+  >([]);
   const [localReveal, setLocalReveal] = useState<{
     role: Role;
     faction: Faction;
@@ -90,6 +94,17 @@ export function GameClient({ roomId }: { roomId: string }) {
   const shownDetectiveLogIdRef = useRef<string | null>(null);
   const detectiveLogReadyRef = useRef(false);
 
+  const queuePersonalNightPopup = (popup: {
+    id: string;
+    tone: "info" | "good" | "bad";
+    title: string;
+    detail: string;
+  }) => {
+    setPendingPersonalNightPopups((prev) =>
+      prev.some((p) => p.id === popup.id) ? prev : [...prev, popup]
+    );
+  };
+
   useEffect(() => {
     if (!state?.afkGraceEndsAt || state.afkGracePlayerId !== state.you?.id) {
       return;
@@ -99,30 +114,21 @@ export function GameClient({ roomId }: { roomId: string }) {
   }, [state?.afkGraceEndsAt, state?.afkGracePlayerId, state?.you?.id]);
 
   // Seed detective log cursor so reconnect/history does not spam old popups.
+  // Live investigation popups come from detective:result (before town announcements).
   useEffect(() => {
     if (!state?.detectiveLog) return;
-    if (!detectiveLogReadyRef.current) {
-      const latest = state.detectiveLog[state.detectiveLog.length - 1];
-      shownDetectiveLogIdRef.current = latest?.id ?? null;
-      detectiveLogReadyRef.current = true;
-      return;
-    }
     const latest = state.detectiveLog[state.detectiveLog.length - 1];
-    if (!latest || latest.id === shownDetectiveLogIdRef.current) return;
-    shownDetectiveLogIdRef.current = latest.id;
-    setPendingDetectivePopup({
-      targetName: latest.targetName,
-      faction: latest.faction,
-      cycle: latest.cycle,
-    });
+    shownDetectiveLogIdRef.current = latest?.id ?? null;
+    detectiveLogReadyRef.current = true;
   }, [state?.detectiveLog]);
 
-  // Investigation result comes first — promote as soon as it arrives.
+  // Personal night-power results come first — promote as soon as they arrive.
   useEffect(() => {
-    if (detectivePopup || !pendingDetectivePopup) return;
-    setDetectivePopup(pendingDetectivePopup);
-    setPendingDetectivePopup(null);
-  }, [detectivePopup, pendingDetectivePopup]);
+    if (personalNightPopup || pendingPersonalNightPopups.length === 0) return;
+    const [next, ...rest] = pendingPersonalNightPopups;
+    setPersonalNightPopup(next);
+    setPendingPersonalNightPopups(rest);
+  }, [personalNightPopup, pendingPersonalNightPopups]);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -148,25 +154,8 @@ export function GameClient({ roomId }: { roomId: string }) {
         setLocalReveal(null);
         shownDetectiveLogIdRef.current = null;
         detectiveLogReadyRef.current = false;
-        setDetectivePopup(null);
-        setPendingDetectivePopup(null);
-      } else if (
-        next.you?.role === "detective" &&
-        next.detectiveLog &&
-        next.detectiveLog.length > 0
-      ) {
-        const latest = next.detectiveLog[next.detectiveLog.length - 1];
-        if (!detectiveLogReadyRef.current) {
-          shownDetectiveLogIdRef.current = latest.id;
-          detectiveLogReadyRef.current = true;
-        } else if (latest.id !== shownDetectiveLogIdRef.current) {
-          shownDetectiveLogIdRef.current = latest.id;
-          setPendingDetectivePopup({
-            targetName: latest.targetName,
-            faction: latest.faction,
-            cycle: latest.cycle,
-          });
-        }
+        setPersonalNightPopup(null);
+        setPendingPersonalNightPopups([]);
       }
     };
 
@@ -203,12 +192,27 @@ export function GameClient({ roomId }: { roomId: string }) {
       targetId: string;
       targetName: string;
       faction: Faction;
+      cycle?: number;
     }) => {
       // Prefer investigation before any day-phase announcement.
-      setPendingDetectivePopup({
-        targetName: payload.targetName,
-        faction: payload.faction,
+      queuePersonalNightPopup({
+        id: `detective-${payload.targetId}-${payload.faction}-${payload.cycle ?? "x"}`,
+        tone: payload.faction === "mafia" ? "bad" : "good",
+        title:
+          payload.cycle != null
+            ? `Night ${payload.cycle} investigation`
+            : "Investigation result",
+        detail: `${payload.targetName} is aligned with the ${payload.faction.toUpperCase()}.`,
       });
+    };
+
+    const onNightPowerResult = (payload: {
+      id: string;
+      tone: "info" | "good" | "bad";
+      title: string;
+      detail: string;
+    }) => {
+      queuePersonalNightPopup(payload);
     };
 
     const onErr = ({ message, code }: { message: string; code?: string }) => {
@@ -259,6 +263,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     s.on("chat:message", onChat);
     s.on("role:reveal", onRoleReveal);
     s.on("detective:result", onDetectiveResult);
+    s.on("night:powerResult", onNightPowerResult);
 
     const join = () => {
       if (quittingRef.current) return;
@@ -280,6 +285,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("chat:message", onChat);
       s.off("role:reveal", onRoleReveal);
       s.off("detective:result", onDetectiveResult);
+      s.off("night:powerResult", onNightPowerResult);
       s.off("connect", join);
     };
   }, [roomId, router]);
@@ -435,14 +441,14 @@ export function GameClient({ roomId }: { roomId: string }) {
   const showAnnouncement =
     !!state.announcement &&
     state.announcement.id !== dismissedAnnouncementId &&
-    !detectivePopup &&
-    !pendingDetectivePopup;
+    !personalNightPopup &&
+    pendingPersonalNightPopups.length === 0;
   const showActionDialog =
     !!pendingAction &&
     actionKey !== dismissedActionKey &&
     !showAnnouncement &&
-    !detectivePopup &&
-    !pendingDetectivePopup;
+    !personalNightPopup &&
+    pendingPersonalNightPopups.length === 0;
 
   const emitVoiceInvite = (targetId: string) => {
     if (!voiceChannel) return;
@@ -490,20 +496,17 @@ export function GameClient({ roomId }: { roomId: string }) {
         }
       />
 
-      {detectivePopup && (
+      {personalNightPopup && (
         <PhaseResultPopup
           announcement={{
-            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}-${detectivePopup.cycle ?? "x"}`,
-            tone: detectivePopup.faction === "mafia" ? "bad" : "good",
-            title:
-              detectivePopup.cycle != null
-                ? `Night ${detectivePopup.cycle} investigation`
-                : "Investigation result",
-            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction.toUpperCase()}.`,
+            id: personalNightPopup.id,
+            tone: personalNightPopup.tone,
+            title: personalNightPopup.title,
+            detail: personalNightPopup.detail,
             at: Date.now(),
           }}
           durationMs={5500}
-          onDismiss={() => setDetectivePopup(null)}
+          onDismiss={() => setPersonalNightPopup(null)}
         />
       )}
       {showAnnouncement && state.announcement && (

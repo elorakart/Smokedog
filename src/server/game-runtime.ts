@@ -1318,13 +1318,169 @@ export class GameRuntime {
     return ` by ${actor.name} with ${role} role`;
   }
 
+  private emitNightPowerResult(
+    socketId: string,
+    payload: {
+      tone: PhaseAnnouncement["tone"];
+      title: string;
+      detail: string;
+      id?: string;
+    }
+  ) {
+    this.io.to(socketId).emit("night:powerResult", {
+      id: payload.id ?? randomUUID(),
+      tone: payload.tone,
+      title: payload.title,
+      detail: payload.detail,
+    });
+  }
+
+  private emitPersonalNightPowerResults(
+    room: Room,
+    result: ReturnType<typeof resolveNight>
+  ) {
+    const cycle = room.cycle;
+    const nightLabel = `Night ${cycle}`;
+
+    if (result.detective) {
+      const target = room.players.find((p) => p.id === result.detective!.targetId);
+      const inv = room.players.find((p) => p.id === result.detective!.investigatorId);
+      if (inv?.socketId && target) {
+        this.io.to(inv.socketId).emit("detective:result", {
+          targetId: result.detective.targetId,
+          targetName: target.name,
+          faction: result.detective.faction,
+          cycle,
+        });
+      }
+    }
+
+    const doctorAction = room.nightActions.find((a) => a.type === "doctor_protect");
+    if (doctorAction) {
+      const doctor =
+        (result.doctorId
+          ? room.players.find((p) => p.id === result.doctorId)
+          : null) ?? room.players.find((p) => p.id === doctorAction.playerId);
+      const patient = room.players.find((p) => p.id === doctorAction.targetId);
+      if (doctor?.socketId && patient) {
+        if (result.doctorSavedTargetId === patient.id) {
+          this.emitNightPowerResult(doctor.socketId, {
+            tone: "good",
+            title: `${nightLabel} — patient saved`,
+            detail: `${patient.name} survived the night under your care.`,
+          });
+        } else {
+          this.emitNightPowerResult(doctor.socketId, {
+            tone: "info",
+            title: `${nightLabel} — quiet watch`,
+            detail: `No attack reached ${patient.name}.`,
+          });
+        }
+      }
+    }
+
+    if (result.blackmailerId && result.silencedId) {
+      const blackmailer = room.players.find((p) => p.id === result.blackmailerId);
+      const silenced = room.players.find((p) => p.id === result.silencedId);
+      if (blackmailer?.socketId && silenced) {
+        this.emitNightPowerResult(blackmailer.socketId, {
+          tone: "good",
+          title: `${nightLabel} — blackmail`,
+          detail: `You silenced ${silenced.name} for the day.`,
+        });
+      }
+    }
+
+    const vigAction = room.nightActions.find((a) => a.type === "vigilante_shoot");
+    if (vigAction) {
+      const vig = room.players.find((p) => p.id === vigAction.playerId);
+      const target = room.players.find((p) => p.id === vigAction.targetId);
+      if (vig?.socketId && target) {
+        const kill = result.deaths.find(
+          (d) => d.actorId === vig.id && d.actorRole === "vigilante"
+        );
+        const selfDeath = result.deaths.find((d) => d.playerId === vig.id);
+        if (kill) {
+          this.emitNightPowerResult(vig.socketId, {
+            tone: "bad",
+            title: `${nightLabel} — shot landed`,
+            detail: `You eliminated ${target.name}.`,
+          });
+        } else if (selfDeath?.reason.toLowerCase().includes("attacking")) {
+          this.emitNightPowerResult(vig.socketId, {
+            tone: "bad",
+            title: `${nightLabel} — ambushed`,
+            detail: `You died attacking a bodyguard protecting ${target.name}.`,
+          });
+        } else if (result.doctorSavedTargetId === target.id) {
+          this.emitNightPowerResult(vig.socketId, {
+            tone: "info",
+            title: `${nightLabel} — shot blocked`,
+            detail: `${target.name} was protected — your bullet failed.`,
+          });
+        } else if (
+          result.deaths.some(
+            (d) =>
+              d.actorId === vig.id &&
+              d.reason.toLowerCase().includes("intercepting")
+          )
+        ) {
+          this.emitNightPowerResult(vig.socketId, {
+            tone: "info",
+            title: `${nightLabel} — intercepted`,
+            detail: `A bodyguard intercepted your shot on ${target.name}.`,
+          });
+        }
+      }
+    }
+
+    const bgAction = room.nightActions.find((a) => a.type === "bodyguard_protect");
+    if (bgAction) {
+      const bg = room.players.find((p) => p.id === bgAction.playerId);
+      const charge = room.players.find((p) => p.id === bgAction.targetId);
+      const intercepted = result.deaths.find(
+        (d) =>
+          d.playerId === bg?.id &&
+          d.reason.toLowerCase().includes("intercepting")
+      );
+      if (bg?.socketId && charge && intercepted) {
+        this.emitNightPowerResult(bg.socketId, {
+          tone: "bad",
+          title: `${nightLabel} — last stand`,
+          detail: `You died protecting ${charge.name}.`,
+        });
+      }
+    }
+
+    const intel = room.mafiaNightIntel;
+    const intelParts: string[] = [];
+    if (intel.bossTargetName) {
+      intelParts.push(`Boss marked ${intel.bossTargetName}`);
+    }
+    if (intel.goonTargetName && intel.goonTargetName !== intel.bossTargetName) {
+      intelParts.push(`Goon marked ${intel.goonTargetName}`);
+    }
+    if (intel.blackmailTargetName) {
+      intelParts.push(`Blackmail on ${intel.blackmailTargetName}`);
+    }
+    if (intelParts.length > 0) {
+      for (const p of room.players) {
+        if (!p.alive || !p.socketId || !isMafiaRole(p.role)) continue;
+        this.emitNightPowerResult(p.socketId, {
+          tone: "info",
+          title: `${nightLabel} — mafia intel`,
+          detail: `${intelParts.join(". ")}.`,
+        });
+      }
+    }
+  }
+
   private resolveNightPhase(room: Room) {
     this.handlePhaseTimeoutAfk(room);
     const result = resolveNight(room.players, room.nightActions);
 
     if (result.detective) {
       const target = room.players.find((p) => p.id === result.detective!.targetId);
-      const inv = room.players.find((p) => p.id === result.detective!.investigatorId);
       room.detectiveByPlayer[result.detective.investigatorId] = {
         targetId: result.detective.targetId,
         faction: result.detective.faction,
@@ -1349,14 +1505,9 @@ export class GameRuntime {
           `${target.name} was investigated${by} — ${result.detective.faction}.`
         );
       }
-      if (inv?.socketId) {
-        this.io.to(inv.socketId).emit("detective:result", {
-          targetId: result.detective.targetId,
-          targetName: target?.name ?? "Unknown",
-          faction: result.detective.faction,
-        });
-      }
     }
+
+    this.emitPersonalNightPowerResults(room, result);
 
     if (result.doctorSavedTargetId) {
       const saved = room.players.find((p) => p.id === result.doctorSavedTargetId);
