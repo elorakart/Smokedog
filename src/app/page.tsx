@@ -39,8 +39,7 @@ const GAME_CARDS: GameCard[] = [
     pitch: "The city's last night. Trust no one. Vote wisely.",
     players: "4–12 Players",
     duration: "15–30 Min",
-    image:
-      "https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1600&q=80",
+    image: "/games/mafia-city.jpg",
     badge: "Featured",
     moreInfo: true,
   },
@@ -50,8 +49,7 @@ const GAME_CARDS: GameCard[] = [
     pitch: "Race to match the one shared symbol. First click claims the card.",
     players: "2–8 Players",
     duration: "Real-time",
-    image:
-      "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1600&q=80",
+    image: "/games/spot-it.jpg",
     badge: "Live",
     moreInfo: true,
   },
@@ -61,8 +59,7 @@ const GAME_CARDS: GameCard[] = [
     pitch: "Classic 3×3 duel. Hover to preview. First to three wins.",
     players: "2 Players",
     duration: "Turn-based",
-    image:
-      "https://images.unsplash.com/photo-1616587894289-86480e533129?auto=format&fit=crop&w=1600&q=80",
+    image: "/games/tic-tac-toe.jpg",
     badge: "Live",
     moreInfo: true,
   },
@@ -72,8 +69,7 @@ const GAME_CARDS: GameCard[] = [
     pitch: "Drop discs with gravity. Connect four in a row to win.",
     players: "2 Players",
     duration: "Turn-based",
-    image:
-      "https://images.unsplash.com/photo-1553481187-be93c21490a9?auto=format&fit=crop&w=1600&q=80",
+    image: "/games/connect-4.jpg",
     badge: "Live",
     moreInfo: true,
   },
@@ -83,8 +79,7 @@ const GAME_CARDS: GameCard[] = [
     pitch: "Keep it under 21. Busts cost lives. Bombs demand instant 0s.",
     players: "2–6 Players",
     duration: "Turn-based",
-    image:
-      "https://images.unsplash.com/photo-1516542076529-1ea3854896f2?auto=format&fit=crop&w=1600&q=80",
+    image: "/games/five-alive.jpg",
     badge: "Under maintenance",
     badgeTone: "amber",
     disabled: true,
@@ -317,7 +312,7 @@ export default function HomePage() {
                 <img
                   src={card.image}
                   alt=""
-                  className="h-[240px] w-full object-cover opacity-45 transition duration-700 group-hover:scale-105 md:h-[320px]"
+                  className="h-[240px] w-full object-cover object-center opacity-50 transition duration-700 group-hover:scale-105 md:h-[320px]"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-manila via-manila/70 to-transparent" />
                 <div className="absolute inset-0 p-6 md:p-8">
