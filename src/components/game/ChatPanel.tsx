@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Mic, MicOff, PhoneOff } from "lucide-react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Mic, MicOff, PhoneOff } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { ChatChannel, ChatMessage, PublicGameState } from "@/lib/types";
 import { GlassPanel } from "@/components/ui/primitives";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
@@ -15,6 +15,8 @@ import {
 } from "@/lib/chat-access";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import type { GameSocket } from "@/lib/socket/client";
+
+const NEAR_BOTTOM_PX = 48;
 
 export function ChatPanel({
   state,
@@ -80,6 +82,65 @@ export function ChatPanel({
   const messages = state.chat.filter((m) => m.channel === active);
   const [text, setText] = useState("");
 
+  const listRef = useRef<HTMLDivElement>(null);
+  const pinnedRef = useRef(true);
+  const lastMsgIdRef = useRef<string | null>(null);
+  const [unread, setUnread] = useState(0);
+
+  const isNearBottom = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+  }, []);
+
+  const scrollToLatest = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    pinnedRef.current = true;
+    setUnread(0);
+  }, []);
+
+  const onListScroll = useCallback(() => {
+    const near = isNearBottom();
+    pinnedRef.current = near;
+    if (near) setUnread(0);
+  }, [isNearBottom]);
+
+  useEffect(() => {
+    pinnedRef.current = true;
+    setUnread(0);
+    lastMsgIdRef.current = null;
+    requestAnimationFrame(() => scrollToLatest());
+  }, [active, scrollToLatest]);
+
+  useEffect(() => {
+    const latest = messages[messages.length - 1];
+    const latestId = latest?.id ?? null;
+    if (latestId === lastMsgIdRef.current) return;
+
+    const prevId = lastMsgIdRef.current;
+    lastMsgIdRef.current = latestId;
+    if (!prevId || !latest) {
+      if (pinnedRef.current) requestAnimationFrame(() => scrollToLatest());
+      return;
+    }
+
+    const prevIndex = messages.findIndex((m) => m.id === prevId);
+    const arrived =
+      prevIndex >= 0 ? messages.slice(prevIndex + 1) : messages.slice(-1);
+    const fromOthers = arrived.filter((m) => m.playerId !== you?.id);
+
+    if (pinnedRef.current || latest.playerId === you?.id) {
+      requestAnimationFrame(() => scrollToLatest());
+      return;
+    }
+
+    if (fromOthers.length > 0) {
+      setUnread((n) => n + fromOthers.length);
+    }
+  }, [messages, you?.id, scrollToLatest]);
+
   const voice = useVoiceChat(
     socket,
     state.roomId,
@@ -107,6 +168,8 @@ export function ChatPanel({
     if (!text.trim() || !canSendActive) return;
     onSend(active, text);
     setText("");
+    pinnedRef.current = true;
+    requestAnimationFrame(() => scrollToLatest());
   };
 
   const speaking = new Set(voice.speakingIds);
@@ -134,7 +197,7 @@ export function ChatPanel({
   }
 
   return (
-    <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
+    <GlassPanel className="relative flex h-[420px] max-md:h-[50vh] flex-col">
       <div className="flex divide-x divide-crimson/30 border-b border-crimson/30">
         {tabs.map((t) => {
           const selected = active === t.id;
@@ -249,50 +312,76 @@ export function ChatPanel({
         </>
       )}
 
-      <div data-lenis-prevent className="flex-1 space-y-2 overflow-y-auto p-3">
-        {messages.length === 0 && (
-          <p className="text-sm text-ink-steel">
-            {!canViewActive
-              ? "Channel closed"
-              : active === "town" && state.phase === "night"
-                ? "Public channel opens at dawn."
-                : active === "mafia" && state.phase === "day"
-                  ? "Mafia channel opens after dark."
-                  : "No messages yet."}
-          </p>
-        )}
-        {messages.map((m: ChatMessage, i) => {
-          const isOwn = m.playerId === you?.id;
-          return (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className={`text-sm max-md:flex max-md:flex-col ${
-                isOwn ? "max-md:items-end" : "max-md:items-start"
-              } ${i % 2 ? "md:bg-crimson/5" : ""} md:rounded-sm md:px-2 md:py-1 ${
-                isOwn
-                  ? "max-md:ml-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-br-sm max-md:bg-crimson/20 max-md:px-3 max-md:py-2"
-                  : "max-md:mr-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-bl-sm max-md:bg-crimson/10 max-md:px-3 max-md:py-2"
-              }`}
-            >
-              <span className="font-mono text-[10px] text-ink-steel max-md:hidden">
-                {new Date(m.at).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>{" "}
-              <span
-                className={`font-semibold text-crimson-glow ${
-                  isOwn ? "max-md:hidden" : ""
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          data-lenis-prevent
+          onScroll={onListScroll}
+          className="absolute inset-0 space-y-2 overflow-y-auto p-3"
+        >
+          {messages.length === 0 && (
+            <p className="text-sm text-ink-steel">
+              {!canViewActive
+                ? "Channel closed"
+                : active === "town" && state.phase === "night"
+                  ? "Public channel opens at dawn."
+                  : active === "mafia" && state.phase === "day"
+                    ? "Mafia channel opens after dark."
+                    : "No messages yet."}
+            </p>
+          )}
+          {messages.map((m: ChatMessage, i) => {
+            const isOwn = m.playerId === you?.id;
+            return (
+              <motion.div
+                key={m.id}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`text-sm max-md:flex max-md:flex-col ${
+                  isOwn ? "max-md:items-end" : "max-md:items-start"
+                } ${i % 2 ? "md:bg-crimson/5" : ""} md:rounded-sm md:px-2 md:py-1 ${
+                  isOwn
+                    ? "max-md:ml-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-br-sm max-md:bg-crimson/20 max-md:px-3 max-md:py-2"
+                    : "max-md:mr-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-bl-sm max-md:bg-crimson/10 max-md:px-3 max-md:py-2"
                 }`}
               >
-                {m.name}
-              </span>
-              <p>{m.text}</p>
-            </motion.div>
-          );
-        })}
+                <span className="font-mono text-[10px] text-ink-steel max-md:hidden">
+                  {new Date(m.at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>{" "}
+                <span
+                  className={`font-semibold text-crimson-glow ${
+                    isOwn ? "max-md:hidden" : ""
+                  }`}
+                >
+                  {m.name}
+                </span>
+                <p>{m.text}</p>
+              </motion.div>
+            );
+          })}
+          <div aria-hidden className="h-px w-full" />
+        </div>
+
+        <AnimatePresence>
+          {unread > 0 && (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              onClick={scrollToLatest}
+              className="absolute bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-sm border-2 border-crimson bg-crimson px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-manila shadow-stamp transition hover:opacity-90"
+            >
+              <ChevronDown size={12} />
+              {unread === 1
+                ? "1 unread message"
+                : `${unread} unread messages`}
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
       <form
