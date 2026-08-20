@@ -117,22 +117,12 @@ export function GameClient({ roomId }: { roomId: string }) {
     });
   }, [state?.detectiveLog]);
 
-  // Show investigation after phase announcement so it is not buried.
+  // Investigation result comes first — promote as soon as it arrives.
   useEffect(() => {
-    const announcementBlocking =
-      !!state?.announcement &&
-      state.announcement.id !== dismissedAnnouncementId;
-    if (announcementBlocking || detectivePopup || !pendingDetectivePopup) {
-      return;
-    }
+    if (detectivePopup || !pendingDetectivePopup) return;
     setDetectivePopup(pendingDetectivePopup);
     setPendingDetectivePopup(null);
-  }, [
-    state?.announcement,
-    dismissedAnnouncementId,
-    detectivePopup,
-    pendingDetectivePopup,
-  ]);
+  }, [detectivePopup, pendingDetectivePopup]);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -160,6 +150,23 @@ export function GameClient({ roomId }: { roomId: string }) {
         detectiveLogReadyRef.current = false;
         setDetectivePopup(null);
         setPendingDetectivePopup(null);
+      } else if (
+        next.you?.role === "detective" &&
+        next.detectiveLog &&
+        next.detectiveLog.length > 0
+      ) {
+        const latest = next.detectiveLog[next.detectiveLog.length - 1];
+        if (!detectiveLogReadyRef.current) {
+          shownDetectiveLogIdRef.current = latest.id;
+          detectiveLogReadyRef.current = true;
+        } else if (latest.id !== shownDetectiveLogIdRef.current) {
+          shownDetectiveLogIdRef.current = latest.id;
+          setPendingDetectivePopup({
+            targetName: latest.targetName,
+            faction: latest.faction,
+            cycle: latest.cycle,
+          });
+        }
       }
     };
 
@@ -197,6 +204,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       targetName: string;
       faction: Faction;
     }) => {
+      // Prefer investigation before any day-phase announcement.
       setPendingDetectivePopup({
         targetName: payload.targetName,
         faction: payload.faction,
@@ -426,11 +434,15 @@ export function GameClient({ roomId }: { roomId: string }) {
     : null;
   const showAnnouncement =
     !!state.announcement &&
-    state.announcement.id !== dismissedAnnouncementId;
+    state.announcement.id !== dismissedAnnouncementId &&
+    !detectivePopup &&
+    !pendingDetectivePopup;
   const showActionDialog =
     !!pendingAction &&
     actionKey !== dismissedActionKey &&
-    !showAnnouncement;
+    !showAnnouncement &&
+    !detectivePopup &&
+    !pendingDetectivePopup;
 
   const emitVoiceInvite = (targetId: string) => {
     if (!voiceChannel) return;
@@ -478,6 +490,22 @@ export function GameClient({ roomId }: { roomId: string }) {
         }
       />
 
+      {detectivePopup && (
+        <PhaseResultPopup
+          announcement={{
+            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}-${detectivePopup.cycle ?? "x"}`,
+            tone: detectivePopup.faction === "mafia" ? "bad" : "good",
+            title:
+              detectivePopup.cycle != null
+                ? `Night ${detectivePopup.cycle} investigation`
+                : "Investigation result",
+            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction.toUpperCase()}.`,
+            at: Date.now(),
+          }}
+          durationMs={5500}
+          onDismiss={() => setDetectivePopup(null)}
+        />
+      )}
       {showAnnouncement && state.announcement && (
         <PhaseResultPopup
           announcement={announcementForViewer(state.announcement, state)}
@@ -491,22 +519,6 @@ export function GameClient({ roomId }: { roomId: string }) {
           title={pendingAction.title}
           detail={pendingAction.detail}
           onDismiss={() => setDismissedActionKey(actionKey)}
-        />
-      )}
-      {detectivePopup && !showAnnouncement && (
-        <PhaseResultPopup
-          announcement={{
-            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}-${detectivePopup.cycle ?? "x"}`,
-            tone: detectivePopup.faction === "mafia" ? "bad" : "good",
-            title:
-              detectivePopup.cycle != null
-                ? `Night ${detectivePopup.cycle} investigation`
-                : "Investigation result",
-            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction.toUpperCase()}.`,
-            at: Date.now(),
-          }}
-          durationMs={5000}
-          onDismiss={() => setDetectivePopup(null)}
         />
       )}
       {mafiaVoiceWarning && (
