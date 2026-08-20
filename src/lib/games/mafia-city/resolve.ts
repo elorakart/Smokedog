@@ -297,13 +297,15 @@ export function majorityThreshold(livingCount: number): number {
   return Math.floor(livingCount / 2) + 1;
 }
 
-function eligibleVoters(players: Player[]): Player[] {
-  const alive = living(players);
-  const livingVoters = alive.filter((p) => !p.blackmailed);
-  const deadVillagers = players.filter(
-    (p) => !p.alive && p.role === "villager"
-  );
-  return [...livingVoters, ...deadVillagers];
+/** Living non-blackmailed players, plus dead villagers (who keep a vote). */
+export function playerCanDayVote(p: Player): boolean {
+  if (p.alive) return !p.blackmailed;
+  return p.role === "villager";
+}
+
+/** Roster for the day vote tally — not the full seat count. */
+export function eligibleVoters(players: Player[]): Player[] {
+  return players.filter(playerCanDayVote);
 }
 
 export function tallyLynch(

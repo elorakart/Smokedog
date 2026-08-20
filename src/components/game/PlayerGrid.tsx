@@ -252,6 +252,18 @@ export function VotePanel({
   const skipVoteCount = Object.values(state.votes).filter(
     (v) => v === SKIP_VOTE_ID
   ).length;
+  // Prefer server eligible count (includes dead villagers). Never fall back to full roster.
+  const livingEligible = state.players.filter(
+    (p) => p.alive && !p.blackmailed
+  ).length;
+  const youIneligibleDead =
+    !!state.you && !state.you.alive && !deadVillager;
+  let votesNeeded = state.dayVotesNeeded || livingEligible;
+  // If server still reports full roster while you are a dead non-voter, exclude that seat.
+  if (youIneligibleDead && votesNeeded >= state.players.length) {
+    votesNeeded = Math.max(livingEligible, state.players.length - 1);
+  }
+  const votesIn = Math.min(state.dayVotesIn, votesNeeded);
 
   if (isDiscussion) {
     return (
@@ -276,7 +288,7 @@ export function VotePanel({
           : "Majority of the living hangs a suspect, or skip to spare the city. Town voice is closed during voting."}
       </p>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-        Votes in: {state.dayVotesIn}/{state.dayVotesNeeded}
+        Votes in: {votesIn}/{votesNeeded}
       </p>
       {muted && (
         <p className="mt-2 font-mono text-xs uppercase text-crimson/80">

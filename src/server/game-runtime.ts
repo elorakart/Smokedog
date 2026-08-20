@@ -87,6 +87,8 @@ function isChatOnlyGame(gameId: string): boolean {
   );
 }
 import {
+  eligibleVoters,
+  playerCanDayVote,
   resolveNight,
   tallyLynch,
   validNightTargets,
@@ -184,16 +186,13 @@ function emptyVoiceChannels(): Record<ChatChannel, Set<string>> {
 }
 
 function dayVoteEligible(room: Room): Player[] {
-  const livingVoters = living(room).filter((p) => !p.blackmailed);
-  const deadVillagers = room.players.filter(
-    (p) => !p.alive && p.role === "villager"
-  );
-  return [...livingVoters, ...deadVillagers];
+  return eligibleVoters(room.players);
 }
 
 function dayVoteStats(room: Room) {
   const eligible = dayVoteEligible(room);
   const votesIn = eligible.filter((p) => room.votes[p.id]).length;
+  // Denominator is eligible voters only (living + dead villagers), never full roster.
   return { eligible, votesIn, votesNeeded: eligible.length };
 }
 
@@ -365,7 +364,10 @@ export class GameRuntime {
       afkGracePlayerId: room.afkGracePlayerId,
       roleDistributionPreview: rolePreview,
       deadVillagerVote:
-        !!you && !you.alive && you.role === "villager" && room.daySubPhase === "vote",
+        !!you &&
+        !you.alive &&
+        playerCanDayVote(you) &&
+        room.daySubPhase === "vote",
       fiveAlive: five
         ? {
             runningTotal: five.runningTotal,
@@ -427,7 +429,7 @@ export class GameRuntime {
   /** Dead villagers keep a vote — do not lock the lynch until they have cast (or timer ends). */
   private deadVillagersHaveVoted(room: Room): boolean {
     const deadVillagers = room.players.filter(
-      (p) => !p.alive && p.role === "villager"
+      (p) => !p.alive && playerCanDayVote(p)
     );
     return deadVillagers.every((p) => room.votes[p.id] != null);
   }
@@ -671,10 +673,7 @@ export class GameRuntime {
           ) {
             return;
           }
-          const stillEligible =
-            (bot.alive && !bot.blackmailed) ||
-            (!bot.alive && bot.role === "villager");
-          if (!stillEligible || room.votes[bot.id]) return;
+          if (!playerCanDayVote(bot) || room.votes[bot.id]) return;
           const targetId = pickBotVoteTarget(room.players, bot, room.votes);
           if (!targetId) return;
           this.submitVote(room.id, bot.id, targetId);
@@ -1935,10 +1934,7 @@ export class GameRuntime {
     }
     const voter = room.players.find((p) => p.id === playerId);
     if (!voter) return;
-    const canVote =
-      (voter.alive && !voter.blackmailed) ||
-      (!voter.alive && voter.role === "villager");
-    if (!canVote) return;
+    if (!playerCanDayVote(voter)) return;
     room.votes[playerId] = SKIP_VOTE_ID;
     if (room.afkGracePlayerId === playerId) {
       room.afkGracePlayerId = null;
@@ -1961,11 +1957,7 @@ export class GameRuntime {
     }
     const voter = room.players.find((p) => p.id === playerId);
     const target = room.players.find((p) => p.id === targetId);
-    const canVote =
-      !!voter &&
-      ((voter.alive && !voter.blackmailed) ||
-        (!voter.alive && voter.role === "villager"));
-    if (!canVote || !target?.alive || target.id === voter.id) {
+    if (!voter || !playerCanDayVote(voter) || !target?.alive || target.id === voter.id) {
       return;
     }
     room.votes[playerId] = targetId;
