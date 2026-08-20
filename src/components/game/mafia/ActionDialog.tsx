@@ -16,6 +16,7 @@ export function ActionDialog({
 }) {
   useEffect(() => {
     playActionNeeded();
+    window.scrollTo({ top: 0, behavior: "smooth" });
     const t = setTimeout(onDismiss, 5000);
     return () => clearTimeout(t);
   }, [title, detail, onDismiss]);
@@ -23,20 +24,29 @@ export function ActionDialog({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        className="fixed left-1/2 top-20 z-40 w-[min(92vw,28rem)] -translate-x-1/2 rounded-sm border border-amber-400/40 bg-amber-400/10 px-4 py-3 shadow-lg backdrop-blur-md"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-void/60 p-4 backdrop-blur-[8px]"
+        onClick={onDismiss}
       >
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-200" />
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100">
-              {title}
-            </p>
-            <p className="mt-1 text-sm text-ink">{detail}</p>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-[min(92vw,28rem)] rounded-sm border border-amber-400/40 bg-surface/95 px-5 py-4 shadow-lg"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-200" />
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100">
+                {title}
+              </p>
+              <p className="mt-2 text-sm text-ink">{detail}</p>
+            </div>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

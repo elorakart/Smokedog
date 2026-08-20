@@ -4,26 +4,46 @@ import { Mic, MicOff, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
-import { ROLE_META } from "@/lib/games/mafia-city/roles";
+import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import type { NightActionType, PublicGameState, PublicPlayer } from "@/lib/types";
 import { SKIP_VOTE_ID } from "@/lib/types";
 import { nightActionFor } from "@/lib/games/mafia-city/roles";
 import { NIGHT_ACTION_LOCKED, NIGHT_ACTION_PROMPTS } from "@/lib/action-prompt";
 
-function tags(p: PublicPlayer) {
+function tags(p: PublicPlayer, intel?: PublicGameState["mafiaNightIntel"]) {
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       <StatusChip tone={p.alive ? "live" : "dead"}>
         {p.alive ? "Alive" : "Spectator"}
       </StatusChip>
+      {p.role && (
+        <StatusChip tone={isMafiaRole(p.role) ? "mafia" : "town"}>
+          {ROLE_META[p.role].label}
+        </StatusChip>
+      )}
+      {intel?.bossTargetId === p.id && (
+        <StatusChip tone="afk">Boss mark</StatusChip>
+      )}
+      {intel?.goonTargetId === p.id && (
+        <StatusChip tone="afk">Goon mark</StatusChip>
+      )}
+      {intel?.blackmailTargetId === p.id && (
+        <StatusChip tone="mute">Silenced</StatusChip>
+      )}
       {p.blackmailed && p.alive && (
         <StatusChip tone="mute">
           <MicOff size={10} className="mr-1" /> Muted
         </StatusChip>
       )}
       {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
-      {p.afkCount >= 2 && p.alive && !p.isBot && <StatusChip tone="afk">AFK</StatusChip>}
-      {!p.connected && !p.isBot && <StatusChip tone="neutral"><WifiOff size={10} /></StatusChip>}
+      {p.afkCount >= 2 && p.alive && !p.isBot && (
+        <StatusChip tone="afk">AFK</StatusChip>
+      )}
+      {!p.connected && !p.isBot && (
+        <StatusChip tone="neutral">
+          <WifiOff size={10} />
+        </StatusChip>
+      )}
     </div>
   );
 }
@@ -58,6 +78,7 @@ export function PlayerGrid({
   }
   const inVoice = new Set(voiceParticipantIds ?? []);
   const speaking = new Set(speakingIds ?? []);
+  const showMafiaIntel = !!state.mafiaNightIntel;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -86,38 +107,39 @@ export function PlayerGrid({
                 className={`flex h-full flex-col p-3 transition ${
                   selected ? "ring-2 ring-crimson shadow-glow" : ""
                 } ${!p.alive ? "opacity-50" : ""} ${
-                  !disabled ? "hover:-translate-y-1 hover:shadow-spotlight" : ""
+                  !disabled
+                    ? "cursor-pointer hover:-translate-y-1 hover:shadow-spotlight"
+                    : ""
                 }`}
+                onClick={
+                  !disabled && onSelect
+                    ? () => onSelect(p.id)
+                    : undefined
+                }
               >
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onSelect?.(p.id)}
-                  className={`mx-auto w-full max-w-[6.5rem] ${
-                    disabled ? "cursor-default" : ""
-                  }`}
-                >
+                <div className="mx-auto w-full max-w-[6.5rem]">
                   <div
                     className={`aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
-                      selected ? "ring-crimson" : speaking.has(p.id) ? "ring-emerald-400" : inVoice.has(p.id) ? "ring-emerald-400/50" : "ring-transparent"
+                      selected
+                        ? "ring-crimson"
+                        : speaking.has(p.id)
+                          ? "ring-emerald-400 animate-pulse"
+                          : inVoice.has(p.id)
+                            ? "ring-emerald-400/50"
+                            : "ring-transparent"
                     }`}
                   >
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}
-                      className="h-full w-full"
+                      className="h-full w-full pointer-events-none"
                     />
                   </div>
-                </button>
+                </div>
                 <p className="mt-2 truncate text-center font-display text-sm font-semibold">
                   {p.name}
                 </p>
-                {p.role && state.phase === "gameover" && (
-                  <p className="font-mono text-[10px] uppercase text-ink-steel">
-                    {ROLE_META[p.role].label}
-                  </p>
-                )}
-                {tags(p)}
+                {tags(p, showMafiaIntel ? state.mafiaNightIntel : undefined)}
                 {showVotes && voteCounts[p.id] ? (
                   <p className="mt-1 font-mono text-xs text-crimson-glow">
                     {voteCounts[p.id]} vote{voteCounts[p.id] > 1 ? "s" : ""}
@@ -126,7 +148,10 @@ export function PlayerGrid({
                 {canInvite && (
                   <button
                     type="button"
-                    onClick={() => onInviteVoice(p.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onInviteVoice(p.id);
+                    }}
                     className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-emerald-400/30 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300"
                   >
                     <Mic size={10} /> Invite voice
@@ -145,53 +170,76 @@ export function NightActionPanel({
   state,
   onAct,
   onInviteVoice,
+  speakingIds,
 }: {
   state: PublicGameState;
   onAct: (type: NightActionType, targetId: string) => void;
   onInviteVoice?: (id: string) => void;
+  speakingIds?: string[];
 }) {
   const you = state.you;
   const type = you?.role ? (nightActionFor(you.role) as NightActionType | null) : null;
   const noBullets = you?.role === "vigilante" && (you.bulletsLeft ?? 0) <= 0;
   const target = state.players.find((p) => p.id === state.nightActionTargetId);
+  const dead = !you?.alive;
 
-  if (!you?.alive) {
-    return <p className="text-ink-steel">You are spectating the night from the graveyard.</p>;
+  if (dead) {
+    return (
+      <div>
+        <h3 className="font-display text-xl font-bold">Night watch</h3>
+        <p className="mt-1 text-sm text-ink-steel">
+          You are eliminated — watch the city. Use graveyard chat.
+        </p>
+        <div className="mt-4">
+          <PlayerGrid
+            state={state}
+            onInviteVoice={onInviteVoice}
+            voiceParticipantIds={
+              state.voiceParticipants.mafia ?? state.voiceParticipants.town
+            }
+            speakingIds={speakingIds}
+          />
+        </div>
+      </div>
+    );
   }
+
   if (!type || noBullets) {
     return (
-      <p className="text-ink-steel">
-        {noBullets
-          ? "You are out of bullets. Stay quiet."
-          : "No night action. Wait for dawn."}
-      </p>
+      <div>
+        <p className="text-ink-steel">
+          {noBullets
+            ? "You are out of bullets. Stay quiet."
+            : "No night action. Wait for dawn."}
+        </p>
+        <div className="mt-4">
+          <PlayerGrid
+            state={state}
+            voiceParticipantIds={
+              state.voiceParticipants.mafia ?? state.voiceParticipants.town
+            }
+            speakingIds={speakingIds}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
     <div>
       <h3 className="font-display text-xl font-bold">{NIGHT_ACTION_PROMPTS[type]}</h3>
-      {state.mafiaNightIntel && (
-        <div className="mt-2 rounded-sm border border-crimson/30 bg-crimson/5 px-3 py-2 text-xs text-ink-steel">
-          {state.mafiaNightIntel.bossTargetName && (
-            <p>Boss target: {state.mafiaNightIntel.bossTargetName}</p>
-          )}
-          {state.mafiaNightIntel.goonTargetName && (
-            <p>Goon target: {state.mafiaNightIntel.goonTargetName}</p>
-          )}
-          {state.mafiaNightIntel.blackmailTargetName && (
-            <p>Blackmail: {state.mafiaNightIntel.blackmailTargetName}</p>
-          )}
-        </div>
-      )}
       {state.submittedNightAction && target ? (
         <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
           {NIGHT_ACTION_LOCKED[type](target.name)}
         </p>
       ) : state.submittedNightAction ? (
-        <p className="mt-1 font-mono text-xs uppercase text-emerald-300">Action locked in</p>
+        <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
+          Action locked in
+        </p>
       ) : (
-        <p className="mt-1 text-sm text-ink-steel">Tap a portrait to lock your target.</p>
+        <p className="mt-1 text-sm text-ink-steel">
+          Tap a card to lock your target.
+        </p>
       )}
       <div className="mt-4">
         <PlayerGrid
@@ -200,7 +248,10 @@ export function NightActionPanel({
           selectedId={state.nightActionTargetId}
           onSelect={(id) => onAct(type, id)}
           onInviteVoice={onInviteVoice}
-          voiceParticipantIds={state.voiceParticipants.mafia ?? state.voiceParticipants.town}
+          voiceParticipantIds={
+            state.voiceParticipants.mafia ?? state.voiceParticipants.town
+          }
+          speakingIds={speakingIds}
         />
       </div>
     </div>
@@ -224,6 +275,7 @@ export function VotePanel({
 }) {
   const muted = !!state.you?.blackmailed;
   const deadVillager = !!state.deadVillagerVote;
+  const dead = !state.you?.alive;
   const canParticipate =
     (!!state.you?.alive && !muted) || deadVillager;
   const isHost = !!state.you?.isHost;
@@ -240,8 +292,9 @@ export function VotePanel({
       <div>
         <h3 className="font-display text-xl font-bold">Day discussion</h3>
         <p className="mt-1 text-sm text-ink-steel">
-          Debate suspects on town voice and chat. Voting opens in the final 15
-          seconds.
+          {dead && !deadVillager
+            ? "You are eliminated — watch the debate. Voting opens in the final 15 seconds."
+            : "Debate suspects on town voice and chat. Voting opens in the final 15 seconds."}
         </p>
         <PlayerGrid
           state={state}
@@ -257,8 +310,9 @@ export function VotePanel({
     <div>
       <h3 className="font-display text-xl font-bold">Lynch vote</h3>
       <p className="mt-1 text-sm text-ink-steel">
-        Majority of the living hangs a suspect, or skip to spare the city. Town
-        voice is closed during voting.
+        {dead && !deadVillager
+          ? "You cannot vote — watch the tally. Town voice is closed during voting."
+          : "Majority of the living hangs a suspect, or skip to spare the city. Town voice is closed during voting."}
       </p>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Votes in: {state.dayVotesIn}/{state.dayVotesNeeded}

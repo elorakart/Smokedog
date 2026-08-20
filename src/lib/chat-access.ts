@@ -24,14 +24,18 @@ export function canAccessChannel(
     if (opts.phase === "fivealive_turn" || opts.phase === "fivealive_bomb") {
       return opts.alive && !opts.blackmailed;
     }
-    return (
+    // Alive town chat (send+read) during day
+    if (
       opts.alive &&
       opts.phase === "day" &&
       !opts.blackmailed &&
       (opts.daySubPhase === "discussion" ||
         opts.daySubPhase === "vote" ||
         !opts.daySubPhase)
-    );
+    ) {
+      return true;
+    }
+    return false;
   }
   if (channel === "mafia") {
     return (
@@ -44,13 +48,19 @@ export function canAccessChannel(
   return false;
 }
 
+/** Dead players can view public day chat but not send. */
+export function canViewTownChat(opts: ChannelAccessOpts): boolean {
+  if (canAccessChannel("town", opts)) return true;
+  return !opts.alive && opts.phase === "day";
+}
+
 export function canUseTownVoice(opts: ChannelAccessOpts): boolean {
   return canAccessChannel("town", opts) && opts.daySubPhase !== "vote";
 }
 
 export function availableChannels(opts: ChannelAccessOpts): ChatChannel[] {
   const channels: ChatChannel[] = [];
-  if (canAccessChannel("town", opts)) channels.push("town");
+  if (canViewTownChat(opts)) channels.push("town");
   if (canAccessChannel("mafia", opts)) channels.push("mafia");
   if (canAccessChannel("graveyard", opts)) channels.push("graveyard");
   return channels;

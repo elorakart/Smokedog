@@ -317,8 +317,7 @@ export class GameRuntime {
         viewerIsDetective && room.detectiveLog.length > 0
           ? room.detectiveLog
           : undefined,
-      chronicle:
-        revealAll && viewerIsTown ? room.chronicle : undefined,
+      chronicle: revealAll ? room.chronicle : undefined,
       afkGraceEndsAt: room.afkGraceEndsAt,
       afkGracePlayerId: room.afkGracePlayerId,
       roleDistributionPreview: rolePreview,
@@ -380,7 +379,10 @@ export class GameRuntime {
     return room.chat
       .filter((m) => {
         if (m.channel === "town") {
-          return canAccessChannel("town", opts);
+          return (
+            canAccessChannel("town", opts) ||
+            (!!you && !you.alive && room.phase === "day")
+          );
         }
         if (m.channel === "graveyard") return !!you && !you.alive;
         if (m.channel === "mafia") {
@@ -1150,10 +1152,66 @@ export class GameRuntime {
     this.handlePhaseTimeoutAfk(room);
     const result = resolveNight(room.players, room.nightActions);
 
+    if (result.detective) {
+      const target = room.players.find((p) => p.id === result.detective!.targetId);
+      const inv = room.players.find((p) => p.id === result.detective!.investigatorId);
+      room.detectiveByPlayer[result.detective.investigatorId] = {
+        targetId: result.detective.targetId,
+        faction: result.detective.faction,
+      };
+      if (target) {
+        room.detectiveLog.push({
+          id: randomUUID(),
+          targetId: target.id,
+          targetName: target.name,
+          faction: result.detective.faction,
+          at: Date.now(),
+          cycle: room.cycle,
+        });
+        this.addChronicle(
+          room,
+          "night",
+          `Detective investigated ${target.name} — ${result.detective.faction}.`
+        );
+      }
+      if (inv?.socketId) {
+        this.io.to(inv.socketId).emit("detective:result", {
+          targetId: result.detective.targetId,
+          faction: result.detective.faction,
+        });
+      }
+    }
+
+    if (result.doctorSavedTargetId) {
+      const saved = room.players.find((p) => p.id === result.doctorSavedTargetId);
+      if (saved) {
+        this.addChronicle(room, "night", `Doctor saved ${saved.name}.`);
+      }
+    }
+
+    if (result.silencedId) {
+      const p = room.players.find((x) => x.id === result.silencedId);
+      if (p) {
+        log(room, `${p.name} has been blackmailed into silence.`);
+        this.addChronicle(room, "night", `${p.name} was blackmailed.`);
+      }
+    }
+
     if (result.deaths.length === 0) {
       log(room, "The night passes without blood.");
-      this.addChronicle(room, "night", "The night passed quietly.");
-      this.setAnnouncement(room, "good", "Quiet night", "No one was eliminated overnight.");
+      if (
+        !result.doctorSavedTargetId &&
+        !result.detective &&
+        !result.silencedId
+      ) {
+        this.addChronicle(room, "night", "The night passed quietly.");
+      }
+      this.setAnnouncement(
+        room,
+        "good",
+        "Quiet night",
+        "No one was eliminated overnight."
+      );
     } else {
       const names = result.deaths
         .map((d) => room.players.find((x) => x.id === d.playerId)?.name)
@@ -1176,34 +1234,6 @@ export class GameRuntime {
           this.leaveMafiaRooms(p, room.id);
           this.removeFromAllVoice(room, p.id);
         }
-      }
-    }
-    if (result.silencedId) {
-      const p = room.players.find((x) => x.id === result.silencedId);
-      if (p) log(room, `${p.name} has been blackmailed into silence.`);
-    }
-    if (result.detective) {
-      const inv = room.players.find((p) => p.id === result.detective!.investigatorId);
-      const target = room.players.find((p) => p.id === result.detective!.targetId);
-      room.detectiveByPlayer[result.detective.investigatorId] = {
-        targetId: result.detective.targetId,
-        faction: result.detective.faction,
-      };
-      if (target) {
-        room.detectiveLog.push({
-          id: randomUUID(),
-          targetId: target.id,
-          targetName: target.name,
-          faction: result.detective.faction,
-          at: Date.now(),
-          cycle: room.cycle,
-        });
-      }
-      if (inv?.socketId) {
-        this.io.to(inv.socketId).emit("detective:result", {
-          targetId: result.detective.targetId,
-          faction: result.detective.faction,
-        });
       }
     }
 
@@ -1235,13 +1265,8 @@ export class GameRuntime {
     const target = room.players.find((p) => p.id === lynchedId);
     if (!target || !target.alive) return;
     target.alive = false;
-    const role = target.role ? ROLE_META[target.role].label : "Unknown";
-    log(room, `The city lynches ${target.name}. They were the ${role}.`);
-    this.addChronicle(
-      room,
-      "day",
-      `${target.name} was lynched (${role}).`
-    );
+    log(room, `The city lynches ${target.name}.`);
+    this.addChronicle(room, "day", `${target.name} was lynched.`);
     this.setAnnouncement(
       room,
       "bad",
@@ -1776,8 +1801,15 @@ export class GameRuntime {
 
   joinVoice(roomId: string, playerId: string, channel: ChatChannel) {
     const room = this.getRoom(roomId);
-    if (!room || room.gameId === "five-alive") return;
-    const player = room.players.find((p) => p.id === playerId);
+    const player = room?.players.find((p) => p.id === playerId);
+    if (!room || room.gameId === "five-alive") {
+      if (player?.socketId) {
+        this.io.to(player.socketId).emit("voice:error", {
+          message: "Voice is not available in this game.",
+        });
+      }
+      return;
+    }
     if (!player?.socketId) return;
     const opts = this.channelAccessOpts(room, player);
     if (!canAccessChannel(channel, opts)) {

@@ -47,6 +47,7 @@ export function PhaseResultPopup({
     } else if (announcement.tone === "bad") {
       playBadNews();
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
     const t = setTimeout(onDismiss, 5000);
     return () => clearTimeout(t);
   }, [announcement.id, announcement.title, announcement.tone, onDismiss]);
@@ -54,17 +55,28 @@ export function PhaseResultPopup({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        className={`fixed inset-x-4 top-24 z-40 mx-auto max-w-md rounded-sm border px-5 py-4 shadow-lg backdrop-blur-md sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 ${styles.border} ${styles.bg}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[45] flex items-center justify-center bg-void/50 p-4 backdrop-blur-[6px]"
+        onClick={onDismiss}
       >
-        <p className={`font-mono text-[10px] uppercase tracking-[0.2em] ${styles.text}`}>
-          {announcement.title}
-        </p>
-        {announcement.detail && (
-          <p className="mt-2 text-sm text-ink">{announcement.detail}</p>
-        )}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          onClick={(e) => e.stopPropagation()}
+          className={`w-[min(92vw,28rem)] rounded-sm border px-5 py-4 shadow-lg backdrop-blur-md ${styles.border} ${styles.bg}`}
+        >
+          <p
+            className={`font-mono text-[10px] uppercase tracking-[0.2em] ${styles.text}`}
+          >
+            {announcement.title}
+          </p>
+          {announcement.detail && (
+            <p className="mt-2 text-sm text-ink">{announcement.detail}</p>
+          )}
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

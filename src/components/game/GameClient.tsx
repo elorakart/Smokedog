@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
   ChatChannel,
+  ChatMessage,
+  Faction,
   NightActionType,
   PublicGameState,
+  Role,
   RoomSettings,
 } from "@/lib/types";
 import { loadProfile } from "@/lib/profile";
@@ -16,7 +19,6 @@ import { ActionPrompt } from "@/components/game/ActionPrompt";
 import { ActionDialog } from "@/components/game/mafia/ActionDialog";
 import { PhaseResultPopup } from "@/components/game/mafia/PhaseResultPopup";
 import { DetectivePanel } from "@/components/game/mafia/DetectivePanel";
-import { SpectatorBanner } from "@/components/game/mafia/SpectatorBanner";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
@@ -30,7 +32,7 @@ import { SiteHeader } from "@/components/ui/SiteHeader";
 import { phaseSwap } from "@/components/ui/motion";
 import { availableChannels, canUseTownVoice, CHANNEL_LABELS } from "@/lib/chat-access";
 import { pendingPlayerAction } from "@/lib/action-prompt";
-import { isMafiaRole } from "@/lib/games/mafia-city/roles";
+import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
 import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
 import { FiveAliveBombPanel } from "@/components/game/five-alive/FiveAliveBombPanel";
@@ -61,6 +63,12 @@ export function GameClient({ roomId }: { roomId: string }) {
   );
   const [mafiaVoiceWarning, setMafiaVoiceWarning] = useState(false);
   const [afkTick, setAfkTick] = useState(0);
+  const [speakingIds, setSpeakingIds] = useState<string[]>([]);
+  const [localReveal, setLocalReveal] = useState<{
+    role: Role;
+    faction: Faction;
+    ability: string;
+  } | null>(null);
   const quittingRef = useRef(false);
   const quitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishLeaveRef = useRef<() => void>(() => {});
@@ -85,6 +93,34 @@ export function GameClient({ roomId }: { roomId: string }) {
     const onState = (next: PublicGameState) => {
       setError(null);
       setState(next);
+      if (next.you?.role) {
+        const meta = ROLE_META[next.you.role];
+        setLocalReveal({
+          role: next.you.role,
+          faction: meta.faction,
+          ability: meta.ability,
+        });
+      }
+      if (next.phase === "lobby") setLocalReveal(null);
+    };
+
+    const onChat = (message: ChatMessage) => {
+      setState((prev) => {
+        if (!prev) return prev;
+        if (prev.chat.some((m) => m.id === message.id)) return prev;
+        return {
+          ...prev,
+          chat: [...prev.chat, message].slice(-50),
+        };
+      });
+    };
+
+    const onRoleReveal = (payload: {
+      role: Role;
+      faction: Faction;
+      ability: string;
+    }) => {
+      setLocalReveal(payload);
     };
     const onErr = ({ message, code }: { message: string; code?: string }) => {
       if (quittingRef.current) {
@@ -131,6 +167,8 @@ export function GameClient({ roomId }: { roomId: string }) {
     s.on("room:left", onLeft);
     s.on("host:afkWarning", onAfk);
     s.on("voice:invite", onInvite);
+    s.on("chat:message", onChat);
+    s.on("role:reveal", onRoleReveal);
 
     const join = () => {
       if (quittingRef.current) return;
@@ -149,6 +187,8 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("room:left", onLeft);
       s.off("host:afkWarning", onAfk);
       s.off("voice:invite", onInvite);
+      s.off("chat:message", onChat);
+      s.off("role:reveal", onRoleReveal);
       s.off("connect", join);
     };
   }, [roomId, router]);
@@ -280,11 +320,13 @@ export function GameClient({ roomId }: { roomId: string }) {
   const actionKey = pendingAction
     ? `${state.phase}-${state.daySubPhase}-${pendingAction.title}`
     : null;
-  const showActionDialog =
-    !!pendingAction && actionKey !== dismissedActionKey;
   const showAnnouncement =
     !!state.announcement &&
     state.announcement.id !== dismissedAnnouncementId;
+  const showActionDialog =
+    !!pendingAction &&
+    actionKey !== dismissedActionKey &&
+    !showAnnouncement;
 
   const emitVoiceInvite = (targetId: string) => {
     if (!voiceChannel) return;
@@ -432,11 +474,24 @@ export function GameClient({ roomId }: { roomId: string }) {
               </>
             )}
 
-            {state.phase === "reveal" && state.you?.role && (
-              <RoleRevealCard
-                role={state.you.role}
-                phaseEndsAt={state.phaseEndsAt}
-              />
+            {state.phase === "reveal" && (
+              <>
+                {(state.you?.role ?? localReveal?.role) ? (
+                  <RoleRevealCard
+                    role={(state.you?.role ?? localReveal!.role) as Role}
+                    phaseEndsAt={state.phaseEndsAt}
+                  />
+                ) : (
+                  <div className="flex min-h-[60vh] flex-col items-center justify-center">
+                    <p className="font-mono text-xs uppercase tracking-[0.3em] text-crimson-glow">
+                      Sealing identity…
+                    </p>
+                    <p className="mt-2 text-sm text-ink-steel">
+                      Your role card is being delivered.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {state.gameId === "five-alive" && state.phase === "fivealive_turn" && (
@@ -497,11 +552,11 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "night" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-                {!state.you?.alive && <SpectatorBanner />}
                 <NightActionPanel
                   state={state}
                   onAct={emitNight}
                   onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
+                  speakingIds={speakingIds}
                 />
                 <div className="space-y-4">
                   {state.detectiveLog && (
@@ -522,6 +577,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
+                    onSpeakingChange={setSpeakingIds}
                   />
                 </div>
               </div>
@@ -529,9 +585,6 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "day" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-                {!state.you?.alive && !state.deadVillagerVote && (
-                  <SpectatorBanner />
-                )}
                 <VotePanel
                   state={state}
                   onVote={emitVote}
@@ -544,6 +597,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                       ? emitVoiceInvite
                       : undefined
                   }
+                  speakingIds={speakingIds}
                 />
                 <div className="space-y-4">
                   {state.detectiveLog && (
@@ -582,6 +636,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
+                    onSpeakingChange={setSpeakingIds}
                   />
                 </div>
               </div>

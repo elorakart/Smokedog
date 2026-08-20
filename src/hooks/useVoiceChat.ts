@@ -80,8 +80,12 @@ export function useVoiceChat(
         remoteAudioRef.current.set(peerId, audio);
       }
       audio.srcObject = stream;
+      void audio.play().catch(() => {
+        /* autoplay may need gesture — join click already happened */
+      });
       try {
         const ctx = new AudioContext();
+        if (ctx.state === "suspended") void ctx.resume();
         attachAnalyser(peerId, stream, ctx);
       } catch {
         /* analyser unavailable */
@@ -220,6 +224,10 @@ export function useVoiceChat(
       if (payload.channel !== channelRef.current || !playerId) return;
       const others = payload.participantIds.filter((id) => id !== playerId);
       setParticipants(others);
+      if (payload.participantIds.includes(playerId) && localStreamRef.current) {
+        setJoined(true);
+        setError(null);
+      }
       if (!localStreamRef.current) return;
       for (const id of others) {
         if (!peersRef.current.has(id)) createPeer(id, true);
@@ -249,7 +257,11 @@ export function useVoiceChat(
       setSpeakingIds([...speakingRef.current]);
     };
 
-    const onError = ({ message }: { message: string }) => setError(message);
+    const onError = ({ message }: { message: string }) => {
+      setError(message);
+      cleanupAll();
+      channelRef.current = null;
+    };
 
     socket.on("voice:participants", onParticipants);
     socket.on("voice:signal", onSignal);
@@ -321,12 +333,13 @@ export function useVoiceChat(
       channelRef.current = channel;
       try {
         const ctx = new AudioContext();
+        if (ctx.state === "suspended") await ctx.resume();
         attachAnalyser("__local__", stream, ctx);
       } catch {
         /* analyser unavailable */
       }
       socket.emit("voice:join", { roomId, channel });
-      setJoined(true);
+      // Wait for voice:participants ack before setting joined=true
     } catch {
       setError("Microphone access denied");
       cleanupAll();

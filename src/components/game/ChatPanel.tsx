@@ -9,6 +9,7 @@ import {
   availableChannels,
   canAccessChannel,
   canUseTownVoice,
+  canViewTownChat,
   CHANNEL_LABELS,
 } from "@/lib/chat-access";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
@@ -20,12 +21,14 @@ export function ChatPanel({
   onSend,
   joinVoiceRequest,
   enableVoice = true,
+  onSpeakingChange,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
   onSend: (channel: ChatChannel, text: string) => void;
   joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
   enableVoice?: boolean;
+  onSpeakingChange?: (ids: string[]) => void;
 }) {
   const you = state.you;
   const channelOpts = useMemo(
@@ -43,7 +46,9 @@ export function ChatPanel({
   );
 
   const tabs = useMemo(() => {
-    if (!channelOpts) return [{ id: "town" as ChatChannel, label: CHANNEL_LABELS.town }];
+    if (!channelOpts) {
+      return [{ id: "town" as ChatChannel, label: CHANNEL_LABELS.town }];
+    }
     return availableChannels(channelOpts).map((id) => ({
       id,
       label: CHANNEL_LABELS[id],
@@ -57,16 +62,20 @@ export function ChatPanel({
     if (!tabs.some((t) => t.id === tab) && tabs[0]) setTab(tabs[0].id);
   }, [tabs, tab]);
 
-  const canUseActive =
+  const canSendActive =
     !!channelOpts && canAccessChannel(active, channelOpts);
+  const canViewActive =
+    !!channelOpts &&
+    (active === "town"
+      ? canViewTownChat(channelOpts)
+      : canAccessChannel(active, channelOpts));
   const canUseVoice =
     !!channelOpts &&
     (active === "town"
       ? canUseTownVoice(channelOpts)
       : canAccessChannel(active, channelOpts));
   const playerNames = useMemo(
-    () =>
-      Object.fromEntries(state.players.map((p) => [p.id, p.name])),
+    () => Object.fromEntries(state.players.map((p) => [p.id, p.name])),
     [state.players]
   );
   const messages = state.chat.filter((m) => m.channel === active);
@@ -77,10 +86,14 @@ export function ChatPanel({
     socket,
     state.roomId,
     you?.id,
-    canUseActive ? active : null,
+    canUseVoice ? active : null,
     enableVoice && canUseVoice,
     playerNames
   );
+
+  useEffect(() => {
+    onSpeakingChange?.(voice.speakingIds);
+  }, [voice.speakingIds, onSpeakingChange]);
 
   useEffect(() => {
     if (!enableVoice || !joinVoiceRequest) return;
@@ -96,22 +109,15 @@ export function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinVoiceRequest?.nonce, active]);
 
-  useEffect(() => {
-    if (!enableVoice || !canUseVoice) return;
-    if (active === "mafia" && state.phase === "night" && !voice.joined) {
-      void voice.join();
-    }
-  }, [enableVoice, canUseVoice, active, state.phase, voice.joined, voice]);
-
   const submit = () => {
-    if (!text.trim() || !canUseActive) return;
+    if (!text.trim() || !canSendActive) return;
     onSend(active, text);
     setText("");
   };
 
   if (tabs.length === 0) {
     return (
-      <GlassPanel className="flex h-[420px] flex-col items-center justify-center p-6 text-center">
+      <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col items-center justify-center p-6 text-center">
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
           Comms offline
         </p>
@@ -124,8 +130,10 @@ export function ChatPanel({
     );
   }
 
+  const speaking = new Set(voice.speakingIds);
+
   return (
-    <GlassPanel className="flex h-[420px] flex-col">
+    <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
       <div className="flex border-b border-white/10">
         {tabs.map((t) => (
           <button
@@ -175,7 +183,7 @@ export function ChatPanel({
               )}
             </div>
             <span className="max-w-[55%] truncate text-right font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-              {voiceInChannel.length} in voice
+              {Math.max(voiceInChannel.length, voice.joined ? 1 : 0)} in voice
               {voice.participantLabels.length > 0 && (
                 <span className="block normal-case tracking-normal text-ink-steel/80">
                   {voice.participantLabels.slice(0, 3).join(", ")}
@@ -184,6 +192,28 @@ export function ChatPanel({
               )}
             </span>
           </div>
+
+          {voiceInChannel.length > 0 && (
+            <div className="flex flex-wrap gap-1 border-b border-white/10 px-3 py-2">
+              {voiceInChannel.map((id) => {
+                const name =
+                  state.players.find((p) => p.id === id)?.name ?? "Operator";
+                const isSpeaking = speaking.has(id);
+                return (
+                  <span
+                    key={id}
+                    className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                      isSpeaking
+                        ? "animate-pulse border-emerald-400 bg-emerald-400/20 text-emerald-200"
+                        : "border-white/10 text-ink-steel"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
           {voice.error && (
             <p className="border-b border-white/10 px-3 py-2 text-xs text-amber-200">
@@ -196,30 +226,47 @@ export function ChatPanel({
       <div data-lenis-prevent className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 && (
           <p className="text-sm text-ink-steel">
-            {active === "town" && state.phase === "night"
-              ? "Public channel opens at dawn."
-              : active === "mafia" && state.phase === "day"
-                ? "Mafia channel opens after dark."
-                : "No messages yet."}
+            {!canViewActive
+              ? "Channel closed"
+              : active === "town" && state.phase === "night"
+                ? "Public channel opens at dawn."
+                : active === "mafia" && state.phase === "day"
+                  ? "Mafia channel opens after dark."
+                  : "No messages yet."}
           </p>
         )}
-        {messages.map((m: ChatMessage, i) => (
-          <motion.div
-            key={m.id}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`rounded-sm px-2 py-1 text-sm ${i % 2 ? "bg-white/5" : ""}`}
-          >
-            <span className="font-mono text-[10px] text-ink-steel">
-              {new Date(m.at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>{" "}
-            <span className="font-semibold text-crimson-glow">{m.name}</span>
-            <p>{m.text}</p>
-          </motion.div>
-        ))}
+        {messages.map((m: ChatMessage, i) => {
+          const isOwn = m.playerId === you?.id;
+          return (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className={`text-sm max-md:flex max-md:flex-col ${
+                isOwn ? "max-md:items-end" : "max-md:items-start"
+              } ${i % 2 ? "md:bg-white/5" : ""} md:rounded-sm md:px-2 md:py-1 ${
+                isOwn
+                  ? "max-md:ml-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-br-sm max-md:bg-crimson/20 max-md:px-3 max-md:py-2"
+                  : "max-md:mr-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-bl-sm max-md:bg-white/10 max-md:px-3 max-md:py-2"
+              }`}
+            >
+              <span className="font-mono text-[10px] text-ink-steel max-md:hidden">
+                {new Date(m.at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>{" "}
+              <span
+                className={`font-semibold text-crimson-glow ${
+                  isOwn ? "max-md:hidden" : ""
+                }`}
+              >
+                {m.name}
+              </span>
+              <p>{m.text}</p>
+            </motion.div>
+          );
+        })}
       </div>
 
       <form
@@ -231,20 +278,24 @@ export function ChatPanel({
       >
         <input
           value={text}
-          disabled={!canUseActive}
+          disabled={!canSendActive}
           onChange={(e) => setText(e.target.value)}
           placeholder={
-            !canUseActive
+            !canViewActive
               ? "Channel closed"
-              : you?.blackmailed && active === "town"
-                ? "Silenced"
-                : "Transmit..."
+              : !canSendActive
+                ? you && !you.alive && active === "town"
+                  ? "Spectators cannot transmit"
+                  : "Channel closed"
+                : you?.blackmailed && active === "town"
+                  ? "Silenced"
+                  : "Transmit..."
           }
           className="flex-1 bg-transparent px-3 py-3 text-sm outline-none disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={!canUseActive}
+          disabled={!canSendActive}
           className="px-4 font-mono text-[10px] uppercase tracking-widest text-crimson-glow disabled:opacity-40"
         >
           Send

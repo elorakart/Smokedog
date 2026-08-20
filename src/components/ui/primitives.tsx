@@ -4,12 +4,27 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 export function GlassPanel({
   children,
   className = "",
+  onClick,
 }: {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 }) {
   return (
     <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       className={`rounded-lg border border-white/10 bg-surface/70 backdrop-blur-xl ${className}`}
     >
       {children}

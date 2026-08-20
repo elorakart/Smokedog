@@ -112,7 +112,7 @@ export function FiveAliveLobbyView({
             const p = state.players[i];
             if (!p) {
               return (
-                <motion.div key={`empty-${i}`} variants={fadeUp}>
+                <motion.div key={`empty-${i}`} variants={fadeUp} className="min-w-0">
                   <GlassPanel className="flex aspect-square flex-col items-center justify-center text-ink-steel">
                     <UserPlus size={22} />
                     <span className="mt-2 font-mono text-[10px] uppercase">
@@ -123,30 +123,38 @@ export function FiveAliveLobbyView({
               );
             }
             return (
-              <motion.div key={p.id} variants={fadeUp} layout>
-                <GlassPanel className="p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
-                  <div className="mx-auto w-fit overflow-hidden rounded-full ring-1 ring-white/10">
-                    <PlayerAvatar id={p.avatarId} size={200} className="h-auto w-full" />
+              <motion.div key={p.id} variants={fadeUp} className="min-w-0">
+                <GlassPanel className="flex h-full flex-col p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
+                  <div className="mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-white/10">
+                    <PlayerAvatar
+                      id={p.avatarId}
+                      size={128}
+                      className="h-full w-full"
+                    />
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-1">
-                    <p className="truncate font-display text-sm font-semibold">{p.name}</p>
+                  <div className="mt-2 flex min-w-0 items-center justify-between gap-1">
+                    <p className="min-w-0 truncate font-display text-sm font-semibold">
+                      {p.name}
+                    </p>
                     {p.isHost && <StatusChip>Host</StatusChip>}
                   </div>
-                  <div className="mt-1 flex items-center justify-between">
+                  <div className="mt-1 flex min-h-[1.5rem] items-center justify-between gap-1">
                     <StatusChip tone={p.connected ? "live" : "neutral"}>
                       {p.connected ? "Online" : "Away"}
                     </StatusChip>
                     {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
                   </div>
-                  {host && !p.isHost && (
-                    <button
-                      type="button"
-                      onClick={() => onKick(p.id)}
-                      className="mt-2 font-mono text-[10px] uppercase text-crimson-glow"
-                    >
-                      {p.isBot ? "Remove" : "Kick"}
-                    </button>
-                  )}
+                  <div className="mt-2 min-h-[1.25rem]">
+                    {host && !p.isHost ? (
+                      <button
+                        type="button"
+                        onClick={() => onKick(p.id)}
+                        className="font-mono text-[10px] uppercase text-crimson-glow"
+                      >
+                        {p.isBot ? "Remove" : "Kick"}
+                      </button>
+                    ) : null}
+                  </div>
                 </GlassPanel>
               </motion.div>
             );
