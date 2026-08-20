@@ -79,7 +79,7 @@ export function GameHud({
         <button
           type="button"
           onClick={() => copy(state.roomId)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-white/10 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-manila/20 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
         >
           {state.roomId} <Copy size={11} className="sm:h-3 sm:w-3" />
         </button>
@@ -88,13 +88,13 @@ export function GameHud({
             className={`shrink-0 rounded-sm border bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest sm:px-3 sm:py-2 sm:text-sm ${
               remaining <= 10 && !state.paused
                 ? "animate-pulse border-crimson text-crimson-glow"
-                : "border-white/10 text-crimson-glow"
+                : "border-manila/20 text-crimson-glow"
             }`}
           >
             {state.paused ? "PAUSED" : format(remaining)}
           </div>
         )}
-        <div className="shrink-0 rounded-sm border border-white/10 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
+        <div className="shrink-0 rounded-sm border border-manila/20 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
           {phaseLabel[state.phase]}
         </div>
         {showMidGameSettings && (

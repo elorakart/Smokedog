@@ -43,7 +43,7 @@ export function GameOverScreen({
     : isBoard
       ? youWonBoard || !!state.boardDraw
       : wonMafia;
-  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [chronicleOpen, setChronicleOpen] = useState(true);
   const chronicle = state.chronicle ?? [];
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export function GameOverScreen({
         particleCount: 140,
         spread: 80,
         origin: { y: 0.6 },
-        colors: ["#e61919", "#ffb4aa", "#dae3f1"],
+        colors: ["#8B1E1E", "#C45C4A", "#E8DCC8"],
       });
     }, 200);
     return () => clearTimeout(t);
@@ -155,17 +155,19 @@ export function GameOverScreen({
   return (
     <div className="mx-auto max-w-3xl py-10">
       <p className="font-mono text-xs uppercase tracking-[0.25em] text-crimson-glow">
-        {won ? "Victory" : "Defeat"}
+        Debrief
       </p>
-      <h1 className="mt-2 font-display text-5xl font-extrabold">
+      <h1 className="mt-2 font-display text-5xl font-bold">
         {state.winner === "town"
           ? "The Town holds"
           : "The Mafia owns the night"}
       </h1>
-      <p className="mt-3 text-ink-steel">Match recap — every dossier unsealed.</p>
+      <p className="mt-3 text-ink-steel">
+        {won ? "Victory stamped." : "Defeat filed."} Every dossier unsealed.
+      </p>
 
       {chronicle.length > 0 && (
-        <GlassPanel className="mt-6 overflow-hidden">
+        <GlassPanel className="mt-6 overflow-hidden border-manila/25 bg-manila/5">
           <button
             type="button"
             onClick={() => setChronicleOpen((v) => !v)}
@@ -177,13 +179,16 @@ export function GameOverScreen({
             {chronicleOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
           {chronicleOpen && (
-            <ul className="border-t border-white/10 px-4 py-3 text-sm text-ink-steel">
+            <ul className="border-t border-manila/15 px-4 py-3 font-mono text-xs leading-relaxed text-ink">
               {chronicle.map((entry) => (
-                <li key={entry.id} className="border-b border-white/5 py-2 last:border-0">
-                  <span className="font-mono text-[10px] uppercase">
+                <li
+                  key={entry.id}
+                  className="border-b border-manila/10 py-2.5 last:border-0"
+                >
+                  <span className="uppercase tracking-wider text-crimson-glow">
                     {entry.phase === "night" ? "Night" : "Day"} {entry.cycle}
                   </span>
-                  <p>{entry.summary}</p>
+                  <p className="mt-0.5 text-ink/80">{entry.summary}</p>
                 </li>
               ))}
             </ul>
@@ -194,7 +199,7 @@ export function GameOverScreen({
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {(state.recap ?? state.players).map((p) => (
           <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-            <div className="overflow-hidden rounded-full ring-1 ring-white/10">
+            <div className="overflow-hidden rounded-sm ring-1 ring-manila/20">
               <PlayerAvatar id={p.avatarId} size={56} />
             </div>
             <div>

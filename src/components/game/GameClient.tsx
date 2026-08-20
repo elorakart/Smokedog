@@ -405,7 +405,7 @@ export function GameClient({ roomId }: { roomId: string }) {
   return (
     <motion.div
       data-phase={state.phase}
-      animate={{ backgroundColor: nightTheme ? "#060910" : "#0b141e" }}
+      animate={{ backgroundColor: nightTheme ? "#0a0806" : "#12100E" }}
       className="min-h-screen"
     >
       <SiteHeader

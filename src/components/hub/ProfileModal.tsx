@@ -102,30 +102,30 @@ export function ProfileModal({
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-lg"
           >
-            <GlassPanel className="relative p-8">
+            <GlassPanel variant="paper" className="relative p-8">
               <button
                 onClick={onClose}
                 disabled={isPending}
-                className="absolute right-4 top-4 text-ink-steel hover:text-ink disabled:opacity-40"
+                className="absolute right-4 top-4 text-ink-dark/50 hover:text-ink-dark disabled:opacity-40"
                 aria-label="Close"
               >
                 <X size={18} />
               </button>
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-crimson-glow">
-                Operator Dossier
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-crimson">
+                Intake form
               </p>
-              <h2 className="mt-2 font-display text-2xl font-bold">
+              <h2 className="mt-2 font-display text-2xl font-bold text-ink-dark">
                 {mode === "create" && createGameId
-                  ? `Create ${gameLabel(createGameId)} party`
-                  : "Enter the city"}
+                  ? `Open ${gameLabel(createGameId)}`
+                  : "Stamp your name"}
               </h2>
               {mode === "create" && createGameId && (
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-dark/50">
                   Game: {gameLabel(createGameId)}
                 </p>
               )}
-              <label className="mt-6 block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                Display name
+              <label className="mt-6 block font-mono text-[10px] uppercase tracking-widest text-ink-dark/50">
+                Operator name
               </label>
               <input
                 value={name}
@@ -133,9 +133,9 @@ export function ProfileModal({
                 disabled={isPending}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your alias"
-                className="mt-2 w-full rounded-sm border-b border-crimson/60 bg-void px-3 py-3 text-ink outline-none focus:border-crimson"
+                className="mt-2 w-full border-b border-dashed border-ink-dark/40 bg-transparent px-1 py-3 text-ink-dark outline-none focus:border-crimson"
               />
-              <p className="mt-6 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+              <p className="mt-6 font-mono text-[10px] uppercase tracking-widest text-ink-dark/50">
                 Mugshot
               </p>
               <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-10">
@@ -145,9 +145,9 @@ export function ProfileModal({
                     type="button"
                     disabled={isPending}
                     onClick={() => setAvatarId(i)}
-                    className={`overflow-hidden rounded-full ring-2 transition hover:scale-105 ${
+                    className={`overflow-hidden rounded-sm ring-2 transition hover:scale-105 ${
                       avatarId === i
-                        ? "ring-crimson shadow-glow"
+                        ? "ring-crimson shadow-stamp"
                         : "ring-transparent opacity-70 hover:opacity-100"
                     }`}
                   >
@@ -166,11 +166,11 @@ export function ProfileModal({
                   }}
                   className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wider transition ${
                     mode === "create"
-                      ? "bg-crimson text-white"
-                      : "bg-surface-high text-ink-steel hover:text-ink"
+                      ? "bg-crimson text-manila"
+                      : "border border-ink-dark/20 text-ink-dark/60 hover:text-ink-dark"
                   }`}
                 >
-                  Create Party
+                  Open a room
                 </button>
                 <button
                   type="button"
@@ -181,11 +181,11 @@ export function ProfileModal({
                   }}
                   className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wider transition ${
                     mode === "join"
-                      ? "bg-crimson text-white"
-                      : "bg-surface-high text-ink-steel hover:text-ink"
+                      ? "bg-crimson text-manila"
+                      : "border border-ink-dark/20 text-ink-dark/60 hover:text-ink-dark"
                   }`}
                 >
-                  Join Party
+                  Join with code
                 </button>
               </div>
 
@@ -199,8 +199,8 @@ export function ProfileModal({
                     setLocalError(null);
                   }}
                   placeholder="ROOM CODE"
-                  className={`mt-4 w-full rounded-sm border-b bg-void px-3 py-3 text-center font-mono text-lg tracking-[0.4em] outline-none ${
-                    displayError ? "border-crimson" : "border-crimson/60"
+                  className={`mt-4 w-full border-b border-dashed bg-transparent px-1 py-3 text-center font-mono text-lg tracking-[0.4em] text-ink-dark outline-none ${
+                    displayError ? "border-crimson" : "border-ink-dark/40"
                   }`}
                 />
               )}
@@ -211,7 +211,7 @@ export function ProfileModal({
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="mt-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-widest text-ink-steel"
+                    className="mt-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-widest text-ink-dark/50"
                   >
                     <LoadingSpinner size={14} />
                     {pendingLabel}
@@ -225,7 +225,7 @@ export function ProfileModal({
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="mt-4 flex items-start gap-2 font-mono text-xs text-crimson-glow"
+                    className="mt-4 flex items-start gap-2 font-mono text-xs text-crimson"
                   >
                     <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                     {displayError}
@@ -246,11 +246,10 @@ export function ProfileModal({
                 {isPending
                   ? pendingLabel ?? "Processing…"
                   : mode === "create"
-                    ? "Create Party"
-                    : "Join Party"}
+                    ? "Open a room"
+                    : "Join with code"}
               </PrimaryButton>
-            </GlassPanel>
-          </motion.div>
+            </GlassPanel>          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

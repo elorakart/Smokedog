@@ -292,7 +292,7 @@ function LobbySidebar({
         disabled={!canStart || starting}
         onClick={onStart}
       >
-        {starting ? "Starting…" : "Start Game"}
+        {starting ? "Starting…" : "Start case"}
       </PrimaryButton>
       {!canStart && (
         <p className="mt-2 text-center font-mono text-[10px] text-ink-steel">

@@ -225,8 +225,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(230,25,25,0.12),transparent_55%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-desk">
+      <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(139,30,30,0.14),transparent_55%)]" />
       <SiteHeader avatarId={profile?.avatarId ?? guestAvatarId} />
 
       <motion.main
@@ -235,21 +235,46 @@ export default function HomePage() {
         animate="show"
         className="relative mx-auto max-w-6xl px-6 pb-16 md:px-10"
       >
-        <motion.p
+        <motion.section
           variants={fadeUp}
-          className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow"
+          className="relative mt-6 flex flex-col items-center justify-center py-10 text-center md:py-14"
         >
-          SMOKEDOG Arena
-        </motion.p>
-        <motion.h1
-          variants={fadeUp}
-          className="mt-3 font-display text-4xl font-extrabold tracking-tight md:text-5xl"
-        >
-          Drop in or pick a game
-        </motion.h1>
-        <motion.p variants={fadeUp} className="mt-3 max-w-xl text-ink-steel">
-          Join an open party below, or create a new battlefield.
-        </motion.p>
+          <div className="relative w-full max-w-lg border-2 border-crimson bg-manila px-8 py-10 text-ink-dark shadow-stamp md:px-12 md:py-12">
+            <span className="animate-stamp absolute -right-2 -top-3 border-2 border-crimson bg-paper px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-crimson -rotate-[8deg]">
+              Sealed
+            </span>
+            <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-crimson">
+              Case file // SMOKEDOG
+            </p>
+            <h1 className="mt-4 font-display text-5xl font-bold tracking-tight md:text-6xl">
+              SMOKEDOG
+            </h1>
+            <div className="mx-auto mt-4 h-px w-24 bg-crimson" />
+            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-ink-dark/70">
+              Open a room. Stamp your name. Trust no dossier.
+            </p>
+            <button
+              type="button"
+              disabled={!!pending}
+              onClick={() => openCreate("mafia-city")}
+              className="mt-7 inline-block bg-crimson px-6 py-2.5 font-mono text-[10px] uppercase tracking-widest text-manila transition hover:brightness-110 disabled:opacity-40"
+            >
+              Open a room
+            </button>
+            <button
+              type="button"
+              disabled={!!pending}
+              onClick={() => {
+                setPrefillCode("");
+                setModalMode("join");
+                setModal(true);
+              }}
+              className="mt-4 block w-full font-mono text-[9px] uppercase tracking-[0.28em] text-ink-dark/45 transition hover:text-crimson"
+            >
+              Join with code
+            </button>
+          </div>
+        </motion.section>
 
         <OpenLobbies
           onJoin={joinWithProfile}
@@ -268,8 +293,8 @@ export default function HomePage() {
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow">
             Operations
           </p>
-          <h2 className="mt-2 font-display text-3xl font-extrabold">
-            Select Your Battlefield
+          <h2 className="mt-2 font-display text-3xl font-bold">
+            Select your battlefield
           </h2>
         </motion.div>
 
@@ -286,27 +311,27 @@ export default function HomePage() {
                 }}
                 whileHover={card.disabled ? undefined : { scale: 1.01 }}
                 whileTap={card.disabled ? undefined : { scale: 0.995 }}
-                className={`group relative w-full overflow-hidden rounded-lg text-left ${
+                className={`group relative w-full overflow-hidden rounded-sm text-left ${
                   card.disabled ? "cursor-not-allowed opacity-60" : ""
                 }`}
               >
                 <img
                   src={card.image}
                   alt=""
-                  className="h-[240px] w-full object-cover opacity-50 transition duration-700 group-hover:scale-105 md:h-[320px]"
+                  className="h-[240px] w-full object-cover opacity-45 transition duration-700 group-hover:scale-105 md:h-[320px]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-void via-void/45 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-desk via-desk/50 to-transparent" />
                 <div className="absolute inset-0 p-6 md:p-8">
                   <span
                     className={`rounded-sm px-3 py-1 font-mono text-[10px] uppercase tracking-widest ${
                       card.badgeTone === "amber"
-                        ? "bg-amber-500/90 text-void"
-                        : "bg-crimson text-white"
+                        ? "bg-amber-500/90 text-desk"
+                        : "bg-crimson text-manila"
                     }`}
                   >
                     {card.badge}
                   </span>
-                  <h3 className="mt-5 font-display text-3xl font-extrabold md:text-4xl">
+                  <h3 className="mt-5 font-display text-3xl font-bold md:text-4xl">
                     {card.title}
                   </h3>
                   <p className="mt-2 max-w-lg text-sm text-ink md:text-base">
@@ -320,7 +345,7 @@ export default function HomePage() {
                       <Clock size={14} /> {card.duration}
                     </span>
                   </div>
-                  <span className="mt-6 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-widest text-crimson-glow">
+                  <span className="mt-6 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-widest text-crimson-glow">
                     {card.disabled ? "Unavailable" : "Play now"}{" "}
                     {!card.disabled && (
                       <ArrowRight
@@ -335,7 +360,7 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setRulesGameId(card.id)}
-                  className="absolute bottom-6 right-6 z-10 rounded-sm border border-white/20 bg-void/60 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink backdrop-blur-sm transition hover:border-crimson/40 hover:text-crimson-glow md:bottom-8 md:right-8"
+                  className="absolute bottom-6 right-6 z-10 rounded-sm border border-manila/25 bg-desk/70 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink backdrop-blur-sm transition hover:border-crimson/50 hover:text-crimson-glow md:bottom-8 md:right-8"
                 >
                   More info
                 </button>
@@ -344,7 +369,6 @@ export default function HomePage() {
           ))}
         </div>
       </motion.main>
-
       <GameRulesModal
         open={!!rulesGameId}
         gameId={rulesGameId}

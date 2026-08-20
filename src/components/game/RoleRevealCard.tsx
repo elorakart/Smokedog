@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
 import type { Role } from "@/lib/types";
-import { GlassPanel, StatusChip } from "@/components/ui/primitives";
+import { Stamp } from "@/components/ui/primitives";
 
 export function RoleRevealCard({
   role,
@@ -13,12 +13,12 @@ export function RoleRevealCard({
   role: Role;
   phaseEndsAt?: number | null;
 }) {
-  const [flipped, setFlipped] = useState(false);
+  const [open, setOpen] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const meta = ROLE_META[role];
 
   useEffect(() => {
-    const t = setTimeout(() => setFlipped(true), 600);
+    const t = setTimeout(() => setOpen(true), 500);
     return () => clearTimeout(t);
   }, [role]);
 
@@ -32,44 +32,53 @@ export function RoleRevealCard({
   }, [phaseEndsAt]);
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center bg-manila/5 px-4">
       <p className="mb-6 font-mono text-xs uppercase tracking-[0.3em] text-crimson-glow">
-        Identity sealed
+        Envelope sealed
         {remaining != null && remaining > 0 && (
           <span className="ml-2 text-ink-steel">— {remaining}s</span>
         )}
       </p>
-      <button type="button" onClick={() => setFlipped(true)}>
+      <button type="button" onClick={() => setOpen(true)} className="w-full max-w-sm">
         <motion.div
-          className="relative h-80 w-56"
-          animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.7 }}
-          style={{ transformStyle: "preserve-3d" }}
+          initial={{ scale: 0.94, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.45 }}
+          className="relative border-2 border-ink-dark bg-paper p-8 text-left text-ink-dark shadow-stamp"
         >
-          <div
-            className="absolute inset-0"
-            style={{ backfaceVisibility: "hidden" }}
-          >
-            <GlassPanel className="flex h-full items-center justify-center">
-              <span className="font-display text-4xl font-extrabold tracking-[0.3em]">
+          {!open ? (
+            <div className="flex h-56 flex-col items-center justify-center">
+              <span className="font-display text-4xl font-bold tracking-[0.2em]">
                 SD
               </span>
-            </GlassPanel>
-          </div>
-          <div
-            className="absolute inset-0"
-            style={{ transform: "rotateY(180deg)", backfaceVisibility: "hidden" }}
-          >
-            <GlassPanel className="flex h-full flex-col items-center justify-center p-6">
-              <StatusChip tone={meta.faction === "mafia" ? "mafia" : "town"}>
-                {meta.faction}
-              </StatusChip>
-              <h2 className="mt-4 text-center font-display text-2xl font-bold">
-                {meta.label}
-              </h2>
-              <p className="mt-4 text-center text-sm text-ink-steel">{meta.ability}</p>
-            </GlassPanel>
-          </div>
+              <p className="mt-4 font-mono text-[10px] uppercase tracking-widest text-ink-dark/40">
+                Tap to unseal
+              </p>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-crimson">
+                Envelope sealed
+              </p>
+              <h2 className="mt-6 font-display text-4xl font-bold">{meta.label}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-ink-dark/70">
+                {meta.ability}
+              </p>
+              <div className="absolute -right-3 -top-3">
+                <Stamp>{meta.faction}</Stamp>
+              </div>
+              <div className="mt-8 h-1 w-full bg-ink-dark/10" />
+              {remaining != null && remaining > 0 && (
+                <p className="mt-3 font-mono text-[9px] uppercase text-ink-dark/40">
+                  Reveal ends in 0:{remaining.toString().padStart(2, "0")}
+                </p>
+              )}
+            </motion.div>
+          )}
         </motion.div>
       </button>
     </div>

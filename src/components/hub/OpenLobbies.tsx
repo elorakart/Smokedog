@@ -69,11 +69,11 @@ export function OpenLobbies({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow">
-            Global frequency
+            Index
           </p>
-          <h2 className="mt-2 font-display text-2xl font-bold">Open parties</h2>
+          <h2 className="mt-2 font-display text-2xl font-bold">Open case files</h2>
           <p className="mt-1 text-sm text-ink-steel">
-            Search live lobbies with empty seats and drop in.
+            Live rooms with empty seats — stamp in.
           </p>
         </div>
         <button
@@ -110,7 +110,7 @@ export function OpenLobbies({
         >
           {joinPending && firstOpen && joiningCode === firstOpen.roomId
             ? "Joining…"
-            : "Quick join"}
+            : "Quick stamp"}
         </PrimaryButton>
       </div>
 

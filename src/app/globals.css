@@ -6,28 +6,34 @@
 
 :root {
   color-scheme: dark;
+  --ledger-ink: #1a1510;
+  --ledger-manila: #e8dcc8;
+  --ledger-paper: #f4ebd8;
+  --ledger-crimson: #8b1e1e;
+  --ledger-desk: #12100e;
 }
 
 html,
 body {
-  background: #0b141e;
-  color: #dae3f1;
+  background: #12100e;
+  color: #e8dcc8;
   min-height: 100%;
 }
 
 body {
   background-image:
-    radial-gradient(ellipse at center, rgba(24, 32, 42, 0.4) 0%, transparent 55%),
-    radial-gradient(ellipse at center, transparent 35%, rgba(6, 15, 24, 0.92) 100%);
+    radial-gradient(ellipse at 50% 0%, rgba(139, 30, 30, 0.12) 0%, transparent 45%),
+    radial-gradient(ellipse at center, rgba(28, 24, 20, 0.5) 0%, transparent 55%),
+    radial-gradient(ellipse at center, transparent 35%, rgba(10, 8, 6, 0.94) 100%);
 }
 
 ::selection {
-  background: #e61919;
-  color: #fff;
+  background: #8b1e1e;
+  color: #f4ebd8;
 }
 
 input[type="range"] {
-  accent-color: #e61919;
+  accent-color: #8b1e1e;
 }
 
 @keyframes pulse-slow {
@@ -55,4 +61,23 @@ input[type="range"] {
   75% {
     transform: translateX(6px);
   }
+}
+
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: scale(1.35) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) rotate(-6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+.animate-stamp {
+  animation: stamp-in 0.45s cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }

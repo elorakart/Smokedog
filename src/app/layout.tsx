@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Montserrat } from "next/font/google";
+import { Inter, JetBrains_Mono, Libre_Baskerville } from "next/font/google";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import "./globals.css";
 
-const montserrat = Montserrat({
+const display = Libre_Baskerville({
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-montserrat",
+  weight: ["400", "700"],
+  variable: "--font-display",
 });
 
 const inter = Inter({
@@ -22,7 +22,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "SMOKEDOG's Arena",
-  description: "Multiplayer games — Mafia City and 5 Alive.",
+  description: "Multiplayer games — Mafia City and more.",
 };
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${montserrat.variable} ${inter.variable} ${jetbrains.variable} font-sans antialiased`}
+        className={`${display.variable} ${inter.variable} ${jetbrains.variable} font-sans antialiased`}
       >
         <LenisProvider>{children}</LenisProvider>
       </body>

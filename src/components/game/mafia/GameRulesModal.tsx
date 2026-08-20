@@ -137,16 +137,21 @@ export function GameRulesModal({
       onClick={onClose}
     >
       <div onClick={(e) => e.stopPropagation()}>
-        <GlassPanel className="max-h-[85vh] w-full max-w-lg overflow-y-auto p-6 sm:p-8">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
+        <GlassPanel
+          variant="paper"
+          className="max-h-[85vh] w-full max-w-lg overflow-y-auto p-6 sm:p-8"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson">
             Field manual
           </p>
-          <h2 className="mt-2 font-display text-2xl font-bold">{rules.title}</h2>
+          <h2 className="mt-2 font-display text-2xl font-bold text-ink-dark">
+            {rules.title}
+          </h2>
 
-          <div className="mt-6 space-y-4 text-sm text-ink-steel">
+          <div className="mt-6 space-y-4 text-sm text-ink-dark/70">
             {rules.sections.map((section) => (
               <section key={section.title}>
-                <h3 className="font-display text-base font-semibold text-ink">
+                <h3 className="font-display text-base font-semibold text-ink-dark">
                   {section.title}
                 </h3>
                 <p className="mt-1">{section.body}</p>
@@ -157,9 +162,9 @@ export function GameRulesModal({
           <button
             type="button"
             onClick={onClose}
-            className="mt-6 w-full rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest"
+            className="mt-6 w-full rounded-sm border border-ink-dark/30 py-3 font-mono text-xs uppercase tracking-widest text-ink-dark"
           >
-            Close
+            Close dossier
           </button>
         </GlassPanel>
       </div>

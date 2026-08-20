@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 
+/** Ledger visual system — ink desk, manila paper, dried crimson */
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,42 +10,49 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        void: "#060f18",
-        background: "#0b141e",
+        void: "#0a0806",
+        desk: "#12100E",
+        background: "#12100E",
+        paper: "#F4EBD8",
+        manila: "#E8DCC8",
         surface: {
-          DEFAULT: "#18202a",
-          low: "#131c26",
-          high: "#222b35",
-          highest: "#2d3540",
-          bright: "#313a45",
+          DEFAULT: "#1c1814",
+          low: "#161310",
+          high: "#26201a",
+          highest: "#322a22",
+          bright: "#3a3128",
         },
+        /* Light text on desk (was cool blue-gray; now manila) */
         ink: {
-          DEFAULT: "#dae3f1",
-          muted: "#e8bcb6",
-          steel: "#8e97a4",
+          DEFAULT: "#E8DCC8",
+          muted: "#C4B5A0",
+          steel: "#9A8B78",
+          dark: "#1a1510",
         },
         crimson: {
-          DEFAULT: "#e61919",
-          glow: "#ffb4aa",
-          deep: "#690003",
+          DEFAULT: "#8B1E1E",
+          glow: "#C45C4A",
+          deep: "#4A0F0F",
         },
         outline: {
-          DEFAULT: "#ae8782",
+          DEFAULT: "#9A8B78",
           variant: "#5e3f3b",
         },
       },
       fontFamily: {
-        display: ["var(--font-montserrat)", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
         sans: ["var(--font-inter)", "sans-serif"],
         mono: ["var(--font-jetbrains)", "monospace"],
+        serif: ["var(--font-display)", "Georgia", "serif"],
       },
       boxShadow: {
-        glow: "0 0 24px rgba(230, 25, 25, 0.45)",
-        spotlight: "0 0 32px rgba(218, 227, 241, 0.12)",
+        glow: "0 0 20px rgba(139, 30, 30, 0.35)",
+        spotlight: "0 0 32px rgba(232, 220, 200, 0.08)",
+        stamp: "2px 3px 0 rgba(26, 21, 16, 0.25)",
       },
       backgroundImage: {
         vignette:
-          "radial-gradient(ellipse at center, transparent 40%, rgba(6, 15, 24, 0.85) 100%)",
+          "radial-gradient(ellipse at center, transparent 40%, rgba(18, 16, 14, 0.9) 100%)",
       },
     },
   },
