@@ -9,6 +9,7 @@ import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitive
 import { fadeUp } from "@/components/ui/motion";
 import { getSocket } from "@/lib/socket/client";
 import { ensurePlayerId, loadProfile } from "@/lib/profile";
+import { gameLabel } from "@/lib/games/labels";
 import type { OpenLobby } from "@/lib/types";
 
 export function OpenLobbies({
@@ -153,11 +154,7 @@ export function OpenLobbies({
                   <p className="mt-1 text-xs text-ink-steel">
                     Game:{" "}
                     <span className="font-mono text-ink-steel/90">
-                      {lobby.gameId === "five-alive"
-                        ? "5 Alive"
-                        : lobby.gameId === "mafia-city"
-                          ? "Mafia City"
-                          : lobby.gameId}
+                      {gameLabel(lobby.gameId)}
                     </span>
                   </p>
                 </div>

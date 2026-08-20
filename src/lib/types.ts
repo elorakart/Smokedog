@@ -16,7 +16,10 @@ export type Phase =
   | "day"
   | "gameover"
   | "fivealive_turn"
-  | "fivealive_bomb";
+  | "fivealive_bomb"
+  | "spotit_play"
+  | "ttt_play"
+  | "connect4_play";
 
 export type DaySubPhase = "discussion" | "vote";
 
@@ -186,7 +189,36 @@ export interface PublicGameState {
   deadVillagerVote?: boolean;
   // Optional per-game state for 5 Alive.
   fiveAlive?: FiveAlivePublicState;
+  spotIt?: SpotItPublicState;
+  ttt?: TttPublicState;
+  connect4?: Connect4PublicState;
+  boardWinnerId?: string | null;
+  boardDraw?: boolean;
 }
+
+export type SpotItPublicState = {
+  centerCard: number[];
+  yourCard: number[] | null;
+  deckRemaining: number;
+  scores: { playerId: string; name: string; score: number }[];
+  matchSeq: number;
+};
+
+export type TttPublicState = {
+  board: (null | "X" | "O")[];
+  turnPlayerId: string;
+  marks: Record<string, "X" | "O">;
+  winningLine: number[] | null;
+  lastMove: number | null;
+};
+
+export type Connect4PublicState = {
+  board: (null | "R" | "Y")[][];
+  turnPlayerId: string;
+  colors: Record<string, "R" | "Y">;
+  winningCells: { row: number; col: number }[] | null;
+  lastDrop: { col: number; row: number } | null;
+};
 
 export type PublicFiveAliveCard = {
   id: string;
@@ -241,6 +273,7 @@ export interface GameModule {
   displayName: string;
   minPlayers: number;
   maxPlayers: number;
+  status?: "live" | "maintenance" | "coming_soon";
   createSettings(): RoomSettings;
   assignRoles(playerCount: number, settings: RoomSettings): Role[];
 }
@@ -287,6 +320,12 @@ export type ClientToServerEvents = {
     // For bomb forced responses when you cannot (or choose not) to play 0.
     pass?: boolean;
   }) => void;
+  "spotit:submitMatch": (payload: {
+    roomId: string;
+    symbolId: number;
+  }) => void;
+  "ttt:move": (payload: { roomId: string; cellIndex: number }) => void;
+  "connect4:drop": (payload: { roomId: string; column: number }) => void;
   "chat:send": (payload: {
     roomId: string;
     channel: ChatChannel;
@@ -361,4 +400,10 @@ export type ServerToClientEvents = {
     playerId: string;
     speaking: boolean;
   }) => void;
+  "spotit:matchResolved": (payload: {
+    winnerId: string;
+    symbolId: number;
+    matchSeq: number;
+  }) => void;
+  "spotit:reject": (payload: { message: string }) => void;
 };

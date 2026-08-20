@@ -1,10 +1,16 @@
 import type { GameModule } from "@/lib/types";
 import { mafiaCityModule } from "./mafia-city/engine";
 import { fiveAliveModule } from "./5-alive/engine";
+import { spotItModule } from "./spot-it/engine";
+import { ticTacToeModule } from "./tic-tac-toe/engine";
+import { connect4Module } from "./connect-4/engine";
 
 const modules: Record<string, GameModule> = {
   [mafiaCityModule.id]: mafiaCityModule,
   [fiveAliveModule.id]: fiveAliveModule,
+  [spotItModule.id]: spotItModule,
+  [ticTacToeModule.id]: ticTacToeModule,
+  [connect4Module.id]: connect4Module,
 };
 
 export function resolveGameId(id?: string): string {
@@ -22,6 +28,30 @@ export function resolveGameId(id?: string): string {
 
   if (normalized === "mafia" || normalized === "mafia-city") {
     return mafiaCityModule.id;
+  }
+
+  if (
+    normalized === "spot-it" ||
+    normalized === "spotit" ||
+    normalized === "dobble"
+  ) {
+    return spotItModule.id;
+  }
+
+  if (
+    normalized === "tic-tac-toe" ||
+    normalized === "tictactoe" ||
+    normalized === "ttt"
+  ) {
+    return ticTacToeModule.id;
+  }
+
+  if (
+    normalized === "connect-4" ||
+    normalized === "connect4" ||
+    normalized === "c4"
+  ) {
+    return connect4Module.id;
   }
 
   return normalized;

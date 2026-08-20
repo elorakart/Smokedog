@@ -49,6 +49,44 @@ import {
   defaultRoleDistribution,
 } from "@/lib/games/mafia-city/balance";
 import {
+  generateDobbleDeck,
+  shuffleCards,
+  sharedSymbol,
+} from "@/lib/games/spot-it/deck";
+import { botSpotItDelayMs, pickBotSpotItSymbol } from "@/lib/games/spot-it/bot-ai";
+import {
+  applyTttMove,
+  checkTttWin,
+  emptyTttBoard,
+  isTttDraw,
+} from "@/lib/games/tic-tac-toe/logic";
+import { botTttDelayMs, pickBotTttMove } from "@/lib/games/tic-tac-toe/bot-ai";
+import {
+  checkC4Win,
+  dropC4,
+  emptyC4Board,
+  isC4Draw,
+} from "@/lib/games/connect-4/logic";
+import { botC4DelayMs, pickBotC4Column } from "@/lib/games/connect-4/bot-ai";
+import { boardTurnSeconds } from "@/lib/games/board/turnTimer";
+import {
+  toPublicConnect4,
+  toPublicSpotIt,
+  toPublicTtt,
+  type Connect4RoomState,
+  type SpotItRoomState,
+  type TttRoomState,
+} from "@/server/board-game-state";
+
+function isChatOnlyGame(gameId: string): boolean {
+  return (
+    gameId === "five-alive" ||
+    gameId === "spot-it" ||
+    gameId === "tic-tac-toe" ||
+    gameId === "connect-4"
+  );
+}
+import {
   resolveNight,
   tallyLynch,
   validNightTargets,
@@ -112,6 +150,11 @@ interface Room {
     bombActorId: string | null;
     bombResponderIds: string[];
   };
+  spotIt?: SpotItRoomState;
+  ttt?: TttRoomState;
+  connect4?: Connect4RoomState;
+  boardWinnerId?: string | null;
+  boardDraw?: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   detectiveByPlayer: Record<string, { targetId: string; faction: "town" | "mafia" }>;
   afkWarnedPlayerIds: string[];
@@ -347,6 +390,24 @@ export class GameRuntime {
                 : null,
           }
         : undefined,
+      spotIt:
+        room.spotIt && room.gameId === "spot-it"
+          ? toPublicSpotIt(
+              room.spotIt,
+              you?.id,
+              room.players.map((p) => ({ id: p.id, name: p.name }))
+            )
+          : undefined,
+      ttt:
+        room.ttt && room.gameId === "tic-tac-toe"
+          ? toPublicTtt(room.ttt)
+          : undefined,
+      connect4:
+        room.connect4 && room.gameId === "connect-4"
+          ? toPublicConnect4(room.connect4)
+          : undefined,
+      boardWinnerId: revealAll ? room.boardWinnerId ?? null : undefined,
+      boardDraw: revealAll ? !!room.boardDraw : undefined,
     };
   }
 
@@ -528,6 +589,61 @@ export class GameRuntime {
       return;
     }
 
+    if (room.gameId === "spot-it" && room.phase === "spotit_play" && room.spotIt) {
+      const spot = room.spotIt;
+      const center = spot.deck[0];
+      if (!center) return;
+      for (const bot of room.players.filter((p) => p.isBot)) {
+        const top = spot.piles[bot.id]?.[0];
+        if (!top) continue;
+        const symbolId = pickBotSpotItSymbol(top, center);
+        if (symbolId == null) continue;
+        const seq = spot.matchSeq;
+        this.delayBot(room, botSpotItDelayMs(), () => {
+          if (
+            room.phase !== "spotit_play" ||
+            room.paused ||
+            !room.spotIt ||
+            room.spotIt.matchSeq !== seq
+          ) {
+            return;
+          }
+          this.submitSpotItMatch(room.id, bot.id, symbolId);
+        });
+      }
+      return;
+    }
+
+    if (room.gameId === "tic-tac-toe" && room.phase === "ttt_play" && room.ttt) {
+      const turn = room.players.find(
+        (p) => p.id === room.ttt!.turnPlayerId && p.isBot
+      );
+      if (!turn) return;
+      this.delayBot(room, botTttDelayMs(), () => {
+        if (room.phase !== "ttt_play" || room.paused || !room.ttt) return;
+        if (room.ttt.turnPlayerId !== turn.id) return;
+        const cell = pickBotTttMove(room.ttt.board);
+        if (cell == null) return;
+        this.submitTttMove(room.id, turn.id, cell);
+      });
+      return;
+    }
+
+    if (room.gameId === "connect-4" && room.phase === "connect4_play" && room.connect4) {
+      const turn = room.players.find(
+        (p) => p.id === room.connect4!.turnPlayerId && p.isBot
+      );
+      if (!turn) return;
+      this.delayBot(room, botC4DelayMs(), () => {
+        if (room.phase !== "connect4_play" || room.paused || !room.connect4) return;
+        if (room.connect4.turnPlayerId !== turn.id) return;
+        const col = pickBotC4Column(room.connect4.board);
+        if (col == null) return;
+        this.submitConnect4Drop(room.id, turn.id, col);
+      });
+      return;
+    }
+
     if (room.phase === "night") {
       for (const bot of living(room).filter((p) => p.isBot)) {
         const wait = botNightDelayMs(bot.role);
@@ -667,6 +783,11 @@ export class GameRuntime {
   }): Room {
     const requestedId = resolveGameId(opts.gameId);
     const mod = getGameModule(opts.gameId);
+    if (mod.status === "maintenance") {
+      throw new Error(
+        `${mod.displayName} is under maintenance. Try another game.`
+      );
+    }
     if (mod.id !== requestedId) {
       throw new Error(
         `Could not start ${requestedId}. This game server may need a redeploy.`
@@ -913,6 +1034,18 @@ export class GameRuntime {
 
     if (room.gameId === "five-alive") {
       this.startFiveAlive(room);
+      return;
+    }
+    if (room.gameId === "spot-it") {
+      this.startSpotIt(room);
+      return;
+    }
+    if (room.gameId === "tic-tac-toe") {
+      this.startTicTacToe(room);
+      return;
+    }
+    if (room.gameId === "connect-4") {
+      this.startConnect4(room);
       return;
     }
 
@@ -1352,6 +1485,21 @@ export class GameRuntime {
     if (!room || room.paused) return;
     if (room.gameId === "five-alive") {
       this.onTimeoutFiveAlive(roomId);
+      return;
+    }
+    if (room.gameId === "tic-tac-toe" && room.phase === "ttt_play" && room.ttt) {
+      const turnId = room.ttt.turnPlayerId;
+      const bot = room.players.find((p) => p.id === turnId);
+      if (bot) {
+        const cell = pickBotTttMove(room.ttt.board);
+        if (cell != null) this.submitTttMove(room.id, turnId, cell);
+      }
+      return;
+    }
+    if (room.gameId === "connect-4" && room.phase === "connect4_play" && room.connect4) {
+      const turnId = room.connect4.turnPlayerId;
+      const col = pickBotC4Column(room.connect4.board);
+      if (col != null) this.submitConnect4Drop(room.id, turnId, col);
       return;
     }
     if (room.phase === "reveal") {
@@ -1864,7 +2012,7 @@ export class GameRuntime {
     speaking: boolean
   ) {
     const room = this.getRoom(roomId);
-    if (!room || room.gameId === "five-alive") return;
+    if (!room || isChatOnlyGame(room.gameId)) return;
     if (!room.voiceParticipants[channel].has(playerId)) return;
     for (const socketId of this.voiceSocketIds(room, channel)) {
       this.io.to(socketId).emit("voice:speaking", {
@@ -1878,7 +2026,7 @@ export class GameRuntime {
   joinVoice(roomId: string, playerId: string, channel: ChatChannel) {
     const room = this.getRoom(roomId);
     const player = room?.players.find((p) => p.id === playerId);
-    if (!room || room.gameId === "five-alive") {
+    if (!room || isChatOnlyGame(room.gameId)) {
       if (player?.socketId) {
         this.io.to(player.socketId).emit("voice:error", {
           message: "Voice is not available in this game.",
@@ -1913,7 +2061,7 @@ export class GameRuntime {
     targetId: string
   ) {
     const room = this.getRoom(roomId);
-    if (!room || room.gameId === "five-alive") return;
+    if (!room || isChatOnlyGame(room.gameId)) return;
     const from = room.players.find((p) => p.id === fromId);
     const target = room.players.find((p) => p.id === targetId);
     if (!from?.socketId || !target?.socketId || target.isBot || from.id === target.id) {
@@ -1951,7 +2099,7 @@ export class GameRuntime {
     signal: VoiceSignalPayload
   ) {
     const room = this.getRoom(roomId);
-    if (!room || room.gameId === "five-alive") return;
+    if (!room || isChatOnlyGame(room.gameId)) return;
     const from = room.players.find((p) => p.id === fromId);
     const target = room.players.find((p) => p.id === targetId);
     if (!from?.socketId || !target?.socketId) return;
@@ -2188,7 +2336,254 @@ export class GameRuntime {
     room.afkGraceEndsAt = null;
     room.afkGracePlayerId = null;
     room.fiveAlive = undefined;
+    room.spotIt = undefined;
+    room.ttt = undefined;
+    room.connect4 = undefined;
+    room.boardWinnerId = null;
+    room.boardDraw = false;
     room.voiceParticipants = emptyVoiceChannels();
+    this.emitRoom(room);
+  }
+
+  private startSpotIt(room: Room) {
+    const generated = generateDobbleDeck(7);
+    const deck = shuffleCards(generated.cards);
+    const piles: Record<string, number[][]> = {};
+    for (const p of room.players) {
+      const card = deck.pop();
+      if (!card) throw new Error("Deck too small for players");
+      piles[p.id] = [card];
+      p.alive = true;
+      p.ready = false;
+      p.role = "villager";
+    }
+    room.spotIt = {
+      deck,
+      piles,
+      matchSeq: 0,
+      startedAt: Date.now(),
+    };
+    room.boardWinnerId = null;
+    room.boardDraw = false;
+    room.cycle = 1;
+    room.winner = null;
+    room.logs = [];
+    log(room, "Spot It — find the match. First click wins the card.");
+    this.setPhase(room, "spotit_play", null);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitSpotItMatch(roomId: string, playerId: string, symbolId: number) {
+    const room = this.getRoom(roomId);
+    if (!room || room.gameId !== "spot-it" || room.phase !== "spotit_play") return;
+    if (room.paused || !room.spotIt) return;
+    const spot = room.spotIt;
+    const center = spot.deck[0];
+    const playerCard = spot.piles[playerId]?.[0];
+    const player = room.players.find((p) => p.id === playerId);
+    if (!center || !playerCard || !player) return;
+
+    const expected = sharedSymbol(playerCard, center);
+    if (expected == null || expected !== symbolId) {
+      if (player.socketId) {
+        this.io.to(player.socketId).emit("spotit:reject", {
+          message: "That’s not the matching symbol.",
+        });
+      }
+      return;
+    }
+
+    spot.matchSeq += 1;
+    const claimed = spot.deck.shift()!;
+    spot.piles[playerId] = [claimed, ...(spot.piles[playerId] ?? [])];
+    log(room, `${player.name} claimed a card.`);
+    this.io.to(room.id).emit("spotit:matchResolved", {
+      winnerId: playerId,
+      symbolId,
+      matchSeq: spot.matchSeq,
+    });
+
+    if (spot.deck.length === 0) {
+      const ranked = room.players
+        .map((p) => ({
+          id: p.id,
+          score: spot.piles[p.id]?.length ?? 0,
+        }))
+        .sort((a, b) => b.score - a.score);
+      const top = ranked[0]?.score ?? 0;
+      const winners = ranked.filter((r) => r.score === top);
+      room.boardDraw = winners.length > 1;
+      room.boardWinnerId = winners.length === 1 ? winners[0]!.id : null;
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      log(
+        room,
+        room.boardDraw
+          ? "Spot It ended in a draw."
+          : `${room.players.find((p) => p.id === room.boardWinnerId)?.name ?? "Someone"} wins Spot It!`
+      );
+      this.emitRoom(room);
+      return;
+    }
+
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  private startTicTacToe(room: Room) {
+    if (room.players.length !== 2) {
+      throw new Error("Tic-Tac-Toe needs exactly 2 players");
+    }
+    const [a, b] = room.players;
+    for (const p of room.players) {
+      p.alive = true;
+      p.ready = false;
+      p.role = "villager";
+    }
+    room.ttt = {
+      board: emptyTttBoard(),
+      turnPlayerId: a!.id,
+      marks: { [a!.id]: "X", [b!.id]: "O" },
+      winningLine: null,
+      lastMove: null,
+      result: "ongoing",
+      winnerId: null,
+    };
+    room.boardWinnerId = null;
+    room.boardDraw = false;
+    room.cycle = 1;
+    room.winner = null;
+    room.logs = [];
+    log(room, "Tic-Tac-Toe — X goes first.");
+    this.setPhase(room, "ttt_play", boardTurnSeconds(room.settings.daySeconds));
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitTttMove(roomId: string, playerId: string, cellIndex: number) {
+    const room = this.getRoom(roomId);
+    if (!room || room.gameId !== "tic-tac-toe" || room.phase !== "ttt_play") return;
+    if (room.paused || !room.ttt || room.ttt.result !== "ongoing") return;
+    const ttt = room.ttt;
+    if (ttt.turnPlayerId !== playerId) return;
+    const mark = ttt.marks[playerId];
+    if (!mark) return;
+    const next = applyTttMove(ttt.board, cellIndex, mark);
+    if (!next) return;
+    ttt.board = next;
+    ttt.lastMove = cellIndex;
+    const win = checkTttWin(ttt.board);
+    if (win) {
+      ttt.winningLine = win.line;
+      ttt.result = "win";
+      ttt.winnerId = playerId;
+      room.boardWinnerId = playerId;
+      room.boardDraw = false;
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} wins!`);
+      this.emitRoom(room);
+      return;
+    }
+    if (isTttDraw(ttt.board)) {
+      ttt.result = "draw";
+      room.boardDraw = true;
+      room.boardWinnerId = null;
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      log(room, "Tic-Tac-Toe draw.");
+      this.emitRoom(room);
+      return;
+    }
+    const other = room.players.find((p) => p.id !== playerId);
+    if (other) ttt.turnPlayerId = other.id;
+    this.setPhase(room, "ttt_play", boardTurnSeconds(room.settings.daySeconds));
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  private startConnect4(room: Room) {
+    if (room.players.length !== 2) {
+      throw new Error("Connect 4 needs exactly 2 players");
+    }
+    const [a, b] = room.players;
+    for (const p of room.players) {
+      p.alive = true;
+      p.ready = false;
+      p.role = "villager";
+    }
+    room.connect4 = {
+      board: emptyC4Board(),
+      turnPlayerId: a!.id,
+      colors: { [a!.id]: "R", [b!.id]: "Y" },
+      winningCells: null,
+      lastDrop: null,
+      result: "ongoing",
+      winnerId: null,
+    };
+    room.boardWinnerId = null;
+    room.boardDraw = false;
+    room.cycle = 1;
+    room.winner = null;
+    room.logs = [];
+    log(room, "Connect 4 — Red drops first.");
+    this.setPhase(room, "connect4_play", boardTurnSeconds(room.settings.daySeconds));
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitConnect4Drop(roomId: string, playerId: string, column: number) {
+    const room = this.getRoom(roomId);
+    if (!room || room.gameId !== "connect-4" || room.phase !== "connect4_play") {
+      return;
+    }
+    if (room.paused || !room.connect4 || room.connect4.result !== "ongoing") return;
+    const c4 = room.connect4;
+    if (c4.turnPlayerId !== playerId) return;
+    const color = c4.colors[playerId];
+    if (!color) return;
+    const dropped = dropC4(c4.board, column, color);
+    if (!dropped) return;
+    c4.board = dropped.board;
+    c4.lastDrop = { col: column, row: dropped.row };
+    const win = checkC4Win(c4.board, dropped.row, column);
+    if (win) {
+      c4.winningCells = win.cells;
+      c4.result = "win";
+      c4.winnerId = playerId;
+      room.boardWinnerId = playerId;
+      room.boardDraw = false;
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} wins!`);
+      this.emitRoom(room);
+      return;
+    }
+    if (isC4Draw(c4.board)) {
+      c4.result = "draw";
+      room.boardDraw = true;
+      room.boardWinnerId = null;
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.clearBotTimers(room);
+      log(room, "Connect 4 draw.");
+      this.emitRoom(room);
+      return;
+    }
+    const other = room.players.find((p) => p.id !== playerId);
+    if (other) c4.turnPlayerId = other.id;
+    this.setPhase(room, "connect4_play", boardTurnSeconds(room.settings.daySeconds));
+    this.scheduleBots(room);
     this.emitRoom(room);
   }
 

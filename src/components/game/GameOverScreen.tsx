@@ -18,16 +18,31 @@ export function GameOverScreen({
   returning?: boolean;
 }) {
   const isFiveAlive = state.gameId === "five-alive";
+  const isBoard =
+    state.gameId === "spot-it" ||
+    state.gameId === "tic-tac-toe" ||
+    state.gameId === "connect-4";
   const fiveAliveWinner =
     state.players.find((p) => (p.lives ?? 0) > 0) ?? state.players[0];
   const youWonFiveAlive =
     !!fiveAliveWinner && !!state.you && state.you.id === fiveAliveWinner.id;
 
+  const boardWinner = state.players.find((p) => p.id === state.boardWinnerId);
+  const youWonBoard =
+    !!state.you &&
+    (state.boardDraw
+      ? false
+      : state.boardWinnerId === state.you.id);
+
   const wonMafia =
     (state.winner === "town" && state.you?.faction === "town") ||
     (state.winner === "mafia" && state.you?.faction === "mafia");
 
-  const won = isFiveAlive ? youWonFiveAlive : wonMafia;
+  const won = isFiveAlive
+    ? youWonFiveAlive
+    : isBoard
+      ? youWonBoard || !!state.boardDraw
+      : wonMafia;
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const chronicle = state.chronicle ?? [];
 
@@ -74,6 +89,55 @@ export function GameOverScreen({
           ))}
         </div>
 
+        {state.you?.isHost && (
+          <PrimaryButton
+            className="mt-8"
+            loading={returning}
+            disabled={returning}
+            onClick={onReturn}
+          >
+            {returning ? "Returning…" : "Return to Lobby"}
+          </PrimaryButton>
+        )}
+      </div>
+    );
+  }
+
+  if (isBoard) {
+    const title = state.boardDraw
+      ? "Draw"
+      : `${boardWinner?.name ?? "Someone"} wins`;
+    const subtitle =
+      state.gameId === "spot-it"
+        ? "Most cards claimed."
+        : "Match complete.";
+    return (
+      <div className="mx-auto max-w-3xl py-10">
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-crimson-glow">
+          {state.boardDraw ? "Draw" : youWonBoard ? "Victory" : "Defeat"}
+        </p>
+        <h1 className="mt-2 font-display text-5xl font-extrabold">{title}</h1>
+        <p className="mt-3 text-ink-steel">{subtitle}</p>
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
+          {(state.recap ?? state.players).map((p) => (
+            <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
+              <div className="overflow-hidden rounded-full ring-1 ring-white/10">
+                <PlayerAvatar id={p.avatarId} size={56} />
+              </div>
+              <div>
+                <p className="font-display font-semibold">{p.name}</p>
+                {state.spotIt && (
+                  <p className="mt-1 font-mono text-xs text-crimson-glow">
+                    {state.spotIt.scores.find((s) => s.playerId === p.id)?.score ??
+                      0}{" "}
+                    cards
+                  </p>
+                )}
+                {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
+              </div>
+            </GlassPanel>
+          ))}
+        </div>
         {state.you?.isHost && (
           <PrimaryButton
             className="mt-8"

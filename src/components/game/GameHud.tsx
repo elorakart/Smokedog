@@ -51,6 +51,9 @@ export function GameHud({
         : `DAY ${state.cycle}`,
     fivealive_turn: `TURN ${state.cycle}`,
     fivealive_bomb: "BOMB RESOLUTION",
+    spotit_play: "SPOT IT",
+    ttt_play: "TIC-TAC-TOE",
+    connect4_play: "CONNECT 4",
     gameover: "DEBRIEF",
   };
 

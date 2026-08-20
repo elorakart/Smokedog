@@ -36,6 +36,11 @@ import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
 import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
 import { FiveAliveBombPanel } from "@/components/game/five-alive/FiveAliveBombPanel";
+import { SpotItLobbyView } from "@/components/game/SpotItLobbyView";
+import { SpotItTable } from "@/components/game/spot-it/SpotItTable";
+import { BoardLobbyView } from "@/components/game/board/BoardLobbyView";
+import { TttBoard } from "@/components/game/tic-tac-toe/TttBoard";
+import { Connect4Board } from "@/components/game/connect-4/Connect4Board";
 
 export function GameClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -343,7 +348,7 @@ export function GameClient({ roomId }: { roomId: string }) {
   };
 
   const voiceChannel =
-    state.gameId !== "five-alive" &&
+    state.gameId === "mafia-city" &&
     state.you &&
     availableChannels({
       alive: state.you.alive,
@@ -472,7 +477,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       )}
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
-        {voiceInvite && state.gameId !== "five-alive" && (
+        {voiceInvite && state.gameId === "mafia-city" && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-emerald-400/40 bg-emerald-400/10 px-4 py-3">
             <p className="text-sm text-emerald-100">
               <span className="font-semibold">{voiceInvite.fromName}</span> wants
@@ -523,6 +528,39 @@ export function GameClient({ roomId }: { roomId: string }) {
                     onAddBot={emitAddBot}
                     onRemoveBot={emitRemoveBot}
                   />
+                ) : state.gameId === "spot-it" ? (
+                  <SpotItLobbyView
+                    state={state}
+                    onStart={emitStart}
+                    starting={startingGame}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                  />
+                ) : state.gameId === "tic-tac-toe" ? (
+                  <BoardLobbyView
+                    state={state}
+                    title="Tic-Tac-Toe"
+                    blurb="Classic 3×3. First to three in a row wins."
+                    onStart={emitStart}
+                    starting={startingGame}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                    onSettings={emitSettings}
+                  />
+                ) : state.gameId === "connect-4" ? (
+                  <BoardLobbyView
+                    state={state}
+                    title="Connect 4"
+                    blurb="Drop discs. Connect four to win."
+                    onStart={emitStart}
+                    starting={startingGame}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                    onSettings={emitSettings}
+                  />
                 ) : (
                   <LobbyView
                     state={state}
@@ -535,6 +573,42 @@ export function GameClient({ roomId }: { roomId: string }) {
                   />
                 )}
               </>
+            )}
+
+            {state.gameId === "spot-it" && state.phase === "spotit_play" && (
+              <SpotItTable
+                state={state}
+                socket={socket}
+                onMatch={(symbolId) =>
+                  socket.emit("spotit:submitMatch", {
+                    roomId: state.roomId,
+                    symbolId,
+                  })
+                }
+                onSendChat={emitChat}
+              />
+            )}
+
+            {state.gameId === "tic-tac-toe" && state.phase === "ttt_play" && (
+              <TttBoard
+                state={state}
+                socket={socket}
+                onMove={(cellIndex) =>
+                  socket.emit("ttt:move", { roomId: state.roomId, cellIndex })
+                }
+                onSendChat={emitChat}
+              />
+            )}
+
+            {state.gameId === "connect-4" && state.phase === "connect4_play" && (
+              <Connect4Board
+                state={state}
+                socket={socket}
+                onDrop={(column) =>
+                  socket.emit("connect4:drop", { roomId: state.roomId, column })
+                }
+                onSendChat={emitChat}
+              />
             )}
 
             {state.phase === "reveal" && (

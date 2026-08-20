@@ -9,11 +9,7 @@ import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { AVATAR_COUNT } from "@/lib/profile";
 import { validateRoomCode } from "@/lib/room-code";
 
-function gameLabel(gameId: string): string {
-  if (gameId === "five-alive") return "5 Alive";
-  if (gameId === "mafia-city") return "Mafia City";
-  return gameId;
-}
+import { gameLabel } from "@/lib/games/labels";
 
 export function ProfileModal({
   open,

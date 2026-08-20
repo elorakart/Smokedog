@@ -191,6 +191,33 @@ export function attachSocketServer(
       );
     });
 
+    socket.on("spotit:submitMatch", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitSpotItMatch(
+        payload.roomId,
+        socket.data.playerId,
+        payload.symbolId
+      );
+    });
+
+    socket.on("ttt:move", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitTttMove(
+        payload.roomId,
+        socket.data.playerId,
+        payload.cellIndex
+      );
+    });
+
+    socket.on("connect4:drop", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitConnect4Drop(
+        payload.roomId,
+        socket.data.playerId,
+        payload.column
+      );
+    });
+
     socket.on("chat:send", (payload) => {
       if (!socket.data.playerId) return;
       runtime.sendChat(
