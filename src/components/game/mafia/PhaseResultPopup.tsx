@@ -15,9 +15,11 @@ const AUTO_DISMISS_MS = 3000;
 export function PhaseResultPopup({
   announcement,
   onDismiss,
+  durationMs = AUTO_DISMISS_MS,
 }: {
   announcement: PhaseAnnouncement;
   onDismiss: () => void;
+  durationMs?: number;
 }) {
   useEffect(() => {
     if (announcement.title.toLowerCase().includes("voting")) {
@@ -28,9 +30,15 @@ export function PhaseResultPopup({
       playBadNews();
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-    const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
+    const t = setTimeout(onDismiss, durationMs);
     return () => clearTimeout(t);
-  }, [announcement.id, announcement.title, announcement.tone, onDismiss]);
+  }, [
+    announcement.id,
+    announcement.title,
+    announcement.tone,
+    durationMs,
+    onDismiss,
+  ]);
 
   const accent =
     announcement.tone === "bad"

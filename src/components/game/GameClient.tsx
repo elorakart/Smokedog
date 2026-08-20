@@ -70,6 +70,12 @@ export function GameClient({ roomId }: { roomId: string }) {
   const [detectivePopup, setDetectivePopup] = useState<{
     targetName: string;
     faction: Faction;
+    cycle?: number;
+  } | null>(null);
+  const [pendingDetectivePopup, setPendingDetectivePopup] = useState<{
+    targetName: string;
+    faction: Faction;
+    cycle?: number;
   } | null>(null);
   const [localReveal, setLocalReveal] = useState<{
     role: Role;
@@ -79,6 +85,8 @@ export function GameClient({ roomId }: { roomId: string }) {
   const quittingRef = useRef(false);
   const quitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishLeaveRef = useRef<() => void>(() => {});
+  const shownDetectiveLogIdRef = useRef<string | null>(null);
+  const detectiveLogReadyRef = useRef(false);
 
   useEffect(() => {
     if (!state?.afkGraceEndsAt || state.afkGracePlayerId !== state.you?.id) {
@@ -87,6 +95,42 @@ export function GameClient({ roomId }: { roomId: string }) {
     const t = setInterval(() => setAfkTick((n) => n + 1), 500);
     return () => clearInterval(t);
   }, [state?.afkGraceEndsAt, state?.afkGracePlayerId, state?.you?.id]);
+
+  // Seed detective log cursor so reconnect/history does not spam old popups.
+  useEffect(() => {
+    if (!state?.detectiveLog) return;
+    if (!detectiveLogReadyRef.current) {
+      const latest = state.detectiveLog[state.detectiveLog.length - 1];
+      shownDetectiveLogIdRef.current = latest?.id ?? null;
+      detectiveLogReadyRef.current = true;
+      return;
+    }
+    const latest = state.detectiveLog[state.detectiveLog.length - 1];
+    if (!latest || latest.id === shownDetectiveLogIdRef.current) return;
+    shownDetectiveLogIdRef.current = latest.id;
+    setPendingDetectivePopup({
+      targetName: latest.targetName,
+      faction: latest.faction,
+      cycle: latest.cycle,
+    });
+  }, [state?.detectiveLog]);
+
+  // Show investigation after phase announcement so it is not buried.
+  useEffect(() => {
+    const announcementBlocking =
+      !!state?.announcement &&
+      state.announcement.id !== dismissedAnnouncementId;
+    if (announcementBlocking || detectivePopup || !pendingDetectivePopup) {
+      return;
+    }
+    setDetectivePopup(pendingDetectivePopup);
+    setPendingDetectivePopup(null);
+  }, [
+    state?.announcement,
+    dismissedAnnouncementId,
+    detectivePopup,
+    pendingDetectivePopup,
+  ]);
 
   useEffect(() => {
     const profile = loadProfile();
@@ -108,7 +152,13 @@ export function GameClient({ roomId }: { roomId: string }) {
           ability: meta.ability,
         });
       }
-      if (next.phase === "lobby") setLocalReveal(null);
+      if (next.phase === "lobby") {
+        setLocalReveal(null);
+        shownDetectiveLogIdRef.current = null;
+        detectiveLogReadyRef.current = false;
+        setDetectivePopup(null);
+        setPendingDetectivePopup(null);
+      }
     };
 
     const onChat = (message: ChatMessage) => {
@@ -145,7 +195,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       targetName: string;
       faction: Faction;
     }) => {
-      setDetectivePopup({
+      setPendingDetectivePopup({
         targetName: payload.targetName,
         faction: payload.faction,
       });
@@ -441,15 +491,19 @@ export function GameClient({ roomId }: { roomId: string }) {
           onDismiss={() => setDismissedActionKey(actionKey)}
         />
       )}
-      {detectivePopup && (
+      {detectivePopup && !showAnnouncement && (
         <PhaseResultPopup
           announcement={{
-            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}`,
-            tone: "info",
-            title: "Investigation result",
-            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction}.`,
+            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}-${detectivePopup.cycle ?? "x"}`,
+            tone: detectivePopup.faction === "mafia" ? "bad" : "good",
+            title:
+              detectivePopup.cycle != null
+                ? `Night ${detectivePopup.cycle} investigation`
+                : "Investigation result",
+            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction.toUpperCase()}.`,
             at: Date.now(),
           }}
+          durationMs={5000}
           onDismiss={() => setDetectivePopup(null)}
         />
       )}

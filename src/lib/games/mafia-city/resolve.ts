@@ -231,12 +231,13 @@ export function resolveNight(
     }
   }
 
+  // Detective learns the result even if they die the same night — they already acted.
   const detectiveAction = actions.find((a) => a.type === "detective_inspect");
   const investigator = byId(players, detectiveAction?.playerId);
   const inspected = byId(players, detectiveAction?.targetId);
   const detective =
-    investigator?.alive &&
-    investigator.role === "detective" &&
+    !!detectiveAction &&
+    investigator?.role === "detective" &&
     inspected?.role &&
     investigator.id !== inspected.id
       ? {

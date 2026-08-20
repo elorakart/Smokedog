@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, WifiOff } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, StatusChip } from "@/components/ui/primitives";
 import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
@@ -48,6 +49,36 @@ function tags(p: PublicPlayer, intel?: PublicGameState["mafiaNightIntel"]) {
   );
 }
 
+function KillStamp({ self }: { self: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center overflow-hidden rounded-sm bg-crimson/55"
+    >
+      <motion.div
+        initial={{ scale: 1.6, rotate: -18, opacity: 0 }}
+        animate={{ scale: 1, rotate: -8, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 320, damping: 18 }}
+        className={`border-2 border-manila bg-crimson px-2 py-1 font-mono uppercase text-manila shadow-stamp ${
+          self
+            ? "text-xs tracking-[0.22em]"
+            : "text-[10px] tracking-[0.18em]"
+        }`}
+      >
+        Eliminated
+      </motion.div>
+      <motion.span
+        initial={{ scaleX: 0, opacity: 0 }}
+        animate={{ scaleX: 1, opacity: 1 }}
+        transition={{ delay: 0.12, duration: 0.28 }}
+        className="absolute left-[8%] right-[8%] top-1/2 h-0.5 origin-left bg-manila"
+      />
+    </motion.div>
+  );
+}
+
 export function PlayerGrid({
   state,
   selectable,
@@ -73,6 +104,27 @@ export function PlayerGrid({
     }
   }
   const showMafiaIntel = !!state.mafiaNightIntel;
+  const prevAliveRef = useRef<Record<string, boolean>>({});
+  const primedRef = useRef(false);
+  const [killAnimIds, setKillAnimIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const prev = prevAliveRef.current;
+    if (!primedRef.current) {
+      for (const p of state.players) prev[p.id] = p.alive;
+      primedRef.current = true;
+      return;
+    }
+    const newlyDead: string[] = [];
+    for (const p of state.players) {
+      if (prev[p.id] === true && !p.alive) newlyDead.push(p.id);
+      prev[p.id] = p.alive;
+    }
+    if (newlyDead.length === 0) return;
+    setKillAnimIds(new Set(newlyDead));
+    const t = setTimeout(() => setKillAnimIds(new Set()), 2800);
+    return () => clearTimeout(t);
+  }, [state.players]);
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -88,18 +140,30 @@ export function PlayerGrid({
           !p.isBot &&
           p.connected &&
           p.id !== state.you?.id;
+        const showingKill = killAnimIds.has(p.id);
+        const isSelf = p.id === state.you?.id;
         return (
           <div key={p.id} className="min-w-0">
             <motion.div
               initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04, duration: 0.35 }}
-              className="h-full"
+              animate={
+                showingKill
+                  ? { opacity: 1, y: 0, x: [0, -6, 6, -4, 4, 0] }
+                  : { opacity: 1, y: 0, x: 0 }
+              }
+              transition={
+                showingKill
+                  ? { duration: 0.45 }
+                  : { delay: i * 0.04, duration: 0.35 }
+              }
+              className="relative h-full"
             >
               <GlassPanel
-                className={`flex h-full flex-col p-3 transition ${
+                className={`relative flex h-full flex-col overflow-hidden p-3 transition ${
                   selected ? "ring-2 ring-crimson shadow-glow" : ""
-                } ${!p.alive ? "opacity-50" : ""} ${
+                } ${!p.alive && !showingKill ? "opacity-50" : ""} ${
+                  showingKill ? "ring-2 ring-crimson" : ""
+                } ${
                   !disabled
                     ? "cursor-pointer hover:-translate-y-1 hover:shadow-spotlight"
                     : ""
@@ -110,17 +174,46 @@ export function PlayerGrid({
                     : undefined
                 }
               >
+                <AnimatePresence>
+                  {showingKill && <KillStamp self={isSelf} />}
+                </AnimatePresence>
                 <div className="mx-auto w-full max-w-[6.5rem]">
                   <div
                     className={`relative aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
-                      selected ? "ring-crimson" : "ring-transparent"
+                      selected || showingKill
+                        ? "ring-crimson"
+                        : "ring-transparent"
                     }`}
                   >
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}
-                      className="pointer-events-none h-full w-full"
+                      className={`pointer-events-none h-full w-full ${
+                        showingKill ? "grayscale" : ""
+                      }`}
                     />
+                    {showingKill && (
+                      <div className="pointer-events-none absolute inset-0">
+                        <svg
+                          viewBox="0 0 100 100"
+                          className="h-full w-full"
+                          aria-hidden
+                        >
+                          <motion.line
+                            x1="18"
+                            y1="18"
+                            x2="82"
+                            y2="82"
+                            stroke="#E8DCC8"
+                            strokeWidth="5"
+                            strokeLinecap="square"
+                            initial={{ pathLength: 0 }}
+                            animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.35, delay: 0.08 }}
+                          />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p className="mt-2 truncate text-center font-display text-sm font-semibold">
