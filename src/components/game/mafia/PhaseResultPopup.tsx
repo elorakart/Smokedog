@@ -12,27 +12,6 @@ import {
 
 const AUTO_DISMISS_MS = 3000;
 
-const TONE_STYLES: Record<
-  PhaseAnnouncement["tone"],
-  { border: string; bg: string; text: string }
-> = {
-  info: {
-    border: "border-crimson/40",
-    bg: "bg-crimson/10",
-    text: "text-crimson",
-  },
-  good: {
-    border: "border-crimson/40",
-    bg: "bg-crimson/10",
-    text: "text-crimson",
-  },
-  bad: {
-    border: "border-crimson/40",
-    bg: "bg-crimson/15",
-    text: "text-crimson-glow",
-  },
-};
-
 export function PhaseResultPopup({
   announcement,
   onDismiss,
@@ -40,8 +19,6 @@ export function PhaseResultPopup({
   announcement: PhaseAnnouncement;
   onDismiss: () => void;
 }) {
-  const styles = TONE_STYLES[announcement.tone];
-
   useEffect(() => {
     if (announcement.title.toLowerCase().includes("voting")) {
       playVoteStart();
@@ -55,13 +32,18 @@ export function PhaseResultPopup({
     return () => clearTimeout(t);
   }, [announcement.id, announcement.title, announcement.tone, onDismiss]);
 
+  const accent =
+    announcement.tone === "bad"
+      ? "border-crimson bg-crimson text-manila"
+      : "border-crimson bg-manila text-crimson";
+
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[45] flex items-center justify-center bg-void/50 p-4 backdrop-blur-[6px]"
+        className="fixed inset-0 z-[45] flex items-center justify-center bg-crimson/35 p-4 backdrop-blur-[4px]"
         onClick={onDismiss}
       >
         <motion.div
@@ -69,23 +51,31 @@ export function PhaseResultPopup({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
           onClick={(e) => e.stopPropagation()}
-          className={`relative w-[min(92vw,28rem)] rounded-sm border px-5 py-4 shadow-lg backdrop-blur-md ${styles.border} ${styles.bg}`}
+          className={`relative w-[min(92vw,28rem)] rounded-sm border-2 px-5 py-5 shadow-stamp ${accent}`}
         >
           <button
             type="button"
             aria-label="Dismiss"
             onClick={onDismiss}
-            className="absolute right-2 top-2 rounded-sm p-1 text-crimson/60 transition hover:bg-crimson/10 hover:text-crimson"
+            className={`absolute right-2 top-2 rounded-sm p-1 transition ${
+              announcement.tone === "bad"
+                ? "text-manila/80 hover:bg-manila/15 hover:text-manila"
+                : "text-crimson/60 hover:bg-crimson/10 hover:text-crimson"
+            }`}
           >
             <X size={16} />
           </button>
-          <p
-            className={`pr-6 font-mono text-[10px] uppercase tracking-[0.2em] ${styles.text}`}
-          >
+          <p className="pr-6 font-mono text-[10px] uppercase tracking-[0.22em] opacity-90">
             {announcement.title}
           </p>
           {announcement.detail && (
-            <p className="mt-2 pr-2 text-sm text-ink">{announcement.detail}</p>
+            <p
+              className={`mt-2 pr-2 text-sm leading-relaxed ${
+                announcement.tone === "bad" ? "text-manila" : "text-crimson"
+              }`}
+            >
+              {announcement.detail}
+            </p>
           )}
         </motion.div>
       </motion.div>

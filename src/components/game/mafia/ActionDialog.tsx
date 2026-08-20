@@ -37,7 +37,7 @@ export function ActionDialog({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-void/60 p-4 backdrop-blur-[8px]"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-crimson/35 p-4 backdrop-blur-[4px]"
         onClick={onDismiss}
       >
         <motion.div
@@ -45,7 +45,7 @@ export function ActionDialog({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-[min(92vw,28rem)] rounded-sm border border-crimson/40 bg-surface/95 px-5 py-4 shadow-lg"
+          className="relative w-[min(92vw,28rem)] rounded-sm border-2 border-crimson bg-manila px-5 py-5 text-crimson shadow-stamp"
         >
           <button
             type="button"
@@ -56,15 +56,14 @@ export function ActionDialog({
             <X size={16} />
           </button>
           <div className="flex items-start gap-3 pr-6">
-            <AlertTriangle
-              size={18}
-              className="mt-0.5 shrink-0 text-crimson/80"
-            />
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-crimson" />
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-crimson">
                 {title}
               </p>
-              <p className="mt-2 text-sm text-ink">{detail}</p>
+              <p className="mt-2 text-sm leading-relaxed text-crimson">
+                {detail}
+              </p>
             </div>
           </div>
         </motion.div>
