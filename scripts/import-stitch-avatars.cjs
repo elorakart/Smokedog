@@ -5,9 +5,8 @@
  *   light-01..03 → 3×2 grids (18 portraits)
  *   light-pair   → 2 large circular portraits (avatars 18–19)
  *
- * Each export is a square crop of the Stitch circular portrait art
- * (circle frame is part of the bitmap). UI should scale with object-contain,
- * not CSS-mask/cover-crop into a second circle.
+ * Exports are circle-masked WebPs: opaque circular mugshot + transparent outside.
+ * Do not leave parchment corners baked into the bitmap.
  */
 const fs = require("fs");
 const path = require("path");
@@ -39,18 +38,127 @@ const LIGHT_PAIR = {
   pad: 6,
 };
 
-async function exportSquare(input, left, top, size, outPath) {
+function isParchment(r, g, b, corner) {
+  const dr = r - corner[0];
+  const dg = g - corner[1];
+  const db = b - corner[2];
+  const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return dist < 42 && lum > 150;
+}
+
+/**
+ * Find outer radius of the ink ring by scanning inward from the four edge midpoints.
+ * Returns radius in pixels from image center to outer edge of the circle art.
+ */
+function detectCircleRadius(data, width, height) {
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  const corner = [
+    data[0],
+    data[1],
+    data[2],
+  ];
+
+  const sample = (x, y) => {
+    const ix = Math.max(0, Math.min(width - 1, Math.round(x)));
+    const iy = Math.max(0, Math.min(height - 1, Math.round(y)));
+    const i = (iy * width + ix) * 4;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+
+  const scanInward = (sx, sy, dx, dy, maxSteps) => {
+    for (let step = 0; step < maxSteps; step++) {
+      const x = sx + dx * step;
+      const y = sy + dy * step;
+      const [r, g, b] = sample(x, y);
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      // Hit ink ring (or dark silhouette at the rim)
+      if (!isParchment(r, g, b, corner) && lum < 90) {
+        return Math.hypot(x - cx, y - cy);
+      }
+    }
+    return null;
+  };
+
+  const maxSteps = Math.ceil(Math.min(width, height) / 2);
+  const hits = [
+    scanInward(cx, 0, 0, 1, maxSteps),
+    scanInward(cx, height - 1, 0, -1, maxSteps),
+    scanInward(0, cy, 1, 0, maxSteps),
+    scanInward(width - 1, cy, -1, 0, maxSteps),
+  ].filter((v) => v != null && v > 8);
+
+  if (hits.length === 0) {
+    return Math.min(width, height) / 2;
+  }
+  // Prefer the tightest reliable ring (exclude outliers from labels/seals)
+  hits.sort((a, b) => a - b);
+  const median = hits[Math.floor(hits.length / 2)];
+  return median;
+}
+
+async function exportCircle(input, left, top, size, outPath) {
   const meta = await sharp(input).metadata();
   const w = meta.width ?? size;
   const h = meta.height ?? size;
   const safeLeft = Math.max(0, Math.min(left, w - 1));
   const safeTop = Math.max(0, Math.min(top, h - 1));
   const safeSize = Math.min(size, w - safeLeft, h - safeTop);
-  await sharp(input)
+
+  const { data, info } = await sharp(input)
     .extract({ left: safeLeft, top: safeTop, width: safeSize, height: safeSize })
-    .resize(OUT_SIZE, OUT_SIZE, { kernel: "lanczos3", fit: "fill" })
     .ensureAlpha()
-    .webp({ quality: 92 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const ringR = detectCircleRadius(data, info.width, info.height);
+  // Tight square around the circle, keep 2px of ring edge
+  const pad = 2;
+  const cropR = Math.min(
+    ringR + pad,
+    info.width / 2,
+    info.height / 2
+  );
+  const cropSize = Math.max(8, Math.floor(cropR * 2));
+  const cropLeft = Math.max(0, Math.round((info.width - cropSize) / 2));
+  const cropTop = Math.max(0, Math.round((info.height - cropSize) / 2));
+  const finalSize = Math.min(cropSize, info.width - cropLeft, info.height - cropTop);
+
+  // Build tight RGBA crop then circular soft mask
+  const cropped = Buffer.alloc(finalSize * finalSize * 4);
+  for (let y = 0; y < finalSize; y++) {
+    for (let x = 0; x < finalSize; x++) {
+      const si = ((cropTop + y) * info.width + (cropLeft + x)) * 4;
+      const di = (y * finalSize + x) * 4;
+      cropped[di] = data[si];
+      cropped[di + 1] = data[si + 1];
+      cropped[di + 2] = data[si + 2];
+      cropped[di + 3] = data[si + 3];
+    }
+  }
+
+  const cx = (finalSize - 1) / 2;
+  const cy = (finalSize - 1) / 2;
+  const r = finalSize / 2 - 0.5;
+  for (let y = 0; y < finalSize; y++) {
+    for (let x = 0; x < finalSize; x++) {
+      const dist = Math.hypot(x - cx, y - cy);
+      const i = (y * finalSize + x) * 4;
+      if (dist > r) {
+        cropped[i + 3] = 0;
+      } else if (dist > r - 1.25) {
+        const a = Math.max(0, Math.min(1, r - dist));
+        cropped[i + 3] = Math.round(cropped[i + 3] * a);
+      }
+    }
+  }
+
+  await sharp(cropped, {
+    raw: { width: finalSize, height: finalSize, channels: 4 },
+  })
+    .resize(OUT_SIZE, OUT_SIZE, { kernel: "lanczos3", fit: "fill" })
+    .webp({ quality: 92, alphaQuality: 100 })
     .toFile(outPath);
 }
 
@@ -90,7 +198,7 @@ async function main() {
         const top = row * cellH + padTop + Math.floor((availH - size) / 2);
         const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
         const stagedPath = path.join(stageDir, name);
-        await exportSquare(srcPath, left, top, size, stagedPath);
+        await exportCircle(srcPath, left, top, size, stagedPath);
         staged.push(name);
         idx++;
       }
@@ -109,7 +217,7 @@ async function main() {
     const top = Math.round(p.cy - size / 2);
     const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
     const stagedPath = path.join(stageDir, name);
-    await exportSquare(pairPath, left, top, size, stagedPath);
+    await exportCircle(pairPath, left, top, size, stagedPath);
     staged.push(name);
     idx++;
   }
@@ -139,7 +247,7 @@ async function main() {
     fs.writeFileSync(dest, fs.readFileSync(src));
   }
   fs.rmSync(stageDir, { recursive: true, force: true });
-  console.log(`Imported ${idx} Stitch light-dossier avatars`);
+  console.log(`Imported ${idx} Stitch light-dossier circle avatars`);
 }
 
 main().catch((err) => {

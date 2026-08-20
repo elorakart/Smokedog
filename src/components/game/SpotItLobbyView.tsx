@@ -45,7 +45,7 @@ export function SpotItLobbyView({
       >
         {state.players.map((p) => (
           <GlassPanel key={p.id} className="flex min-w-0 flex-col p-3">
-            <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] ring-1 ring-crimson/25">
+            <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] bg-transparent">
               <PlayerAvatar id={p.avatarId} size={96} className="h-full w-full" />
             </div>
             <p className="mt-2 truncate text-center font-display text-sm font-semibold">

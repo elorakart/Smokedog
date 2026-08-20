@@ -50,6 +50,7 @@ async function lightenToBuffer(inputPath) {
     data[i] = r;
     data[i + 1] = g;
     data[i + 2] = b;
+    // Preserve existing alpha (circle-masked exports)
   }
 
   return sharp(data, {

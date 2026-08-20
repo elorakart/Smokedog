@@ -72,7 +72,7 @@ export function GameOverScreen({
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-              <div className="ring-1 ring-crimson/25">
+              <div className="bg-transparent">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
               <div>
@@ -132,7 +132,7 @@ export function GameOverScreen({
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-              <div className="overflow-hidden rounded-sm ring-1 ring-crimson/25">
+              <div className="bg-transparent">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
               <div className="min-w-0">
@@ -240,7 +240,7 @@ export function GameOverScreen({
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {(state.recap ?? state.players).map((p) => (
           <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-            <div className="overflow-hidden rounded-sm ring-1 ring-manila/20">
+            <div className="bg-transparent">
               <PlayerAvatar id={p.avatarId} size={56} />
             </div>
             <div>

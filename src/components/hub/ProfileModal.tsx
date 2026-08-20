@@ -145,7 +145,7 @@ export function ProfileModal({
                     type="button"
                     disabled={isPending}
                     onClick={() => setAvatarId(i)}
-                    className={`rounded-sm p-0.5 ring-2 transition hover:scale-105 ${
+                    className={`rounded-full bg-transparent p-0.5 ring-2 transition hover:scale-105 ${
                       avatarId === i
                         ? "ring-crimson shadow-stamp"
                         : "ring-transparent opacity-70 hover:opacity-100"

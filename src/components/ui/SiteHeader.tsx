@@ -43,7 +43,7 @@ export function SiteHeader({
         <span className="hidden font-mono text-[10px] uppercase tracking-widest text-crimson/60 sm:block">
           Case file
         </span>
-        <div className="overflow-hidden rounded-sm ring-1 ring-crimson/30">
+        <div className="bg-transparent">
           <PlayerAvatar id={avatarId} size={36} />
         </div>
       </>

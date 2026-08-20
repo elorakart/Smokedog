@@ -4,8 +4,8 @@ import Image from "next/image";
 import { avatarSrc, normalizeAvatarId } from "@/lib/avatars";
 
 /**
- * Stitch portraits already include their circular frame in the artwork.
- * Scale with object-contain — do not cover-crop or remask into a CSS circle.
+ * Stitch portraits are circular mugshots with transparent corners.
+ * Scale with object-contain — do not cover-crop into a square plate or CSS remask.
  */
 export function PlayerAvatar({
   id,
@@ -23,7 +23,7 @@ export function PlayerAvatar({
 
   return (
     <span
-      className={`relative block shrink-0 bg-transparent ${
+      className={`relative block shrink-0 overflow-visible bg-transparent ${
         fillsParent ? "aspect-square" : ""
       } ${className}`}
       style={fillsParent ? undefined : { width: size, height: size }}
