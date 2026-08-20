@@ -1,16 +1,26 @@
-import type { Faction, NightAction, Player } from "@/lib/types";
+import type { Faction, NightAction, Player, Role } from "@/lib/types";
 import { SKIP_VOTE_ID } from "@/lib/types";
 import { factionOf, isMafiaRole } from "@/lib/games/mafia-city/roles";
 
+export interface NightDeath {
+  playerId: string;
+  reason: string;
+  /** Who caused this death (attacker / protector), when known. */
+  actorId: string | null;
+  actorRole: Role | null;
+}
+
 export interface NightResolution {
-  deaths: { playerId: string; reason: string }[];
+  deaths: NightDeath[];
   silencedId: string | null;
+  blackmailerId: string | null;
   detective: {
     investigatorId: string;
     targetId: string;
     faction: Faction;
   } | null;
   doctorSavedTargetId: string | null;
+  doctorId: string | null;
 }
 
 function living(players: Player[]): Player[] {
@@ -25,7 +35,7 @@ function mafiaKillActions(actions: NightAction[]): NightAction[] {
   return actions.filter((a) => a.type === "mafia_kill");
 }
 
-/** Final mafia hit: boss pick wins; else goon; else first submitted kill. */
+/** Final mafia hit: exactly one victim. Boss pick wins over goon. */
 function mafiaKillTarget(
   players: Player[],
   actions: NightAction[]
@@ -34,17 +44,20 @@ function mafiaKillTarget(
   if (kills.length === 0) return null;
 
   const boss = living(players).find((p) => p.role === "mafia_boss");
+  const goon = living(players).find((p) => p.role === "mafia_goon");
+
   const bossAction = boss
     ? kills.find((a) => a.playerId === boss.id)
     : undefined;
-  if (boss && bossAction) {
-    return { targetId: bossAction.targetId, attackerId: boss.id };
-  }
-
-  const goon = living(players).find((p) => p.role === "mafia_goon");
   const goonAction = goon
     ? kills.find((a) => a.playerId === goon.id)
     : undefined;
+
+  // Boss submitted → boss target only (goon vote ignored for kill).
+  if (boss && bossAction) {
+    return { targetId: bossAction.targetId, attackerId: boss.id };
+  }
+  // Boss silent → goon target.
   if (goon && goonAction) {
     return { targetId: goonAction.targetId, attackerId: goon.id };
   }
@@ -82,58 +95,91 @@ export function resolveNight(
   actions: NightAction[]
 ): NightResolution {
   const blackmail = actions.find((a) => a.type === "blackmail");
+  const blackmailer = byId(players, blackmail?.playerId);
   const silenced = byId(players, blackmail?.targetId);
   const silencedId =
     silenced && silenced.alive && !isMafiaRole(silenced.role)
       ? silenced.id
+      : null;
+  const blackmailerId =
+    silencedId && blackmailer?.alive && blackmailer.role === "blackmailer"
+      ? blackmailer.id
       : null;
   if (silencedId) {
     const target = byId(players, silencedId);
     if (target) target.blackmailed = true;
   }
 
-  const doctorProtect = actions.find((a) => a.type === "doctor_protect")
-    ?.targetId;
+  const doctorAction = actions.find((a) => a.type === "doctor_protect");
+  const doctorProtect = doctorAction?.targetId;
+  const doctorActor = byId(players, doctorAction?.playerId);
   const bgProtect = actions.find((a) => a.type === "bodyguard_protect")
     ?.targetId;
   const bodyguard = living(players).find((p) => p.role === "bodyguard");
 
-  const deathReasons = new Map<string, string>();
-  const markDead = (id: string, reason: string) => {
+  const deathMeta = new Map<
+    string,
+    { reason: string; actorId: string | null; actorRole: Role | null }
+  >();
+  const markDead = (
+    id: string,
+    reason: string,
+    actorId: string | null = null,
+    actorRole: Role | null = null
+  ) => {
     const p = byId(players, id);
     if (!p || !p.alive) return;
     p.alive = false;
-    deathReasons.set(id, reason);
+    deathMeta.set(id, { reason, actorId, actorRole });
   };
 
   let doctorSavedTargetId: string | null = null;
+  let doctorId: string | null = null;
 
   const mafiaHit = mafiaKillTarget(players, actions);
+  // Guarantee a single mafia murder attempt this night (boss/goon share one kill).
   if (mafiaHit) {
     const target = byId(players, mafiaHit.targetId);
     const attacker = byId(players, mafiaHit.attackerId);
     if (target?.alive && attacker?.alive) {
       if (doctorProtect === target.id) {
         doctorSavedTargetId = target.id;
+        doctorId =
+          doctorActor?.alive && doctorActor.role === "doctor"
+            ? doctorActor.id
+            : living(players).find((p) => p.role === "doctor")?.id ?? null;
       } else if (bodyguard && bgProtect === target.id && bodyguard.alive) {
         if (bodyguard.id !== target.id) {
-          markDead(bodyguard.id, "Died intercepting an attack");
-          const mafiaAttacker = mafiaAttackerOnTarget(
+          markDead(
+            bodyguard.id,
+            "Died intercepting an attack",
+            attacker.id,
+            attacker.role ?? null
+          );
+          const mafiaAttackerId = mafiaAttackerOnTarget(
             players,
             actions,
             target.id
           );
-          if (mafiaAttacker && mafiaAttacker !== bodyguard.id) {
-            if (doctorProtect !== mafiaAttacker) {
+          const mafiaAttacker = byId(players, mafiaAttackerId);
+          if (mafiaAttacker && mafiaAttacker.id !== bodyguard.id) {
+            if (doctorProtect !== mafiaAttacker.id) {
               markDead(
-                mafiaAttacker,
-                "Killed while attacking a protected target"
+                mafiaAttacker.id,
+                "Killed while attacking a protected target",
+                bodyguard.id,
+                "bodyguard"
               );
             }
           }
         }
       } else {
-        markDead(target.id, "Eliminated overnight");
+        markDead(
+          target.id,
+          "Eliminated overnight",
+          attacker.id,
+          attacker.role ?? null
+        );
       }
     }
   }
@@ -151,18 +197,37 @@ export function resolveNight(
       shooter.bulletsLeft = (shooter.bulletsLeft ?? 1) - 1;
       if (doctorProtect === vigTarget.id) {
         doctorSavedTargetId = vigTarget.id;
+        doctorId =
+          doctorActor?.alive && doctorActor.role === "doctor"
+            ? doctorActor.id
+            : living(players).find((p) => p.role === "doctor")?.id ?? null;
       } else if (
         bodyguard &&
         bgProtect === vigTarget.id &&
         bodyguard.alive &&
         bodyguard.id !== vigTarget.id
       ) {
-        markDead(bodyguard.id, "Died intercepting an attack");
+        markDead(
+          bodyguard.id,
+          "Died intercepting an attack",
+          shooter.id,
+          shooter.role ?? null
+        );
         if (doctorProtect !== shooter.id) {
-          markDead(shooter.id, "Killed while attacking a protected target");
+          markDead(
+            shooter.id,
+            "Killed while attacking a protected target",
+            bodyguard.id,
+            "bodyguard"
+          );
         }
       } else {
-        markDead(vigTarget.id, "Gunned down overnight");
+        markDead(
+          vigTarget.id,
+          "Gunned down overnight",
+          shooter.id,
+          shooter.role ?? null
+        );
       }
     }
   }
@@ -183,13 +248,17 @@ export function resolveNight(
       : null;
 
   return {
-    deaths: [...deathReasons.entries()].map(([playerId, reason]) => ({
+    deaths: [...deathMeta.entries()].map(([playerId, meta]) => ({
       playerId,
-      reason,
+      reason: meta.reason,
+      actorId: meta.actorId,
+      actorRole: meta.actorRole,
     })),
     silencedId,
+    blackmailerId,
     detective,
     doctorSavedTargetId,
+    doctorId,
   };
 }
 

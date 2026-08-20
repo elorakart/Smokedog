@@ -298,6 +298,7 @@ export type ClientToServerEvents = {
   "lobby:return": (payload: { roomId: string }) => void;
   "lobbies:list": (payload?: { query?: string }) => void;
   "host:skipDay": (payload: { roomId: string }) => void;
+  "host:skipTimer": (payload: { roomId: string }) => void;
   "voice:join": (payload: { roomId: string; channel: ChatChannel }) => void;
   "voice:leave": (payload: { roomId: string; channel: ChatChannel }) => void;
   "voice:invite": (payload: {
@@ -327,6 +328,7 @@ export type ServerToClientEvents = {
   }) => void;
   "detective:result": (payload: {
     targetId: string;
+    targetName: string;
     faction: Faction;
   }) => void;
   "chat:message": (message: ChatMessage) => void;

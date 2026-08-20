@@ -56,8 +56,6 @@ export function PlayerGrid({
   onSelect,
   showVotes,
   onInviteVoice,
-  voiceParticipantIds,
-  speakingIds,
 }: {
   state: PublicGameState;
   selectable?: boolean;
@@ -66,8 +64,6 @@ export function PlayerGrid({
   onSelect?: (id: string) => void;
   showVotes?: boolean;
   onInviteVoice?: (id: string) => void;
-  voiceParticipantIds?: string[];
-  speakingIds?: string[];
 }) {
   const voteCounts: Record<string, number> = {};
   if (showVotes) {
@@ -76,8 +72,6 @@ export function PlayerGrid({
       voteCounts[t] = (voteCounts[t] ?? 0) + 1;
     }
   }
-  const inVoice = new Set(voiceParticipantIds ?? []);
-  const speaking = new Set(speakingIds ?? []);
   const showMafiaIntel = !!state.mafiaNightIntel;
 
   return (
@@ -93,8 +87,7 @@ export function PlayerGrid({
           p.alive &&
           !p.isBot &&
           p.connected &&
-          p.id !== state.you?.id &&
-          !inVoice.has(p.id);
+          p.id !== state.you?.id;
         return (
           <div key={p.id} className="min-w-0">
             <motion.div
@@ -119,20 +112,14 @@ export function PlayerGrid({
               >
                 <div className="mx-auto w-full max-w-[6.5rem]">
                   <div
-                    className={`aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
-                      selected
-                        ? "ring-crimson"
-                        : speaking.has(p.id)
-                          ? "ring-emerald-400 animate-pulse"
-                          : inVoice.has(p.id)
-                            ? "ring-emerald-400/50"
-                            : "ring-transparent"
+                    className={`relative aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
+                      selected ? "ring-crimson" : "ring-transparent"
                     }`}
                   >
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}
-                      className="h-full w-full pointer-events-none"
+                      className="pointer-events-none h-full w-full"
                     />
                   </div>
                 </div>
@@ -170,12 +157,10 @@ export function NightActionPanel({
   state,
   onAct,
   onInviteVoice,
-  speakingIds,
 }: {
   state: PublicGameState;
   onAct: (type: NightActionType, targetId: string) => void;
   onInviteVoice?: (id: string) => void;
-  speakingIds?: string[];
 }) {
   const you = state.you;
   const type = you?.role ? (nightActionFor(you.role) as NightActionType | null) : null;
@@ -191,14 +176,7 @@ export function NightActionPanel({
           You are eliminated — watch the city. Use graveyard chat.
         </p>
         <div className="mt-4">
-          <PlayerGrid
-            state={state}
-            onInviteVoice={onInviteVoice}
-            voiceParticipantIds={
-              state.voiceParticipants.mafia ?? state.voiceParticipants.town
-            }
-            speakingIds={speakingIds}
-          />
+          <PlayerGrid state={state} onInviteVoice={onInviteVoice} />
         </div>
       </div>
     );
@@ -213,13 +191,7 @@ export function NightActionPanel({
             : "No night action. Wait for dawn."}
         </p>
         <div className="mt-4">
-          <PlayerGrid
-            state={state}
-            voiceParticipantIds={
-              state.voiceParticipants.mafia ?? state.voiceParticipants.town
-            }
-            speakingIds={speakingIds}
-          />
+          <PlayerGrid state={state} />
         </div>
       </div>
     );
@@ -248,10 +220,6 @@ export function NightActionPanel({
           selectedId={state.nightActionTargetId}
           onSelect={(id) => onAct(type, id)}
           onInviteVoice={onInviteVoice}
-          voiceParticipantIds={
-            state.voiceParticipants.mafia ?? state.voiceParticipants.town
-          }
-          speakingIds={speakingIds}
         />
       </div>
     </div>
@@ -264,14 +232,12 @@ export function VotePanel({
   onSkipVote,
   onSkipDay,
   onInviteVoice,
-  speakingIds,
 }: {
   state: PublicGameState;
   onVote: (targetId: string) => void;
   onSkipVote?: () => void;
   onSkipDay?: () => void;
   onInviteVoice?: (id: string) => void;
-  speakingIds?: string[];
 }) {
   const muted = !!state.you?.blackmailed;
   const deadVillager = !!state.deadVillagerVote;
@@ -296,12 +262,7 @@ export function VotePanel({
             ? "You are eliminated — watch the debate. Voting opens in the final 15 seconds."
             : "Debate suspects on town voice and chat. Voting opens in the final 15 seconds."}
         </p>
-        <PlayerGrid
-          state={state}
-          onInviteVoice={onInviteVoice}
-          voiceParticipantIds={state.voiceParticipants.town}
-          speakingIds={speakingIds}
-        />
+        <PlayerGrid state={state} onInviteVoice={onInviteVoice} />
       </div>
     );
   }
@@ -349,8 +310,6 @@ export function VotePanel({
           selectedId={votedSkip ? null : votedId}
           onSelect={onVote}
           showVotes
-          voiceParticipantIds={state.voiceParticipants.town}
-          speakingIds={speakingIds}
         />
       </div>
       {canParticipate && onSkipVote && (

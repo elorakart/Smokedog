@@ -5,6 +5,7 @@ import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ChatChannel, ChatMessage, PublicGameState } from "@/lib/types";
 import { GlassPanel } from "@/components/ui/primitives";
+import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import {
   availableChannels,
   canAccessChannel,
@@ -21,14 +22,12 @@ export function ChatPanel({
   onSend,
   joinVoiceRequest,
   enableVoice = true,
-  onSpeakingChange,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
   onSend: (channel: ChatChannel, text: string) => void;
   joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
   enableVoice?: boolean;
-  onSpeakingChange?: (ids: string[]) => void;
 }) {
   const you = state.you;
   const channelOpts = useMemo(
@@ -90,10 +89,6 @@ export function ChatPanel({
     enableVoice && canUseVoice,
     playerNames
   );
-
-  useEffect(() => {
-    onSpeakingChange?.(voice.speakingIds);
-  }, [voice.speakingIds, onSpeakingChange]);
 
   useEffect(() => {
     if (!enableVoice || !joinVoiceRequest) return;
@@ -194,22 +189,38 @@ export function ChatPanel({
           </div>
 
           {voiceInChannel.length > 0 && (
-            <div className="flex flex-wrap gap-1 border-b border-white/10 px-3 py-2">
+            <div className="grid grid-cols-3 gap-2 border-b border-white/10 px-3 py-2 sm:grid-cols-4">
               {voiceInChannel.map((id) => {
-                const name =
-                  state.players.find((p) => p.id === id)?.name ?? "Operator";
+                const player = state.players.find((p) => p.id === id);
+                const name = player?.name ?? "Operator";
                 const isSpeaking = speaking.has(id);
+                const isYou = id === you?.id;
                 return (
-                  <span
+                  <div
                     key={id}
-                    className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                    className={`flex flex-col items-center gap-1 rounded-sm border px-1.5 py-2 ${
                       isSpeaking
-                        ? "animate-pulse border-emerald-400 bg-emerald-400/20 text-emerald-200"
-                        : "border-white/10 text-ink-steel"
+                        ? "border-emerald-400/60 bg-emerald-400/10"
+                        : "border-white/10 bg-white/[0.02]"
                     }`}
                   >
-                    {name}
-                  </span>
+                    <div
+                      className={`relative size-10 overflow-hidden rounded-full ring-2 transition ${
+                        isSpeaking
+                          ? "animate-pulse ring-emerald-400"
+                          : "ring-transparent"
+                      }`}
+                    >
+                      <PlayerAvatar
+                        id={player?.avatarId ?? 0}
+                        size={40}
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <span className="w-full truncate text-center font-mono text-[9px] uppercase tracking-wider text-ink">
+                      {isYou ? "You" : name}
+                    </span>
+                  </div>
                 );
               })}
             </div>

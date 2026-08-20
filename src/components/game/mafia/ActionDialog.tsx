@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { playActionNeeded } from "@/lib/sounds";
+
+const AUTO_DISMISS_MS = 3000;
 
 export function ActionDialog({
   title,
@@ -18,12 +20,14 @@ export function ActionDialog({
     playActionNeeded();
     window.scrollTo({ top: 0, behavior: "smooth" });
     try {
-      const lenis = (window as unknown as { lenis?: { scrollTo: (y: number) => void } }).lenis;
+      const lenis = (
+        window as unknown as { lenis?: { scrollTo: (y: number) => void } }
+      ).lenis;
       lenis?.scrollTo(0);
     } catch {
       /* optional */
     }
-    const t = setTimeout(onDismiss, 5000);
+    const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(t);
   }, [title, detail, onDismiss]);
 
@@ -41,10 +45,21 @@ export function ActionDialog({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-[min(92vw,28rem)] rounded-sm border border-amber-400/40 bg-surface/95 px-5 py-4 shadow-lg"
+          className="relative w-[min(92vw,28rem)] rounded-sm border border-amber-400/40 bg-surface/95 px-5 py-4 shadow-lg"
         >
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-200" />
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={onDismiss}
+            className="absolute right-2 top-2 rounded-sm p-1 text-ink-steel transition hover:bg-white/10 hover:text-ink"
+          >
+            <X size={16} />
+          </button>
+          <div className="flex items-start gap-3 pr-6">
+            <AlertTriangle
+              size={18}
+              className="mt-0.5 shrink-0 text-amber-200"
+            />
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100">
                 {title}

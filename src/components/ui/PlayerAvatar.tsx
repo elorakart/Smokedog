@@ -3,6 +3,10 @@
 import Image from "next/image";
 import { avatarSrc, normalizeAvatarId } from "@/lib/avatars";
 
+/**
+ * Portrait art already fills most of the square. Clip to a circle and
+ * use a light cover so faces stay visible (no aggressive zoom).
+ */
 export function PlayerAvatar({
   id,
   size = 64,
@@ -15,15 +19,24 @@ export function PlayerAvatar({
   priority?: boolean;
 }) {
   const idx = normalizeAvatarId(id);
+  const fillsParent = /\b(h-full|w-full|size-full)\b/.test(className);
+
   return (
-    <Image
-      src={avatarSrc(idx)}
-      alt=""
-      width={size}
-      height={size}
-      priority={priority}
-      className={`aspect-square rounded-full object-cover ring-1 ring-white/10 ${className}`}
-      aria-hidden
-    />
+    <span
+      className={`relative block shrink-0 overflow-hidden rounded-full bg-[#12141a] ${
+        fillsParent ? "aspect-square" : ""
+      } ${className}`}
+      style={fillsParent ? undefined : { width: size, height: size }}
+    >
+      <Image
+        src={avatarSrc(idx)}
+        alt=""
+        fill
+        sizes={fillsParent ? "(max-width: 768px) 28vw, 128px" : `${size}px`}
+        priority={priority}
+        className="object-cover object-[center_30%]"
+        aria-hidden
+      />
+    </span>
   );
 }

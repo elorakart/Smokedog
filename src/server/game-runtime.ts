@@ -363,6 +363,21 @@ export class GameRuntime {
     return votesIn >= eligible.length;
   }
 
+  /** Dead villagers keep a vote — do not lock the lynch until they have cast (or timer ends). */
+  private deadVillagersHaveVoted(room: Room): boolean {
+    const deadVillagers = room.players.filter(
+      (p) => !p.alive && p.role === "villager"
+    );
+    return deadVillagers.every((p) => room.votes[p.id] != null);
+  }
+
+  private maybeFinishDayFromVotes(room: Room) {
+    const lynchedId = tallyLynch(room.players, room.votes);
+    if (!lynchedId) return;
+    if (!this.deadVillagersHaveVoted(room)) return;
+    this.finishDayPhase(room);
+  }
+
   private publicVoiceParticipants(
     room: Room
   ): Partial<Record<ChatChannel, string[]>> {
@@ -525,23 +540,30 @@ export class GameRuntime {
       }
     }
     if (room.phase === "day" && room.daySubPhase === "vote") {
-      for (const bot of living(room).filter((p) => p.isBot && !p.blackmailed)) {
-        const wait = botDayDelayMs();
+      const voters = dayVoteEligible(room).filter(
+        (p) => p.isBot && !(p.alive && p.blackmailed)
+      );
+      voters.forEach((bot, index) => {
+        const wait =
+          botDayDelayMs() + index * (500 + Math.floor(Math.random() * 900));
         this.delayBot(room, wait, () => {
           if (
             room.phase !== "day" ||
             room.daySubPhase !== "vote" ||
             room.paused ||
-            !bot.alive ||
-            bot.blackmailed
+            (bot.alive && bot.blackmailed)
           ) {
             return;
           }
+          const stillEligible =
+            (bot.alive && !bot.blackmailed) ||
+            (!bot.alive && bot.role === "villager");
+          if (!stillEligible || room.votes[bot.id]) return;
           const targetId = pickBotVoteTarget(room.players, bot, room.votes);
           if (!targetId) return;
           this.submitVote(room.id, bot.id, targetId);
         });
-      }
+      });
     }
   }
 
@@ -1148,6 +1170,23 @@ export class GameRuntime {
     room.mafiaNightIntel = intel;
   }
 
+  private byActorRolePhrase(
+    room: Room,
+    actorId: string | null | undefined,
+    actorRole?: string | null
+  ): string {
+    if (!actorId) return "";
+    const actor = room.players.find((p) => p.id === actorId);
+    if (!actor) return "";
+    const role =
+      (actorRole && actorRole in ROLE_META
+        ? ROLE_META[actorRole as keyof typeof ROLE_META].label
+        : actor.role
+          ? ROLE_META[actor.role].label
+          : null) ?? "Unknown";
+    return ` by ${actor.name} with ${role} role`;
+  }
+
   private resolveNightPhase(room: Room) {
     this.handlePhaseTimeoutAfk(room);
     const result = resolveNight(room.players, room.nightActions);
@@ -1168,15 +1207,21 @@ export class GameRuntime {
           at: Date.now(),
           cycle: room.cycle,
         });
+        const by = this.byActorRolePhrase(
+          room,
+          result.detective.investigatorId,
+          "detective"
+        );
         this.addChronicle(
           room,
           "night",
-          `Detective investigated ${target.name} — ${result.detective.faction}.`
+          `${target.name} was investigated${by} — ${result.detective.faction}.`
         );
       }
       if (inv?.socketId) {
         this.io.to(inv.socketId).emit("detective:result", {
           targetId: result.detective.targetId,
+          targetName: target?.name ?? "Unknown",
           faction: result.detective.faction,
         });
       }
@@ -1185,7 +1230,12 @@ export class GameRuntime {
     if (result.doctorSavedTargetId) {
       const saved = room.players.find((p) => p.id === result.doctorSavedTargetId);
       if (saved) {
-        this.addChronicle(room, "night", `Doctor saved ${saved.name}.`);
+        const by = this.byActorRolePhrase(room, result.doctorId, "doctor");
+        this.addChronicle(
+          room,
+          "night",
+          `${saved.name} was saved${by || " by the Doctor"}.`
+        );
       }
     }
 
@@ -1193,7 +1243,16 @@ export class GameRuntime {
       const p = room.players.find((x) => x.id === result.silencedId);
       if (p) {
         log(room, `${p.name} has been blackmailed into silence.`);
-        this.addChronicle(room, "night", `${p.name} was blackmailed.`);
+        const by = this.byActorRolePhrase(
+          room,
+          result.blackmailerId,
+          "blackmailer"
+        );
+        this.addChronicle(
+          room,
+          "night",
+          `${p.name} was blackmailed${by}.`
+        );
       }
     }
 
@@ -1215,15 +1274,23 @@ export class GameRuntime {
     } else {
       const names = result.deaths
         .map((d) => room.players.find((x) => x.id === d.playerId)?.name)
-        .filter(Boolean);
-      log(room, `Someone was eliminated overnight.`);
+        .filter((n): n is string => Boolean(n));
+      const nameList =
+        names.length === 0
+          ? "Someone"
+          : names.length === 1
+            ? names[0]
+            : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+      const verb = names.length === 1 || names.length === 0 ? "was" : "were";
+      log(room, `${nameList} ${verb} eliminated overnight.`);
       for (const d of result.deaths) {
         const p = room.players.find((x) => x.id === d.playerId);
         if (p) {
+          const by = this.byActorRolePhrase(room, d.actorId, d.actorRole);
           this.addChronicle(
             room,
             "night",
-            `${p.name} was eliminated overnight${d.reason ? ` — ${d.reason}` : ""}.`
+            `${p.name} was eliminated overnight${by}.`
           );
           this.leaveMafiaRooms(p, room.id);
           this.removeFromAllVoice(room, p.id);
@@ -1236,7 +1303,7 @@ export class GameRuntime {
         room,
         "bad",
         "Night results",
-        `${result.deaths.length} operator${result.deaths.length > 1 ? "s were" : " was"} eliminated overnight.`
+        `${nameList} ${verb} eliminated overnight.`
       );
     }
 
@@ -1731,10 +1798,7 @@ export class GameRuntime {
     }
     this.emitRoom(room);
 
-    const lynchedId = tallyLynch(room.players, room.votes);
-    if (lynchedId) {
-      this.finishDayPhase(room);
-    }
+    this.maybeFinishDayFromVotes(room);
   }
 
   submitVote(roomId: string, playerId: string, targetId: string) {
@@ -1763,10 +1827,7 @@ export class GameRuntime {
     }
     this.emitRoom(room);
 
-    const lynchedId = tallyLynch(room.players, room.votes);
-    if (lynchedId) {
-      this.finishDayPhase(room);
-    }
+    this.maybeFinishDayFromVotes(room);
   }
 
   skipDay(roomId: string, hostId: string) {
@@ -1782,6 +1843,18 @@ export class GameRuntime {
     }
     log(room, "The host ends the day early.");
     this.finishDayPhase(room);
+  }
+
+  /** Host force-advances the current timed phase (night / discussion / vote / reveal). */
+  skipPhaseTimer(roomId: string, hostId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || !this.requireHost(room, hostId)) return;
+    if (room.paused) return;
+    if (room.phase === "lobby" || room.phase === "gameover") return;
+    if (!room.phaseEndsAt && room.gameId === "mafia-city") return;
+    log(room, "The host skips the timer.");
+    this.clearTimer(room);
+    this.onTimeout(roomId);
   }
 
   relayVoiceSpeaking(

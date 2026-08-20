@@ -90,6 +90,7 @@ export function botNightDelayMs(role?: Role): number {
   return base;
 }
 
+/** Spread bot votes across most of the vote window (not at t=0). */
 export function botDayDelayMs(): number {
-  return 1500 + Math.floor(Math.random() * 5000);
+  return 3000 + Math.floor(Math.random() * 10000);
 }

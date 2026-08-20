@@ -14,6 +14,7 @@ import { fadeUp, stagger } from "@/components/ui/motion";
 import {
   ensurePlayerId,
   loadProfile,
+  randomAvatarId,
   saveProfile,
 } from "@/lib/profile";
 import { getSocket } from "@/lib/socket/client";
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [createGameId, setCreateGameId] = useState<string>("mafia-city");
   const createGameIdRef = useRef<string>("mafia-city");
   const [profile, setProfile] = useState(() => loadProfile());
+  const [guestAvatarId] = useState(() => randomAvatarId());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"create" | "join" | null>(null);
   const [joiningCode, setJoiningCode] = useState<string | null>(null);
@@ -296,7 +298,7 @@ export default function HomePage() {
       <ProfileModal
         open={modal}
         defaultName={profile?.name ?? ""}
-        defaultAvatar={profile?.avatarId ?? 0}
+        defaultAvatar={profile?.avatarId ?? guestAvatarId}
         createGameId={createGameId}
         error={error}
         initialCode={prefillCode}

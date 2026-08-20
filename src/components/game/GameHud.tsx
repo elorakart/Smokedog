@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, LogOut, Pause, Play, Shield } from "lucide-react";
+import { Copy, LogOut, Pause, Play, Shield, SkipForward } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CopyToast } from "@/components/ui/CopyToast";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
@@ -18,6 +18,7 @@ export function GameHud({
   state,
   onPause,
   onResume,
+  onSkipTimer,
   onQuit,
   onSettings,
   quitting = false,
@@ -25,6 +26,7 @@ export function GameHud({
   state: PublicGameState;
   onPause: () => void;
   onResume: () => void;
+  onSkipTimer?: () => void;
   onQuit: () => void;
   onSettings?: (settings: Partial<import("@/lib/types").RoomSettings>) => void;
   quitting?: boolean;
@@ -59,6 +61,13 @@ export function GameHud({
     onSettings &&
     state.phase !== "lobby" &&
     state.phase !== "gameover";
+  const canSkipTimer =
+    !!state.you?.isHost &&
+    !!onSkipTimer &&
+    !state.paused &&
+    !!state.phaseEndsAt &&
+    state.phase !== "lobby" &&
+    state.phase !== "gameover";
 
   return (
     <>
@@ -87,6 +96,17 @@ export function GameHud({
         </div>
         {showMidGameSettings && (
           <MidGameSettings settings={state.settings} onUpdate={onSettings} />
+        )}
+        {canSkipTimer && (
+          <button
+            type="button"
+            onClick={onSkipTimer}
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-sky-400/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-sky-200 sm:px-3 sm:py-2 sm:text-[10px]"
+            title="Skip remaining timer"
+          >
+            <SkipForward size={11} />
+            <span className="hidden sm:inline">Skip timer</span>
+          </button>
         )}
         {state.you?.isHost &&
           state.phase !== "lobby" &&

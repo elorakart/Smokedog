@@ -2,12 +2,15 @@
 
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
 import type { PhaseAnnouncement } from "@/lib/types";
 import {
   playBadNews,
   playGoodNews,
   playVoteStart,
 } from "@/lib/sounds";
+
+const AUTO_DISMISS_MS = 3000;
 
 const TONE_STYLES: Record<
   PhaseAnnouncement["tone"],
@@ -48,7 +51,7 @@ export function PhaseResultPopup({
       playBadNews();
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-    const t = setTimeout(onDismiss, 5000);
+    const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(t);
   }, [announcement.id, announcement.title, announcement.tone, onDismiss]);
 
@@ -66,15 +69,23 @@ export function PhaseResultPopup({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
           onClick={(e) => e.stopPropagation()}
-          className={`w-[min(92vw,28rem)] rounded-sm border px-5 py-4 shadow-lg backdrop-blur-md ${styles.border} ${styles.bg}`}
+          className={`relative w-[min(92vw,28rem)] rounded-sm border px-5 py-4 shadow-lg backdrop-blur-md ${styles.border} ${styles.bg}`}
         >
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={onDismiss}
+            className="absolute right-2 top-2 rounded-sm p-1 text-ink-steel transition hover:bg-white/10 hover:text-ink"
+          >
+            <X size={16} />
+          </button>
           <p
-            className={`font-mono text-[10px] uppercase tracking-[0.2em] ${styles.text}`}
+            className={`pr-6 font-mono text-[10px] uppercase tracking-[0.2em] ${styles.text}`}
           >
             {announcement.title}
           </p>
           {announcement.detail && (
-            <p className="mt-2 text-sm text-ink">{announcement.detail}</p>
+            <p className="mt-2 pr-2 text-sm text-ink">{announcement.detail}</p>
           )}
         </motion.div>
       </motion.div>

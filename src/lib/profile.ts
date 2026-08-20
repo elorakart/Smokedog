@@ -39,3 +39,7 @@ export function ensurePlayerId(): string {
       : `p-${Math.random().toString(36).slice(2, 10)}`;
   return id;
 }
+
+export function randomAvatarId(): number {
+  return Math.floor(Math.random() * AVATAR_COUNT);
+}

@@ -221,6 +221,11 @@ export function attachSocketServer(
       runtime.skipDay(payload.roomId, socket.data.playerId);
     });
 
+    socket.on("host:skipTimer", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.skipPhaseTimer(payload.roomId, socket.data.playerId);
+    });
+
     socket.on("voice:join", (payload) => {
       if (!socket.data.playerId) return;
       runtime.joinVoice(payload.roomId, socket.data.playerId, payload.channel);

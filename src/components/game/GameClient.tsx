@@ -63,7 +63,10 @@ export function GameClient({ roomId }: { roomId: string }) {
   );
   const [mafiaVoiceWarning, setMafiaVoiceWarning] = useState(false);
   const [afkTick, setAfkTick] = useState(0);
-  const [speakingIds, setSpeakingIds] = useState<string[]>([]);
+  const [detectivePopup, setDetectivePopup] = useState<{
+    targetName: string;
+    faction: Faction;
+  } | null>(null);
   const [localReveal, setLocalReveal] = useState<{
     role: Role;
     faction: Faction;
@@ -132,6 +135,18 @@ export function GameClient({ roomId }: { roomId: string }) {
     }) => {
       setLocalReveal(payload);
     };
+
+    const onDetectiveResult = (payload: {
+      targetId: string;
+      targetName: string;
+      faction: Faction;
+    }) => {
+      setDetectivePopup({
+        targetName: payload.targetName,
+        faction: payload.faction,
+      });
+    };
+
     const onErr = ({ message, code }: { message: string; code?: string }) => {
       if (quittingRef.current) {
         finishLeaveRef.current();
@@ -179,6 +194,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     s.on("voice:invite", onInvite);
     s.on("chat:message", onChat);
     s.on("role:reveal", onRoleReveal);
+    s.on("detective:result", onDetectiveResult);
 
     const join = () => {
       if (quittingRef.current) return;
@@ -199,6 +215,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("voice:invite", onInvite);
       s.off("chat:message", onChat);
       s.off("role:reveal", onRoleReveal);
+      s.off("detective:result", onDetectiveResult);
       s.off("connect", join);
     };
   }, [roomId, router]);
@@ -393,6 +410,9 @@ export function GameClient({ roomId }: { roomId: string }) {
             state={state}
             onPause={() => socket.emit("host:pause", { roomId: state.roomId })}
             onResume={() => socket.emit("host:resume", { roomId: state.roomId })}
+            onSkipTimer={() =>
+              socket.emit("host:skipTimer", { roomId: state.roomId })
+            }
             onQuit={() => setQuitConfirmOpen(true)}
             onSettings={
               state.gameId === "mafia-city" && state.you?.isHost
@@ -417,6 +437,18 @@ export function GameClient({ roomId }: { roomId: string }) {
           title={pendingAction.title}
           detail={pendingAction.detail}
           onDismiss={() => setDismissedActionKey(actionKey)}
+        />
+      )}
+      {detectivePopup && (
+        <PhaseResultPopup
+          announcement={{
+            id: `detective-${detectivePopup.targetName}-${detectivePopup.faction}`,
+            tone: "info",
+            title: "Investigation result",
+            detail: `${detectivePopup.targetName} is aligned with the ${detectivePopup.faction}.`,
+            at: Date.now(),
+          }}
+          onDismiss={() => setDetectivePopup(null)}
         />
       )}
       {mafiaVoiceWarning && (
@@ -587,7 +619,6 @@ export function GameClient({ roomId }: { roomId: string }) {
                   state={state}
                   onAct={emitNight}
                   onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
-                  speakingIds={speakingIds}
                 />
                 <div className="space-y-4">
                   {state.detectiveLog && (
@@ -608,7 +639,6 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
-                    onSpeakingChange={setSpeakingIds}
                   />
                 </div>
               </div>
@@ -628,7 +658,6 @@ export function GameClient({ roomId }: { roomId: string }) {
                       ? emitVoiceInvite
                       : undefined
                   }
-                  speakingIds={speakingIds}
                 />
                 <div className="space-y-4">
                   {state.detectiveLog && (
@@ -667,7 +696,6 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
-                    onSpeakingChange={setSpeakingIds}
                   />
                 </div>
               </div>
