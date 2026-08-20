@@ -116,12 +116,12 @@ export function GameOverScreen({
         <p className="font-mono text-xs uppercase tracking-[0.25em] text-crimson-glow">
           {state.boardDraw ? "Draw" : youWonBoard ? "Victory" : "Defeat"}
         </p>
-        <h1 className="mt-2 font-display text-5xl font-extrabold">{title}</h1>
+        <h1 className="mt-2 font-display text-5xl font-bold">{title}</h1>
         <p className="mt-3 text-ink-steel">{subtitle}</p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-              <div className="overflow-hidden rounded-full ring-1 ring-crimson/25">
+              <div className="overflow-hidden rounded-sm ring-1 ring-crimson/25">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
               <div>
@@ -131,6 +131,12 @@ export function GameOverScreen({
                     {state.spotIt.scores.find((s) => s.playerId === p.id)?.score ??
                       0}{" "}
                     cards
+                  </p>
+                )}
+                {state.connect4?.colors[p.id] && (
+                  <p className="mt-1 font-mono text-xs text-crimson">
+                    {state.connect4.colors[p.id] === "R" ? "Red" : "Yellow"}
+                    {state.boardWinnerId === p.id ? " · Winner" : ""}
                   </p>
                 )}
                 {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}

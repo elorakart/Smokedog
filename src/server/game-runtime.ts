@@ -2489,24 +2489,24 @@ export class GameRuntime {
       ttt.winnerId = playerId;
       room.boardWinnerId = playerId;
       room.boardDraw = false;
-      room.phase = "gameover";
       room.phaseEndsAt = null;
       this.clearTimer(room);
       this.clearBotTimers(room);
       log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} wins!`);
       this.emitRoom(room);
+      this.scheduleBoardGameOver(room.id, "tic-tac-toe");
       return;
     }
     if (isTttDraw(ttt.board)) {
       ttt.result = "draw";
       room.boardDraw = true;
       room.boardWinnerId = null;
-      room.phase = "gameover";
       room.phaseEndsAt = null;
       this.clearTimer(room);
       this.clearBotTimers(room);
       log(room, "Tic-Tac-Toe draw.");
       this.emitRoom(room);
+      this.scheduleBoardGameOver(room.id, "tic-tac-toe");
       return;
     }
     const other = room.players.find((p) => p.id !== playerId);
@@ -2514,6 +2514,28 @@ export class GameRuntime {
     this.setPhase(room, "ttt_play", boardTurnSeconds(room.settings.daySeconds));
     this.scheduleBots(room);
     this.emitRoom(room);
+  }
+
+  private scheduleBoardGameOver(
+    roomId: string,
+    gameId: "connect-4" | "tic-tac-toe",
+    delayMs = 900
+  ) {
+    setTimeout(() => {
+      const room = this.getRoom(roomId);
+      if (!room || room.gameId !== gameId) return;
+      if (gameId === "connect-4") {
+        if (room.phase !== "connect4_play") return;
+        if (!room.connect4 || room.connect4.result === "ongoing") return;
+      } else {
+        if (room.phase !== "ttt_play") return;
+        if (!room.ttt || room.ttt.result === "ongoing") return;
+      }
+      room.phase = "gameover";
+      room.phaseEndsAt = null;
+      this.clearTimer(room);
+      this.emitRoom(room);
+    }, delayMs);
   }
 
   private startConnect4(room: Room) {
@@ -2567,24 +2589,24 @@ export class GameRuntime {
       c4.winnerId = playerId;
       room.boardWinnerId = playerId;
       room.boardDraw = false;
-      room.phase = "gameover";
       room.phaseEndsAt = null;
       this.clearTimer(room);
       this.clearBotTimers(room);
       log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} wins!`);
       this.emitRoom(room);
+      this.scheduleBoardGameOver(room.id, "connect-4");
       return;
     }
     if (isC4Draw(c4.board)) {
       c4.result = "draw";
       room.boardDraw = true;
       room.boardWinnerId = null;
-      room.phase = "gameover";
       room.phaseEndsAt = null;
       this.clearTimer(room);
       this.clearBotTimers(room);
       log(room, "Connect 4 draw.");
       this.emitRoom(room);
+      this.scheduleBoardGameOver(room.id, "connect-4");
       return;
     }
     const other = room.players.find((p) => p.id !== playerId);

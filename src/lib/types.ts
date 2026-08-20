@@ -210,6 +210,7 @@ export type TttPublicState = {
   marks: Record<string, "X" | "O">;
   winningLine: number[] | null;
   lastMove: number | null;
+  result?: "ongoing" | "win" | "draw";
 };
 
 export type Connect4PublicState = {
@@ -218,6 +219,8 @@ export type Connect4PublicState = {
   colors: Record<string, "R" | "Y">;
   winningCells: { row: number; col: number }[] | null;
   lastDrop: { col: number; row: number } | null;
+  result?: "ongoing" | "win" | "draw";
+  winnerId?: string | null;
 };
 
 export type PublicFiveAliveCard = {

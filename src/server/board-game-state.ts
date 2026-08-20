@@ -63,6 +63,7 @@ export function toPublicTtt(ttt: TttRoomState): TttPublicState {
     marks: { ...ttt.marks },
     winningLine: ttt.winningLine ? [...ttt.winningLine] : null,
     lastMove: ttt.lastMove,
+    result: ttt.result,
   };
 }
 
@@ -73,5 +74,7 @@ export function toPublicConnect4(c4: Connect4RoomState): Connect4PublicState {
     colors: { ...c4.colors },
     winningCells: c4.winningCells ? c4.winningCells.map((c) => ({ ...c })) : null,
     lastDrop: c4.lastDrop ? { ...c4.lastDrop } : null,
+    result: c4.result,
+    winnerId: c4.winnerId,
   };
 }
