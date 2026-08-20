@@ -129,19 +129,28 @@ export function ChatPanel({
 
   return (
     <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
-      <div className="flex border-b border-crimson/20">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`flex-1 px-3 py-2 font-mono text-[10px] uppercase tracking-widest ${
-              active === t.id ? "bg-surface-high text-ink" : "text-ink-steel"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex divide-x divide-crimson/30 border-b border-crimson/30">
+        {tabs.map((t) => {
+          const selected = active === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              aria-pressed={selected}
+              className={`relative flex-1 px-3 py-2.5 font-mono text-[10px] uppercase tracking-widest transition ${
+                selected
+                  ? "bg-crimson text-manila"
+                  : "bg-manila text-crimson/55 hover:bg-crimson/10 hover:text-crimson"
+              }`}
+            >
+              {t.label}
+              {selected && (
+                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-manila/80" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {enableVoice && (
