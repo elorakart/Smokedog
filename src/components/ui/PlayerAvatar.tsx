@@ -23,7 +23,7 @@ export function PlayerAvatar({
 
   return (
     <span
-      className={`relative block shrink-0 overflow-hidden rounded-full bg-crimson/15 ${
+      className={`relative block shrink-0 overflow-hidden rounded-full bg-manila ring-1 ring-crimson/20 ${
         fillsParent ? "aspect-square" : ""
       } ${className}`}
       style={fillsParent ? undefined : { width: size, height: size }}
@@ -34,7 +34,7 @@ export function PlayerAvatar({
         fill
         sizes={fillsParent ? "(max-width: 768px) 28vw, 128px" : `${size}px`}
         priority={priority}
-        className="object-cover object-[center_30%]"
+        className="object-cover object-[center_30%] brightness-[1.04] contrast-[0.96]"
         aria-hidden
       />
     </span>
