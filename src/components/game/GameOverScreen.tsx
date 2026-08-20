@@ -196,33 +196,45 @@ export function GameOverScreen({
       </p>
 
       {chronicle.length > 0 && (
-        <GlassPanel className="mt-6 overflow-hidden border-manila/25 bg-manila/5">
+        <div className="mt-6 overflow-hidden rounded-sm border-2 border-crimson bg-manila text-crimson shadow-stamp">
           <button
             type="button"
             onClick={() => setChronicleOpen((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
+            className="flex w-full items-center justify-between border-b-2 border-crimson bg-crimson px-4 py-3 text-left text-manila"
           >
-            <span className="font-mono text-[10px] uppercase tracking-widest text-crimson-glow">
-              City chronicle ({chronicle.length} entries)
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em]">
+              City chronicle · {chronicle.length} entries
             </span>
             {chronicleOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
           {chronicleOpen && (
-            <ul className="border-t border-manila/15 px-4 py-3 font-mono text-xs leading-relaxed text-ink">
-              {chronicle.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="border-b border-manila/10 py-2.5 last:border-0"
-                >
-                  <span className="uppercase tracking-wider text-crimson-glow">
-                    {entry.phase === "night" ? "Night" : "Day"} {entry.cycle}
-                  </span>
-                  <p className="mt-0.5 text-ink/80">{entry.summary}</p>
-                </li>
-              ))}
+            <ul className="divide-y divide-crimson/25">
+              {chronicle.map((entry, i) => {
+                const prev = chronicle[i - 1];
+                const phaseBreak =
+                  !!prev &&
+                  (prev.cycle !== entry.cycle || prev.phase !== entry.phase);
+                return (
+                  <li
+                    key={entry.id}
+                    className={`relative px-4 py-3 ${
+                      i % 2 === 0 ? "bg-manila" : "bg-crimson/[0.07]"
+                    } ${phaseBreak ? "border-t-2 border-t-crimson/40" : ""}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 shrink-0 border border-crimson/40 bg-manila px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-crimson">
+                        {entry.phase === "night" ? "Night" : "Day"} {entry.cycle}
+                      </span>
+                      <p className="min-w-0 flex-1 font-mono text-xs leading-relaxed text-crimson/85">
+                        {entry.summary}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
-        </GlassPanel>
+        </div>
       )}
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
