@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
@@ -57,6 +57,9 @@ export function GameClient({ roomId }: { roomId: string }) {
     nonce: number;
     channel: ChatChannel;
   } | null>(null);
+  const clearVoiceInviteForChannel = useCallback((channel: ChatChannel) => {
+    setVoiceInvite((inv) => (inv?.channel === channel ? null : inv));
+  }, []);
   const [startingGame, setStartingGame] = useState(false);
   const [returningToLobby, setReturningToLobby] = useState(false);
   const [quitConfirmOpen, setQuitConfirmOpen] = useState(false);
@@ -317,6 +320,15 @@ export function GameClient({ roomId }: { roomId: string }) {
     state?.phaseEndsAt,
     state?.you?.role,
   ]);
+
+  // Dismiss invite banner once you're in that channel's voice (any join path).
+  useEffect(() => {
+    if (!voiceInvite || !state?.you?.id) return;
+    const ids = state.voiceParticipants[voiceInvite.channel] ?? [];
+    if (ids.includes(state.you.id)) {
+      setVoiceInvite(null);
+    }
+  }, [voiceInvite, state?.you?.id, state?.voiceParticipants]);
 
   if (error && !state) {
     return (
@@ -803,6 +815,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
+                    onVoiceJoined={clearVoiceInviteForChannel}
                   />
                 </div>
               </div>
@@ -860,6 +873,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                     socket={socket}
                     onSend={emitChat}
                     joinVoiceRequest={joinVoiceRequest}
+                    onVoiceJoined={clearVoiceInviteForChannel}
                   />
                 </div>
               </div>

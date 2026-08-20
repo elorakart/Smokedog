@@ -23,12 +23,14 @@ export function ChatPanel({
   socket,
   onSend,
   joinVoiceRequest,
+  onVoiceJoined,
   enableVoice = true,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
   onSend: (channel: ChatChannel, text: string) => void;
   joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
+  onVoiceJoined?: (channel: ChatChannel) => void;
   enableVoice?: boolean;
 }) {
   const you = state.you;
@@ -163,6 +165,13 @@ export function ChatPanel({
     void voice.join();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinVoiceRequest?.nonce, active]);
+
+  // Clear parent invite banner whenever we successfully join this channel
+  // (banner JOIN VOICE or ChatPanel Join voice).
+  useEffect(() => {
+    if (!enableVoice || !voice.joined) return;
+    onVoiceJoined?.(active);
+  }, [enableVoice, voice.joined, active, onVoiceJoined]);
 
   const submit = () => {
     if (!text.trim() || !canSendActive) return;
