@@ -78,7 +78,6 @@ export function ChatPanel({
     [state.players]
   );
   const messages = state.chat.filter((m) => m.channel === active);
-  const voiceInChannel = state.voiceParticipants[active] ?? [];
   const [text, setText] = useState("");
 
   const voice = useVoiceChat(
@@ -110,6 +109,15 @@ export function ChatPanel({
     setText("");
   };
 
+  const speaking = new Set(voice.speakingIds);
+  const voiceRoster = useMemo(() => {
+    const ids = [...(state.voiceParticipants[active] ?? [])];
+    if (you?.id && voice.joined && !ids.includes(you.id)) {
+      ids.unshift(you.id);
+    }
+    return ids;
+  }, [state.voiceParticipants, active, voice.joined, you?.id]);
+
   if (tabs.length === 0) {
     return (
       <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col items-center justify-center p-6 text-center">
@@ -124,15 +132,6 @@ export function ChatPanel({
       </GlassPanel>
     );
   }
-
-  const speaking = new Set(voice.speakingIds);
-  const voiceRoster = useMemo(() => {
-    const ids = [...voiceInChannel];
-    if (you?.id && voice.joined && !ids.includes(you.id)) {
-      ids.unshift(you.id);
-    }
-    return ids;
-  }, [voiceInChannel, voice.joined, you?.id]);
 
   return (
     <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
