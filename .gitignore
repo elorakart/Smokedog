@@ -41,3 +41,4 @@ next-env.d.ts
 public/avatars/_lightened/
 public/avatars/_stage_*/
 public/avatars/_preview-*
+public/avatars/stitch-import/
