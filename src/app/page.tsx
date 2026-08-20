@@ -61,7 +61,7 @@ const GAME_CARDS: GameCard[] = [
     players: "2 Players",
     duration: "Turn-based",
     image:
-      "https://images.unsplash.com/photo-1611195974226-ef3bba0b7015?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?auto=format&fit=crop&w=1600&q=80",
     badge: "Live",
   },
   {
