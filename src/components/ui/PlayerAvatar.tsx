@@ -4,8 +4,8 @@ import Image from "next/image";
 import { avatarSrc, normalizeAvatarId } from "@/lib/avatars";
 
 /**
- * Portrait art already fills most of the square. Clip to a circle and
- * use a light cover so faces stay visible (no aggressive zoom).
+ * Stitch portraits already include their circular frame in the artwork.
+ * Scale with object-contain — do not cover-crop or remask into a CSS circle.
  */
 export function PlayerAvatar({
   id,
@@ -23,7 +23,7 @@ export function PlayerAvatar({
 
   return (
     <span
-      className={`relative block shrink-0 overflow-hidden rounded-full bg-manila ring-1 ring-crimson/20 ${
+      className={`relative block shrink-0 bg-transparent ${
         fillsParent ? "aspect-square" : ""
       } ${className}`}
       style={fillsParent ? undefined : { width: size, height: size }}
@@ -34,7 +34,7 @@ export function PlayerAvatar({
         fill
         sizes={fillsParent ? "(max-width: 768px) 28vw, 128px" : `${size}px`}
         priority={priority}
-        className="object-cover object-[center_30%] brightness-[1.04] contrast-[0.96]"
+        className="object-contain object-center"
         aria-hidden
       />
     </span>

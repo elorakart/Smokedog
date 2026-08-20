@@ -125,7 +125,7 @@ export function FiveAliveLobbyView({
             return (
               <motion.div key={p.id} variants={fadeUp} className="min-w-0">
                 <GlassPanel className="flex h-full flex-col p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
-                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-crimson/25">
+                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] ring-1 ring-crimson/25">
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}

@@ -141,7 +141,7 @@ export function OpenLobbies({
           >
             <GlassPanel className="flex flex-wrap items-center justify-between gap-4 p-4">
               <div className="flex items-center gap-3">
-                <div className="overflow-hidden rounded-full">
+                <div>
                   <PlayerAvatar id={lobby.hostAvatarId} size={44} />
                 </div>
                 <div>

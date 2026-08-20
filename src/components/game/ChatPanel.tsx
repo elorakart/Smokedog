@@ -292,7 +292,7 @@ export function ChatPanel({
                     }`}
                   >
                     <div
-                      className={`relative size-10 overflow-hidden rounded-full ring-2 transition ${
+                      className={`relative size-10 ring-2 transition ${
                         isSpeaking
                           ? "animate-pulse ring-crimson"
                           : "ring-transparent"

@@ -3,7 +3,11 @@
  *
  * Sheets (from stitch project 7822900312632106893):
  *   light-01..03 → 3×2 grids (18 portraits)
- *   dark-pair    → 2×1 (2 portraits, lightly lifted for Ledger)
+ *   light-pair   → 2 large circular portraits (avatars 18–19)
+ *
+ * Each export is a square crop of the Stitch circular portrait art
+ * (circle frame is part of the bitmap). UI should scale with object-contain,
+ * not CSS-mask/cover-crop into a second circle.
  */
 const fs = require("fs");
 const path = require("path");
@@ -13,62 +17,41 @@ const importDir = path.join(__dirname, "../public/avatars/stitch-import");
 const sourceDir = path.join(__dirname, "../public/avatars/source");
 const outDir = path.join(__dirname, "../public/avatars");
 const OUT_SIZE = 256;
-const MANILA = [232, 220, 200];
 
-const SHEETS = [
-  { file: "light-01.png", cols: 3, rows: 2, labelPadTop: 0.12, labelPadBottom: 0.34 },
-  { file: "light-02.png", cols: 3, rows: 2, labelPadTop: 0.18, labelPadBottom: 0.30 },
-  { file: "light-03.png", cols: 3, rows: 2, labelPadTop: 0.12, labelPadBottom: 0.34 },
-  { file: "dark-pair.png", cols: 2, rows: 1, labelPadTop: 0.06, labelPadBottom: 0.06, lighten: true },
+/** 3×2 labeled grids: pad away dossier labels, keep full circular frame. */
+const GRID_SHEETS = [
+  { file: "light-01.png", cols: 3, rows: 2, labelPadTop: 0.10, labelPadBottom: 0.32 },
+  { file: "light-02.png", cols: 3, rows: 2, labelPadTop: 0.16, labelPadBottom: 0.28 },
+  { file: "light-03.png", cols: 3, rows: 2, labelPadTop: 0.10, labelPadBottom: 0.32 },
 ];
 
-function lightenRaw(data) {
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const sat = max === 0 ? 0 : (max - min) / max;
-    const isCrimson =
-      r > 110 && r > g * 1.35 && r > b * 1.35 && sat > 0.35;
-    if (!isCrimson) {
-      const lift = lum < 28 ? 0.7 : lum < 70 ? 0.48 : lum < 130 ? 0.32 : 0.12;
-      r = Math.min(255, r + (255 - r) * lift + 20);
-      g = Math.min(255, g + (255 - g) * lift + 16);
-      b = Math.min(255, b + (255 - b) * lift + 10);
-      if (lum < 160) {
-        const t = (1 - lum / 160) * 0.45;
-        r = Math.round(r * (1 - t) + MANILA[0] * t);
-        g = Math.round(g * (1 - t) + MANILA[1] * t);
-        b = Math.round(b * (1 - t) + MANILA[2] * t);
-      }
-    }
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-}
+/**
+ * Large pair on light-pair.png (dossier portfolio 19/20).
+ * Centers/radii from ring detection; pad keeps the black frame intact.
+ */
+const LIGHT_PAIR = {
+  file: "light-pair.png",
+  portraits: [
+    { cx: 354, cy: 268, rad: 136 },
+    { cx: 664, cy: 268, rad: 135 },
+  ],
+  /** Keep ring intact but stay above dossier labels under the circles. */
+  pad: 6,
+};
 
-async function exportCell(input, left, top, size, outPath, lighten) {
-  let pipeline = sharp(input)
-    .extract({ left, top, width: size, height: size })
-    .resize(OUT_SIZE, OUT_SIZE, { kernel: "lanczos3" })
-    .ensureAlpha();
-
-  if (lighten) {
-    const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
-    lightenRaw(data);
-    await sharp(data, {
-      raw: { width: info.width, height: info.height, channels: 4 },
-    })
-      .webp({ quality: 92 })
-      .toFile(outPath);
-    return;
-  }
-
-  await pipeline.webp({ quality: 92 }).toFile(outPath);
+async function exportSquare(input, left, top, size, outPath) {
+  const meta = await sharp(input).metadata();
+  const w = meta.width ?? size;
+  const h = meta.height ?? size;
+  const safeLeft = Math.max(0, Math.min(left, w - 1));
+  const safeTop = Math.max(0, Math.min(top, h - 1));
+  const safeSize = Math.min(size, w - safeLeft, h - safeTop);
+  await sharp(input)
+    .extract({ left: safeLeft, top: safeTop, width: safeSize, height: safeSize })
+    .resize(OUT_SIZE, OUT_SIZE, { kernel: "lanczos3", fit: "fill" })
+    .ensureAlpha()
+    .webp({ quality: 92 })
+    .toFile(outPath);
 }
 
 async function main() {
@@ -82,12 +65,11 @@ async function main() {
   let idx = 0;
   const staged = [];
 
-  for (const sheet of SHEETS) {
+  for (const sheet of GRID_SHEETS) {
     const srcPath = path.join(importDir, sheet.file);
     if (!fs.existsSync(srcPath)) {
       throw new Error(`Missing sheet: ${srcPath}`);
     }
-    // Keep a copy under source/ for future regenerations.
     fs.copyFileSync(srcPath, path.join(sourceDir, `stitch-${sheet.file}`));
 
     const meta = await sharp(srcPath).metadata();
@@ -100,7 +82,7 @@ async function main() {
       for (let col = 0; col < sheet.cols; col++) {
         const padTop = Math.floor(cellH * sheet.labelPadTop);
         const padBottom = Math.floor(cellH * sheet.labelPadBottom);
-        const padX = Math.floor(cellW * 0.08);
+        const padX = Math.floor(cellW * 0.06);
         const availW = cellW - padX * 2;
         const availH = cellH - padTop - padBottom;
         const size = Math.min(availW, availH);
@@ -108,10 +90,37 @@ async function main() {
         const top = row * cellH + padTop + Math.floor((availH - size) / 2);
         const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
         const stagedPath = path.join(stageDir, name);
-        await exportCell(srcPath, left, top, size, stagedPath, !!sheet.lighten);
+        await exportSquare(srcPath, left, top, size, stagedPath);
         staged.push(name);
         idx++;
       }
+    }
+  }
+
+  const pairPath = path.join(importDir, LIGHT_PAIR.file);
+  if (!fs.existsSync(pairPath)) {
+    throw new Error(`Missing sheet: ${pairPath}`);
+  }
+  fs.copyFileSync(pairPath, path.join(sourceDir, "stitch-light-pair.png"));
+
+  for (const p of LIGHT_PAIR.portraits) {
+    const size = Math.round((p.rad + LIGHT_PAIR.pad) * 2);
+    const left = Math.round(p.cx - size / 2);
+    const top = Math.round(p.cy - size / 2);
+    const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
+    const stagedPath = path.join(stageDir, name);
+    await exportSquare(pairPath, left, top, size, stagedPath);
+    staged.push(name);
+    idx++;
+  }
+
+  // Remove obsolete dark-pair source if present.
+  const darkSrc = path.join(sourceDir, "stitch-dark-pair.png");
+  if (fs.existsSync(darkSrc)) {
+    try {
+      fs.unlinkSync(darkSrc);
+    } catch {
+      /* ignore OneDrive lock */
     }
   }
 
@@ -130,7 +139,7 @@ async function main() {
     fs.writeFileSync(dest, fs.readFileSync(src));
   }
   fs.rmSync(stageDir, { recursive: true, force: true });
-  console.log(`Imported ${idx} Stitch avatars`);
+  console.log(`Imported ${idx} Stitch light-dossier avatars`);
 }
 
 main().catch((err) => {

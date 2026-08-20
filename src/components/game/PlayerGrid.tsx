@@ -179,7 +179,7 @@ export function PlayerGrid({
                 </AnimatePresence>
                 <div className="mx-auto w-full max-w-[6.5rem]">
                   <div
-                    className={`relative aspect-square w-full overflow-hidden rounded-full ring-2 transition ${
+                    className={`relative aspect-square w-full ring-2 transition ${
                       selected || showingKill
                         ? "ring-crimson"
                         : "ring-transparent"
