@@ -262,11 +262,14 @@ export function NightActionPanel({
   const dead = !you?.alive;
 
   if (dead) {
+    const deadVillager = you?.role === "villager";
     return (
       <div>
         <h3 className="font-display text-xl font-bold">Night watch</h3>
         <p className="mt-1 text-sm text-ink-steel">
-          You are eliminated — watch the city. Use graveyard chat.
+          {deadVillager
+            ? "You are eliminated — no night action. You may still vote by day. Use graveyard chat."
+            : "You are eliminated — watch the city. Use graveyard chat — you cannot act or vote."}
         </p>
         <div className="mt-4">
           <PlayerGrid state={state} onInviteVoice={onInviteVoice} />

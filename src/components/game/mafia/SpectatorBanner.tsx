@@ -16,7 +16,7 @@ export function SpectatorBanner({
         </p>
         <p className="text-sm text-crimson/80">
           {canVoteDead
-            ? "You are eliminated, but as a dead villager you may still vote when the tally opens. Otherwise watch and use graveyard chat."
+            ? "You are eliminated. You may still vote by day, but cannot act at night. Use graveyard chat."
             : "You have been eliminated. Watch the city and use graveyard chat — you cannot act or vote."}
         </p>
       </div>

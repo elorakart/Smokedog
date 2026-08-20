@@ -599,7 +599,9 @@ export function GameClient({ roomId }: { roomId: string }) {
           !state.you.alive &&
           state.phase !== "lobby" &&
           state.phase !== "gameover" && (
-            <SpectatorBanner canVoteDead={!!state.deadVillagerVote} />
+            <SpectatorBanner
+              canVoteDead={state.you.role === "villager"}
+            />
           )}
         {state.phase === "gameover" ? (
           <GameOverScreen
