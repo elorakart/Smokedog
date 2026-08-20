@@ -130,7 +130,7 @@ export function TttBoard({
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
                   onClick={() => onMove(i)}
-                  className="relative flex items-center justify-center rounded-sm border border-white/15 bg-surface/80 text-crimson-glow transition hover:border-crimson/40 disabled:cursor-default"
+                  className="relative flex items-center justify-center rounded-sm border border-crimson/25 bg-surface/80 text-crimson-glow transition hover:border-crimson/40 disabled:cursor-default"
                 >
                   {cell && <MarkSvg mark={cell} />}
                   {showGhost && myMark && <MarkSvg mark={myMark} ghost />}

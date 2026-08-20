@@ -129,7 +129,7 @@ export function ChatPanel({
 
   return (
     <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
-      <div className="flex border-b border-white/10">
+      <div className="flex border-b border-crimson/20">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -146,14 +146,14 @@ export function ChatPanel({
 
       {enableVoice && (
         <>
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+          <div className="flex items-center justify-between border-b border-crimson/20 px-3 py-2">
             <div className="flex items-center gap-2">
               {!voice.joined ? (
                 <button
                   type="button"
                   disabled={!canUseVoice}
                   onClick={() => void voice.join()}
-                  className="inline-flex items-center gap-1 rounded-sm border border-emerald-400/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300 disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson disabled:opacity-40"
                 >
                   <Mic size={12} /> Join voice
                 </button>
@@ -162,7 +162,7 @@ export function ChatPanel({
                   <button
                     type="button"
                     onClick={() => voice.setMuted((m) => !m)}
-                    className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 font-mono text-[10px] uppercase tracking-widest"
+                    className="inline-flex items-center gap-1 rounded-sm border border-crimson/25 px-2 py-1 font-mono text-[10px] uppercase tracking-widest"
                   >
                     {voice.muted ? <MicOff size={12} /> : <Mic size={12} />}
                     {voice.muted ? "Unmute" : "Mute"}
@@ -189,7 +189,7 @@ export function ChatPanel({
           </div>
 
           {voiceInChannel.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 border-b border-white/10 px-3 py-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 border-b border-crimson/20 px-3 py-2 sm:grid-cols-4">
               {voiceInChannel.map((id) => {
                 const player = state.players.find((p) => p.id === id);
                 const name = player?.name ?? "Operator";
@@ -200,14 +200,14 @@ export function ChatPanel({
                     key={id}
                     className={`flex flex-col items-center gap-1 rounded-sm border px-1.5 py-2 ${
                       isSpeaking
-                        ? "border-emerald-400/60 bg-emerald-400/10"
-                        : "border-white/10 bg-white/[0.02]"
+                        ? "border-crimson/60 bg-crimson/10"
+                        : "border-crimson/20 bg-crimson/[0.03]"
                     }`}
                   >
                     <div
                       className={`relative size-10 overflow-hidden rounded-full ring-2 transition ${
                         isSpeaking
-                          ? "animate-pulse ring-emerald-400"
+                          ? "animate-pulse ring-crimson"
                           : "ring-transparent"
                       }`}
                     >
@@ -227,7 +227,7 @@ export function ChatPanel({
           )}
 
           {voice.error && (
-            <p className="border-b border-white/10 px-3 py-2 text-xs text-amber-200">
+            <p className="border-b border-crimson/20 px-3 py-2 text-xs text-crimson/80">
               {voice.error}
             </p>
           )}
@@ -255,10 +255,10 @@ export function ChatPanel({
               animate={{ opacity: 1, x: 0 }}
               className={`text-sm max-md:flex max-md:flex-col ${
                 isOwn ? "max-md:items-end" : "max-md:items-start"
-              } ${i % 2 ? "md:bg-white/5" : ""} md:rounded-sm md:px-2 md:py-1 ${
+              } ${i % 2 ? "md:bg-crimson/5" : ""} md:rounded-sm md:px-2 md:py-1 ${
                 isOwn
                   ? "max-md:ml-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-br-sm max-md:bg-crimson/20 max-md:px-3 max-md:py-2"
-                  : "max-md:mr-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-bl-sm max-md:bg-white/10 max-md:px-3 max-md:py-2"
+                  : "max-md:mr-auto max-md:max-w-[85%] max-md:rounded-2xl max-md:rounded-bl-sm max-md:bg-crimson/10 max-md:px-3 max-md:py-2"
               }`}
             >
               <span className="font-mono text-[10px] text-ink-steel max-md:hidden">
@@ -281,7 +281,7 @@ export function ChatPanel({
       </div>
 
       <form
-        className="flex border-t border-white/10"
+        className="flex border-t border-crimson/20"
         onSubmit={(e) => {
           e.preventDefault();
           submit();

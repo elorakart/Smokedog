@@ -53,7 +53,7 @@ export function GameOverScreen({
         particleCount: 140,
         spread: 80,
         origin: { y: 0.6 },
-        colors: ["#8B1E1E", "#C45C4A", "#E8DCC8"],
+        colors: ["#8B1E1E", "#E8DCC8"],
       });
     }, 200);
     return () => clearTimeout(t);
@@ -73,7 +73,7 @@ export function GameOverScreen({
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-              <div className="overflow-hidden rounded-full ring-1 ring-white/10">
+              <div className="overflow-hidden rounded-full ring-1 ring-crimson/25">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
               <div>
@@ -121,7 +121,7 @@ export function GameOverScreen({
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
-              <div className="overflow-hidden rounded-full ring-1 ring-white/10">
+              <div className="overflow-hidden rounded-full ring-1 ring-crimson/25">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
               <div>

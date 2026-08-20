@@ -70,7 +70,7 @@ export function BoardLobbyView({
           }
           return (
             <GlassPanel key={p.id} className="flex flex-col p-3">
-              <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] overflow-hidden rounded-full ring-1 ring-white/10">
+              <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] overflow-hidden rounded-full ring-1 ring-crimson/25">
                 <PlayerAvatar id={p.avatarId} size={96} className="h-full w-full" />
               </div>
               <p className="mt-2 truncate text-center font-display text-sm font-semibold">
@@ -102,7 +102,7 @@ export function BoardLobbyView({
 
       {host && (
         <motion.div variants={fadeUp} className="mt-6 space-y-4">
-          <div className="rounded-sm border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-sm border border-crimson/20 bg-crimson/[0.04] p-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
               Auto players
             </p>
@@ -111,7 +111,7 @@ export function BoardLobbyView({
                 type="button"
                 onClick={() => onAddBot()}
                 disabled={full}
-                className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
               >
                 <UserPlus size={12} /> Add bot
               </button>
@@ -119,14 +119,14 @@ export function BoardLobbyView({
                 type="button"
                 onClick={onRemoveBot}
                 disabled={state.autoPlayerCount === 0}
-                className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
               >
                 <UserMinus size={12} /> Remove bot
               </button>
             </div>
           </div>
           {onSettings && (
-            <label className="flex items-center justify-between gap-3 rounded-sm border border-white/10 bg-white/[0.03] px-4 py-3">
+            <label className="flex items-center justify-between gap-3 rounded-sm border border-crimson/20 bg-crimson/[0.04] px-4 py-3">
               <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
                 <Clock size={12} /> Turn seconds
               </span>
@@ -138,7 +138,7 @@ export function BoardLobbyView({
                 onChange={(e) =>
                   onSettings({ daySeconds: Number(e.target.value) || 15 })
                 }
-                className="w-20 rounded-sm border border-white/10 bg-void px-2 py-1 font-mono text-sm"
+                className="w-20 rounded-sm border border-crimson/20 bg-manila px-2 py-1 font-mono text-sm text-crimson"
               />
             </label>
           )}

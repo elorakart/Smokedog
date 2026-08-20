@@ -90,8 +90,8 @@ export function FiveAliveBombPanel({
               onClick={() => onRespond({ pass: true })}
               className={`w-full rounded-sm border px-3 py-2 font-mono text-[10px] uppercase tracking-widest transition ${
                 hasDefuse
-                  ? "cursor-not-allowed border-white/10 bg-white/[0.03] opacity-40"
-                  : "border-[#e63946]/40 bg-[#e63946]/10 text-crimson-glow hover:border-[#e63946]/60"
+                  ? "cursor-not-allowed border-crimson/20 bg-crimson/[0.04] opacity-40"
+                  : "border-[#8B1E1E]/40 bg-[#8B1E1E]/10 text-crimson-glow hover:border-[#8B1E1E]/60"
               }`}
             >
               Pass (lose 1 life)

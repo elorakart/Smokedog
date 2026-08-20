@@ -165,7 +165,7 @@ export function SpotItCard({
 
   return (
     <div
-      className={`relative aspect-square ${dim} rounded-full border-2 border-white/20 bg-gradient-to-br from-[#1a2230] to-[#0c1018] shadow-lg`}
+      className={`relative aspect-square ${dim} rounded-full border-2 border-crimson/30 bg-gradient-to-br from-crimson/20 to-manila shadow-lg`}
     >
       {items.map((item) => {
         const key = symbolKey(item.id);

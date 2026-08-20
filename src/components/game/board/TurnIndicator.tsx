@@ -17,7 +17,7 @@ export function TurnIndicator({
       className={`rounded-sm border px-4 py-3 ${
         yours
           ? "border-crimson/40 bg-crimson/10"
-          : "border-white/10 bg-white/[0.03]"
+          : "border-crimson/20 bg-crimson/[0.04]"
       } ${urgent ? "animate-pulse" : ""}`}
     >
       <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">

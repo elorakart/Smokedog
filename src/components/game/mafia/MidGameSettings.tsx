@@ -18,12 +18,12 @@ export function MidGameSettings({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-sm border border-white/10 px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-steel sm:px-3 sm:py-2"
+        className="inline-flex items-center gap-1 rounded-sm border border-crimson/20 px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-steel sm:px-3 sm:py-2"
       >
         <Settings size={12} /> Timers
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-sm border border-white/10 bg-surface p-4 shadow-lg">
+        <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-sm border border-crimson/20 bg-surface p-4 shadow-lg">
           <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
             Mid-game timers
           </p>

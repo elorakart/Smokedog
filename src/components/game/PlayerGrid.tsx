@@ -139,7 +139,7 @@ export function PlayerGrid({
                       e.stopPropagation();
                       onInviteVoice(p.id);
                     }}
-                    className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-emerald-400/30 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300"
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-crimson/30 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson"
                   >
                     <Mic size={10} /> Invite voice
                   </button>
@@ -201,11 +201,11 @@ export function NightActionPanel({
     <div>
       <h3 className="font-display text-xl font-bold">{NIGHT_ACTION_PROMPTS[type]}</h3>
       {state.submittedNightAction && target ? (
-        <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
+        <p className="mt-1 font-mono text-xs uppercase text-crimson">
           {NIGHT_ACTION_LOCKED[type](target.name)}
         </p>
       ) : state.submittedNightAction ? (
-        <p className="mt-1 font-mono text-xs uppercase text-emerald-300">
+        <p className="mt-1 font-mono text-xs uppercase text-crimson">
           Action locked in
         </p>
       ) : (
@@ -279,22 +279,22 @@ export function VotePanel({
         Votes in: {state.dayVotesIn}/{state.dayVotesNeeded}
       </p>
       {muted && (
-        <p className="mt-2 font-mono text-xs uppercase text-amber-200">
+        <p className="mt-2 font-mono text-xs uppercase text-crimson/80">
           Blackmailed — you cannot vote or speak
         </p>
       )}
       {deadVillager && (
-        <p className="mt-2 font-mono text-xs uppercase text-sky-200">
+        <p className="mt-2 font-mono text-xs uppercase text-crimson">
           Dead villager — you may still cast a vote
         </p>
       )}
       {votedSkip && (
-        <p className="mt-2 font-mono text-xs uppercase text-emerald-300">
+        <p className="mt-2 font-mono text-xs uppercase text-crimson">
           You voted to skip the lynch
         </p>
       )}
       {votedName && !muted && !votedSkip && (
-        <p className="mt-2 font-mono text-xs uppercase text-emerald-300">
+        <p className="mt-2 font-mono text-xs uppercase text-crimson">
           You voted to lynch {votedName}
         </p>
       )}
@@ -317,7 +317,7 @@ export function VotePanel({
           type="button"
           onClick={onSkipVote}
           disabled={!!votedId}
-          className="mt-4 w-full rounded-sm border border-white/15 bg-white/[0.04] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-sky-400/40 hover:text-sky-200 disabled:opacity-40"
+          className="mt-4 w-full rounded-sm border border-crimson/25 bg-crimson/[0.05] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson disabled:opacity-40"
         >
           Skip lynch — no one hangs today
         </button>

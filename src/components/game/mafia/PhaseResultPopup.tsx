@@ -17,14 +17,14 @@ const TONE_STYLES: Record<
   { border: string; bg: string; text: string }
 > = {
   info: {
-    border: "border-sky-400/40",
-    bg: "bg-sky-400/10",
-    text: "text-sky-100",
+    border: "border-crimson/40",
+    bg: "bg-crimson/10",
+    text: "text-crimson",
   },
   good: {
-    border: "border-emerald-400/40",
-    bg: "bg-emerald-400/10",
-    text: "text-emerald-100",
+    border: "border-crimson/40",
+    bg: "bg-crimson/10",
+    text: "text-crimson",
   },
   bad: {
     border: "border-crimson/40",
@@ -75,7 +75,7 @@ export function PhaseResultPopup({
             type="button"
             aria-label="Dismiss"
             onClick={onDismiss}
-            className="absolute right-2 top-2 rounded-sm p-1 text-ink-steel transition hover:bg-white/10 hover:text-ink"
+            className="absolute right-2 top-2 rounded-sm p-1 text-crimson/60 transition hover:bg-crimson/10 hover:text-crimson"
           >
             <X size={16} />
           </button>

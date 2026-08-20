@@ -82,7 +82,7 @@ export function OpenLobbies({
             setLoading(true);
             getSocket(ensurePlayerId()).emit("lobbies:list");
           }}
-          className="inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:text-ink"
+          className="inline-flex items-center gap-2 rounded-sm border border-crimson/20 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:text-ink"
         >
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh
@@ -99,7 +99,7 @@ export function OpenLobbies({
             value={query}
             onChange={(e) => setQuery(e.target.value.toUpperCase())}
             placeholder="Search by code or host name"
-            className="w-full rounded-sm border border-white/10 bg-void py-3 pl-9 pr-3 font-mono text-sm tracking-wider outline-none focus:border-crimson"
+            className="w-full rounded-sm border border-crimson/30 bg-manila py-3 pl-9 pr-3 font-mono text-sm tracking-wider text-crimson outline-none focus:border-crimson"
           />
         </label>
         <PrimaryButton
@@ -118,10 +118,10 @@ export function OpenLobbies({
         {loading &&
           Array.from({ length: 3 }, (_, i) => (
             <GlassPanel key={`skeleton-${i}`} className="flex animate-pulse items-center gap-4 p-4">
-              <div className="size-11 rounded-full bg-white/10" />
+              <div className="size-11 rounded-full bg-crimson/10" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 w-24 rounded bg-white/10" />
-                <div className="h-3 w-40 rounded bg-white/10" />
+                <div className="h-3 w-24 rounded bg-crimson/10" />
+                <div className="h-3 w-40 rounded bg-crimson/10" />
               </div>
             </GlassPanel>
           ))}
@@ -169,11 +169,11 @@ export function OpenLobbies({
                   type="button"
                   disabled={joinPending}
                   onClick={() => join(lobby.roomId)}
-                  className="inline-flex min-w-[72px] items-center justify-center gap-2 rounded-sm bg-crimson px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-white shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-w-[72px] items-center justify-center gap-2 rounded-sm bg-crimson px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-manila shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {joinPending && joiningCode === lobby.roomId ? (
                     <>
-                      <LoadingSpinner size={12} className="text-white" />
+                      <LoadingSpinner size={12} className="text-manila" />
                       Joining
                     </>
                   ) : (

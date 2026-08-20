@@ -1,14 +1,14 @@
 import type { FiveAliveCardInstance } from "./cards";
 import { cardLabel } from "./cards";
 
-/** Stitch "Vivid Pulse" palette for 5 Alive cards. */
+/** Two-color Ledger palette only: manila + crimson. */
 export const FIVE_ALIVE_COLORS = {
-  primary: "#e63946",
-  action: "#457b9d",
-  success: "#2a9d8f",
-  warning: "#e9c46a",
-  neutral: "#1d3557",
-  cardBack: "#9d2c35",
+  primary: "#8B1E1E",
+  action: "#8B1E1E",
+  success: "#8B1E1E",
+  warning: "#8B1E1E",
+  neutral: "#8B1E1E",
+  cardBack: "#8B1E1E",
 } as const;
 
 export type FiveAliveCardCategory =
@@ -35,72 +35,72 @@ export function fiveAliveCardVisual(card: {
       return {
         label: String(card.value),
         category: "number",
-        borderClass: "border-[#457b9d]",
-        accentClass: "text-[#457b9d]",
+        borderClass: "border-crimson/50",
+        accentClass: "text-crimson",
         tagLabel: "Number",
       };
     case "reset0":
       return {
         label: "=0",
         category: "special",
-        borderClass: "border-[#2a9d8f]",
-        accentClass: "text-[#2a9d8f]",
+        borderClass: "border-crimson",
+        accentClass: "text-crimson",
         tagLabel: "Special",
       };
     case "eq21":
       return {
         label: "=21",
         category: "special",
-        borderClass: "border-[#e63946]",
-        accentClass: "text-[#e63946]",
+        borderClass: "border-crimson",
+        accentClass: "text-crimson",
         tagLabel: "Special",
       };
     case "skip":
       return {
         label: "Skip",
         category: "action",
-        borderClass: "border-[#457b9d]",
-        accentClass: "text-[#457b9d]",
+        borderClass: "border-crimson/60",
+        accentClass: "text-crimson",
         tagLabel: "Action",
       };
     case "reverse":
       return {
         label: "Reverse",
         category: "action",
-        borderClass: "border-[#457b9d]",
-        accentClass: "text-[#457b9d]",
+        borderClass: "border-crimson/60",
+        accentClass: "text-crimson",
         tagLabel: "Action",
       };
     case "draw1":
       return {
         label: "+1",
         category: "action",
-        borderClass: "border-[#457b9d]",
-        accentClass: "text-[#457b9d]",
+        borderClass: "border-crimson/60",
+        accentClass: "text-crimson",
         tagLabel: "Action",
       };
     case "draw2":
       return {
         label: "+2",
         category: "action",
-        borderClass: "border-[#457b9d]",
-        accentClass: "text-[#457b9d]",
+        borderClass: "border-crimson/60",
+        accentClass: "text-crimson",
         tagLabel: "Action",
       };
     case "bomb":
       return {
         label: "Bomb",
         category: "penalty",
-        borderClass: "border-[#e63946]",
-        accentClass: "text-[#e63946]",
+        borderClass: "border-crimson",
+        accentClass: "text-crimson",
         tagLabel: "Penalty",
       };
     case "wild":
       return {
         label: "5 Alive",
         category: "wild",
-        borderClass: "border-[#e9c46a]",
-        accentClass: "text-[#e9c46a]",
+        borderClass: "border-crimson",
+        accentClass: "text-crimson",
         tagLabel: "Wild",
       };
   }

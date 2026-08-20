@@ -4,7 +4,7 @@ import { Eye } from "lucide-react";
 
 export function SpectatorBanner() {
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-sm border border-white/10 bg-white/[0.04] px-4 py-3">
+    <div className="mb-4 flex items-center gap-3 rounded-sm border border-crimson/20 bg-crimson/[0.05] px-4 py-3">
       <Eye size={16} className="shrink-0 text-ink-steel" />
       <div>
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">

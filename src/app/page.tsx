@@ -225,8 +225,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-desk">
-      <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(139,30,30,0.14),transparent_55%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-manila">
+      <div className="pointer-events-none absolute inset-0 animate-pulse-slow bg-[radial-gradient(ellipse_at_top,rgba(139,30,30,0.12),transparent_55%)]" />
       <SiteHeader avatarId={profile?.avatarId ?? guestAvatarId} />
 
       <motion.main
@@ -239,25 +239,25 @@ export default function HomePage() {
           variants={fadeUp}
           className="relative mt-6 flex flex-col items-center justify-center py-10 text-center md:py-14"
         >
-          <div className="relative w-full max-w-lg border-2 border-crimson bg-manila px-8 py-10 text-ink-dark shadow-stamp md:px-12 md:py-12">
-            <span className="animate-stamp absolute -right-2 -top-3 border-2 border-crimson bg-paper px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-crimson -rotate-[8deg]">
+          <div className="relative w-full max-w-lg border-2 border-crimson bg-manila px-8 py-10 text-crimson shadow-stamp md:px-12 md:py-12">
+            <span className="animate-stamp absolute -right-2 -top-3 border-2 border-crimson bg-manila px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-crimson -rotate-[8deg]">
               Sealed
             </span>
-            <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-crimson">
+            <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-crimson/70">
               Case file // SMOKEDOG
             </p>
             <h1 className="mt-4 font-display text-5xl font-bold tracking-tight md:text-6xl">
               SMOKEDOG
             </h1>
             <div className="mx-auto mt-4 h-px w-24 bg-crimson" />
-            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-ink-dark/70">
+            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-crimson/70">
               Open a room. Stamp your name. Trust no dossier.
             </p>
             <button
               type="button"
               disabled={!!pending}
               onClick={() => openCreate("mafia-city")}
-              className="mt-7 inline-block bg-crimson px-6 py-2.5 font-mono text-[10px] uppercase tracking-widest text-manila transition hover:brightness-110 disabled:opacity-40"
+              className="mt-7 inline-block bg-crimson px-6 py-2.5 font-mono text-[10px] uppercase tracking-widest text-manila transition hover:opacity-90 disabled:opacity-40"
             >
               Open a room
             </button>
@@ -269,13 +269,12 @@ export default function HomePage() {
                 setModalMode("join");
                 setModal(true);
               }}
-              className="mt-4 block w-full font-mono text-[9px] uppercase tracking-[0.28em] text-ink-dark/45 transition hover:text-crimson"
+              className="mt-4 block w-full font-mono text-[9px] uppercase tracking-[0.28em] text-crimson/50 transition hover:text-crimson"
             >
               Join with code
             </button>
           </div>
         </motion.section>
-
         <OpenLobbies
           onJoin={joinWithProfile}
           joiningCode={joiningCode}
@@ -320,24 +319,24 @@ export default function HomePage() {
                   alt=""
                   className="h-[240px] w-full object-cover opacity-45 transition duration-700 group-hover:scale-105 md:h-[320px]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-desk via-desk/50 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-manila via-manila/70 to-transparent" />
                 <div className="absolute inset-0 p-6 md:p-8">
                   <span
                     className={`rounded-sm px-3 py-1 font-mono text-[10px] uppercase tracking-widest ${
                       card.badgeTone === "amber"
-                        ? "bg-amber-500/90 text-desk"
+                        ? "border border-crimson bg-manila text-crimson"
                         : "bg-crimson text-manila"
                     }`}
                   >
                     {card.badge}
                   </span>
-                  <h3 className="mt-5 font-display text-3xl font-bold md:text-4xl">
+                  <h3 className="mt-5 font-display text-3xl font-bold text-crimson md:text-4xl">
                     {card.title}
                   </h3>
-                  <p className="mt-2 max-w-lg text-sm text-ink md:text-base">
+                  <p className="mt-2 max-w-lg text-sm text-crimson/75 md:text-base">
                     {card.pitch}
                   </p>
-                  <div className="mt-5 flex flex-wrap items-center gap-5 font-mono text-xs uppercase tracking-wider text-ink-steel">
+                  <div className="mt-5 flex flex-wrap items-center gap-5 font-mono text-xs uppercase tracking-wider text-crimson/60">
                     <span className="inline-flex items-center gap-2">
                       <Users size={14} /> {card.players}
                     </span>
@@ -345,7 +344,7 @@ export default function HomePage() {
                       <Clock size={14} /> {card.duration}
                     </span>
                   </div>
-                  <span className="mt-6 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-widest text-crimson-glow">
+                  <span className="mt-6 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-widest text-crimson">
                     {card.disabled ? "Unavailable" : "Play now"}{" "}
                     {!card.disabled && (
                       <ArrowRight
@@ -360,12 +359,11 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setRulesGameId(card.id)}
-                  className="absolute bottom-6 right-6 z-10 rounded-sm border border-manila/25 bg-desk/70 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink backdrop-blur-sm transition hover:border-crimson/50 hover:text-crimson-glow md:bottom-8 md:right-8"
+                  className="absolute bottom-6 right-6 z-10 rounded-sm border border-crimson/40 bg-manila/90 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson transition hover:border-crimson hover:bg-manila md:bottom-8 md:right-8"
                 >
                   More info
                 </button>
-              )}
-            </div>
+              )}            </div>
           ))}
         </div>
       </motion.main>
@@ -396,7 +394,7 @@ export default function HomePage() {
 
       {pending && !modal && (
         <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
-          <div className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-surface/95 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink shadow-lg backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 rounded-sm border border-crimson/20 bg-surface/95 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink shadow-lg backdrop-blur-md">
             <LoadingSpinner size={14} />
             {pending === "create" ? "Creating party…" : "Joining party…"}
           </div>

@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
-/** Dossier panel — paper on desk, or glass-lite surface on dark. */
+/** Dossier panel — manila field, crimson ink only. */
 export function GlassPanel({
   children,
   className = "",
@@ -15,8 +15,8 @@ export function GlassPanel({
 }) {
   const surface =
     variant === "paper"
-      ? "rounded-sm border-2 border-ink-dark/80 bg-paper text-ink-dark shadow-stamp"
-      : "rounded-sm border border-manila/15 bg-surface/80 backdrop-blur-md text-ink";
+      ? "rounded-sm border-2 border-crimson bg-manila text-crimson shadow-stamp"
+      : "rounded-sm border border-crimson/25 bg-manila text-crimson";
 
   return (
     <div
@@ -49,7 +49,7 @@ export function Stamp({
 }) {
   return (
     <span
-      className={`animate-stamp inline-block -rotate-[8deg] border-2 border-crimson px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-crimson ${className}`}
+      className={`animate-stamp inline-block -rotate-[8deg] border-2 border-crimson bg-manila px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-crimson ${className}`}
     >
       {children}
     </span>
@@ -64,14 +64,14 @@ export function StatusChip({
   tone?: "neutral" | "live" | "dead" | "mute" | "afk" | "mafia" | "town" | "bot";
 }) {
   const tones: Record<string, string> = {
-    neutral: "text-ink-steel border-manila/20",
-    live: "text-emerald-300 border-emerald-400/30",
-    dead: "text-ink-steel/70 border-manila/15 line-through opacity-60",
-    mute: "text-amber-200 border-amber-400/30",
-    afk: "text-crimson-glow border-crimson/40",
-    mafia: "text-crimson-glow border-crimson/40",
-    town: "text-manila border-manila/35",
-    bot: "text-ink-muted border-manila/25",
+    neutral: "text-crimson/70 border-crimson/25",
+    live: "text-crimson border-crimson/50",
+    dead: "text-crimson/45 border-crimson/20 line-through opacity-60",
+    mute: "text-crimson/80 border-crimson/40",
+    afk: "text-crimson border-crimson/60",
+    mafia: "bg-crimson text-manila border-crimson",
+    town: "text-crimson border-crimson/45",
+    bot: "text-crimson/60 border-crimson/30",
   };
   return (
     <span
@@ -94,7 +94,7 @@ export function PrimaryButton({
       {...props}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-sm bg-crimson px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.16em] text-manila shadow-glow transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm bg-crimson px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.16em] text-manila shadow-glow transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${className}`}
     >
       {loading && <LoadingSpinner size={16} className="text-manila" />}
       {children}

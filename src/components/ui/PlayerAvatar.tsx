@@ -23,7 +23,7 @@ export function PlayerAvatar({
 
   return (
     <span
-      className={`relative block shrink-0 overflow-hidden rounded-full bg-[#12141a] ${
+      className={`relative block shrink-0 overflow-hidden rounded-full bg-crimson/15 ${
         fillsParent ? "aspect-square" : ""
       } ${className}`}
       style={fillsParent ? undefined : { width: size, height: size }}

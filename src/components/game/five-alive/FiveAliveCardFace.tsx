@@ -57,9 +57,9 @@ export function FiveAliveCardFace({
   return (
     <div
       className={cn(
-        "relative aspect-[5/7] select-none overflow-hidden rounded-xl border-2 bg-white text-[#1d3557] shadow-[0_2px_4px_rgba(29,53,87,0.12),0_8px_20px_rgba(29,53,87,0.08)] transition-all duration-200",
+        "relative aspect-[5/7] select-none overflow-hidden rounded-xl border-2 bg-manila text-crimson shadow-[0_2px_4px_rgba(139,30,30,0.12),0_8px_20px_rgba(139,30,30,0.08)] transition-all duration-200",
         visual.borderClass,
-        selected && "ring-2 ring-[#e63946] ring-offset-2 ring-offset-transparent scale-105",
+        selected && "ring-2 ring-[#8B1E1E] ring-offset-2 ring-offset-transparent scale-105",
         highlight === "defuse" && "ring-2 ring-[#2a9d8f]",
         highlight === "playable" && "hover:-translate-y-1 hover:shadow-xl",
         elevated && "-translate-y-2 shadow-xl",
@@ -67,7 +67,7 @@ export function FiveAliveCardFace({
       )}
       style={{ fontSize: width / 14, width }}
     >
-      <div className="absolute inset-x-0 top-[0.55em] text-center font-display text-[0.65em] font-extrabold uppercase tracking-[0.18em] text-[#e63946]">
+      <div className="absolute inset-x-0 top-[0.55em] text-center font-display text-[0.65em] font-extrabold uppercase tracking-[0.18em] text-[#8B1E1E]">
         5 Alive
       </div>
 

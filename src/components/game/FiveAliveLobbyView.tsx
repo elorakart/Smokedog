@@ -20,7 +20,7 @@ function AutoPlayerControls({
   const autoCount = state.autoPlayerCount;
 
   return (
-    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-4">
+    <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
           Auto players
@@ -38,7 +38,7 @@ function AutoPlayerControls({
           type="button"
           onClick={() => onAddBot()}
           disabled={full}
-          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
         >
           <UserPlus size={12} /> Add one
         </button>
@@ -46,7 +46,7 @@ function AutoPlayerControls({
           type="button"
           onClick={onRemoveBot}
           disabled={autoCount === 0}
-          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
         >
           <UserMinus size={12} /> Remove one
         </button>
@@ -58,7 +58,7 @@ function AutoPlayerControls({
             type="button"
             onClick={() => onAddBot(target)}
             disabled={state.players.length >= target}
-            className="rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+            className="rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
           >
             Fill {target}
           </button>
@@ -125,7 +125,7 @@ export function FiveAliveLobbyView({
             return (
               <motion.div key={p.id} variants={fadeUp} className="min-w-0">
                 <GlassPanel className="flex h-full flex-col p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
-                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-white/10">
+                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-crimson/25">
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}
@@ -198,7 +198,7 @@ export function FiveAliveLobbyView({
           </p>
         )}
 
-        <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] px-4 py-3">
+        <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] px-4 py-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
             <Shield size={14} />
             Lives are tracked per player (5 each).

@@ -15,7 +15,7 @@ export function DetectivePanel({ log }: { log: DetectiveLogEntry[] }) {
         {[...log].reverse().map((entry) => (
           <li
             key={entry.id}
-            className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
+            className="rounded-sm border border-crimson/20 bg-crimson/[0.04] px-3 py-2 text-sm"
           >
             <span className="font-mono text-[10px] uppercase text-ink-steel">
               Night {entry.cycle}

@@ -104,7 +104,7 @@ export function GameHud({
           <button
             type="button"
             onClick={onSkipTimer}
-            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-sky-400/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-sky-200 sm:px-3 sm:py-2 sm:text-[10px]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-crimson sm:px-3 sm:py-2 sm:text-[10px]"
             title="Skip remaining timer"
           >
             <SkipForward size={11} />
@@ -134,7 +134,7 @@ export function GameHud({
           type="button"
           disabled={quitting}
           onClick={onQuit}
-          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-white/10 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50 sm:px-3 sm:py-2 sm:text-[10px]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/20 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50 sm:px-3 sm:py-2 sm:text-[10px]"
         >
           <LogOut size={11} />
           {quitting ? "Leaving…" : "Quit"}

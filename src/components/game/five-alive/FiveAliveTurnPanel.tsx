@@ -109,7 +109,7 @@ export function FiveAliveTurnPanel({
         </div>
 
         {wildCardId && (
-          <div className="mt-4 rounded-sm border border-[#e63946]/40 bg-[#e63946]/10 p-4">
+          <div className="mt-4 rounded-sm border border-[#8B1E1E]/40 bg-[#8B1E1E]/10 p-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-crimson-glow">
               Wild: choose new running total
             </p>
@@ -119,13 +119,13 @@ export function FiveAliveTurnPanel({
               max={21}
               value={wildValue}
               onChange={(e) => setWildValue(clampTurnValue(Number(e.target.value)))}
-              className="mt-2 w-24 rounded-sm border border-white/10 bg-surface-high px-2 py-2 font-mono text-sm"
+              className="mt-2 w-24 rounded-sm border border-crimson/20 bg-surface-high px-2 py-2 font-mono text-sm"
             />
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => setWildCardId(null)}
-                className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel"
+                className="rounded-sm border border-crimson/20 bg-crimson/[0.04] px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel"
               >
                 Cancel
               </button>
@@ -139,7 +139,7 @@ export function FiveAliveTurnPanel({
                     setWildCardId(null);
                   });
                 }}
-                className="flex-1 rounded-sm bg-crimson px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white shadow-glow"
+                className="flex-1 rounded-sm bg-crimson px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-manila shadow-glow"
               >
                 Play Wild
               </button>

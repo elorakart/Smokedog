@@ -37,7 +37,7 @@ function RoleDistributionEditor({
   ).filter(([, n]) => n > 0);
 
   return (
-    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-3">
+    <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
           Role lineup ({playerCount} seats)
@@ -61,7 +61,7 @@ function RoleDistributionEditor({
               <button
                 type="button"
                 onClick={() => bump(role, -1)}
-                className="h-6 w-6 rounded-sm border border-white/10 font-mono text-sm"
+                className="h-6 w-6 rounded-sm border border-crimson/20 font-mono text-sm"
               >
                 −
               </button>
@@ -69,7 +69,7 @@ function RoleDistributionEditor({
               <button
                 type="button"
                 onClick={() => bump(role, 1)}
-                className="h-6 w-6 rounded-sm border border-white/10 font-mono text-sm"
+                className="h-6 w-6 rounded-sm border border-crimson/20 font-mono text-sm"
               >
                 +
               </button>
@@ -103,7 +103,7 @@ function RoleDistributionPreview({
   ).filter(([, n]) => n > 0);
 
   return (
-    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-3">
+    <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-3">
       <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Role lineup ({playerCount} seats)
       </p>
@@ -131,7 +131,7 @@ function AutoPlayerControls({
   const autoCount = state.autoPlayerCount;
 
   return (
-    <div className="mt-4 rounded-sm border border-white/10 bg-white/[0.03] p-4">
+    <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
           Auto operatives
@@ -149,7 +149,7 @@ function AutoPlayerControls({
           type="button"
           onClick={() => onAddBot()}
           disabled={full}
-          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
         >
           <UserPlus size={12} /> Add one
         </button>
@@ -157,7 +157,7 @@ function AutoPlayerControls({
           type="button"
           onClick={onRemoveBot}
           disabled={autoCount === 0}
-          className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
         >
           <UserMinus size={12} /> Remove one
         </button>
@@ -169,7 +169,7 @@ function AutoPlayerControls({
             type="button"
             onClick={() => onAddBot(target)}
             disabled={state.players.length >= target}
-            className="rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
+            className="rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
           >
             Fill {target}
           </button>
@@ -216,7 +216,7 @@ function LobbySidebar({
             playerCount={state.players.length}
           />
         )}
-        <div className="mt-6 rounded-sm border border-white/10 bg-white/5 px-4 py-3 text-center">
+        <div className="mt-6 rounded-sm border border-crimson/20 bg-crimson/5 px-4 py-3 text-center">
           <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
             Awaiting host
           </p>
@@ -275,7 +275,7 @@ function LobbySidebar({
             onClick={() => onSettings({ vigilanteBullets: n })}
             className={`flex-1 rounded-sm py-2 font-mono text-xs transition ${
               state.settings.vigilanteBullets === n
-                ? "bg-crimson text-white"
+                ? "bg-crimson text-manila"
                 : "bg-surface-high text-ink-steel hover:text-ink"
             }`}
           >
@@ -356,7 +356,7 @@ export function LobbyView({
             return (
               <motion.div key={p.id} variants={popIn} className="min-w-0">
                 <GlassPanel className="flex h-full flex-col p-3 transition hover:-translate-y-1 hover:shadow-spotlight">
-                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-white/10">
+                  <div className="relative mx-auto aspect-square w-full max-w-[6.5rem] overflow-hidden rounded-full ring-1 ring-crimson/25">
                     <PlayerAvatar
                       id={p.avatarId}
                       size={128}

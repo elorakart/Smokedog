@@ -41,7 +41,7 @@ export function ActionPrompt({ state }: { state: PublicGameState }) {
         className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 ${
           urgent
             ? "animate-pulse border-crimson bg-crimson/15 text-crimson-glow shadow-glow"
-            : "border-amber-400/40 bg-amber-400/10 text-amber-100"
+            : "border-crimson/40 bg-crimson/10 text-crimson"
         }`}
       >
         {urgent ? <Clock size={16} className="mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="mt-0.5 shrink-0" />}

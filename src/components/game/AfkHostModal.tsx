@@ -28,7 +28,7 @@ export function AfkHostModal({
           <button
             type="button"
             onClick={onPause}
-            className="rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest"
+            className="rounded-sm border border-crimson/20 py-3 font-mono text-xs uppercase tracking-widest"
           >
             Pause Game
           </button>

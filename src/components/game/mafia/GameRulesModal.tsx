@@ -144,14 +144,14 @@ export function GameRulesModal({
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson">
             Field manual
           </p>
-          <h2 className="mt-2 font-display text-2xl font-bold text-ink-dark">
+          <h2 className="mt-2 font-display text-2xl font-bold text-crimson">
             {rules.title}
           </h2>
 
-          <div className="mt-6 space-y-4 text-sm text-ink-dark/70">
+          <div className="mt-6 space-y-4 text-sm text-crimson/70">
             {rules.sections.map((section) => (
               <section key={section.title}>
-                <h3 className="font-display text-base font-semibold text-ink-dark">
+                <h3 className="font-display text-base font-semibold text-crimson">
                   {section.title}
                 </h3>
                 <p className="mt-1">{section.body}</p>
@@ -162,7 +162,7 @@ export function GameRulesModal({
           <button
             type="button"
             onClick={onClose}
-            className="mt-6 w-full rounded-sm border border-ink-dark/30 py-3 font-mono text-xs uppercase tracking-widest text-ink-dark"
+            className="mt-6 w-full rounded-sm border border-crimson/40 py-3 font-mono text-xs uppercase tracking-widest text-crimson"
           >
             Close dossier
           </button>

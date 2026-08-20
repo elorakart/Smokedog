@@ -17,14 +17,14 @@ export function DeckCard({
   return (
     <div
       className={cn(
-        "relative aspect-[5/7] select-none overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05),0_4px_10px_rgba(0,0,0,0.07)]",
+        "relative aspect-[5/7] select-none overflow-hidden rounded-xl border border-crimson/15 bg-manila shadow-[0_1px_2px_rgba(139,30,30,0.05),0_4px_10px_rgba(139,30,30,0.07)]",
         className
       )}
       style={{ width, ...style }}
     >
       {faceDown ? (
         <div
-          className="absolute inset-[0.45em] rounded-lg border border-black/10"
+          className="absolute inset-[0.45em] rounded-lg border border-crimson/15"
           style={{
             backgroundColor: "#9d2c35",
             backgroundImage:
@@ -55,7 +55,7 @@ export function DeckStack({
     <div className={cn("relative", className)} style={{ width, height: (width * 7) / 5 }}>
       {count === 0 ? (
         <div
-          className="flex aspect-[5/7] items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.02] font-mono text-[9px] uppercase tracking-widest text-ink-steel"
+          className="flex aspect-[5/7] items-center justify-center rounded-xl border border-dashed border-crimson/25 bg-crimson/[0.03] font-mono text-[9px] uppercase tracking-widest text-ink-steel"
           style={{ width }}
         >
           Empty
@@ -74,7 +74,7 @@ export function DeckStack({
               width={width}
             />
           ))}
-          <span className="absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e63946] px-1 font-mono text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#8B1E1E] px-1 font-mono text-[10px] font-bold text-manila">
             {count}
           </span>
         </>

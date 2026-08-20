@@ -45,8 +45,8 @@ export function Connect4Board({
     color === "R"
       ? "bg-crimson shadow-[0_0_16px_rgba(230,25,25,0.45)]"
       : color === "Y"
-        ? "bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.4)]"
-        : "bg-white/5";
+        ? "bg-crimson shadow-glow"
+        : "bg-crimson/5";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -70,7 +70,7 @@ export function Connect4Board({
               </div>
             ))}
           </div>
-          <div className="rounded-md border border-sky-400/30 bg-[#0a2744] p-2 shadow-inner">
+          <div className="rounded-md border border-crimson/30 bg-crimson/15 p-2 shadow-inner">
             <div className="grid grid-cols-7 gap-1.5">
               {Array.from({ length: C4_COLS }).map((_, col) => (
                 <button
@@ -92,7 +92,7 @@ export function Connect4Board({
                     return (
                       <div
                         key={key}
-                        className={`relative aspect-square overflow-hidden rounded-full bg-[#06182c] ${
+                        className={`relative aspect-square overflow-hidden rounded-full bg-manila ${
                           dimOthers && cell && !isWin ? "opacity-35" : ""
                         }`}
                       >

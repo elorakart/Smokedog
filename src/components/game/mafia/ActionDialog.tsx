@@ -45,23 +45,23 @@ export function ActionDialog({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-[min(92vw,28rem)] rounded-sm border border-amber-400/40 bg-surface/95 px-5 py-4 shadow-lg"
+          className="relative w-[min(92vw,28rem)] rounded-sm border border-crimson/40 bg-surface/95 px-5 py-4 shadow-lg"
         >
           <button
             type="button"
             aria-label="Dismiss"
             onClick={onDismiss}
-            className="absolute right-2 top-2 rounded-sm p-1 text-ink-steel transition hover:bg-white/10 hover:text-ink"
+            className="absolute right-2 top-2 rounded-sm p-1 text-crimson/60 transition hover:bg-crimson/10 hover:text-crimson"
           >
             <X size={16} />
           </button>
           <div className="flex items-start gap-3 pr-6">
             <AlertTriangle
               size={18}
-              className="mt-0.5 shrink-0 text-amber-200"
+              className="mt-0.5 shrink-0 text-crimson/80"
             />
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-100">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson">
                 {title}
               </p>
               <p className="mt-2 text-sm text-ink">{detail}</p>

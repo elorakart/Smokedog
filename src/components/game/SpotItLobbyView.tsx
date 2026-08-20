@@ -45,7 +45,7 @@ export function SpotItLobbyView({
       >
         {state.players.map((p) => (
           <GlassPanel key={p.id} className="flex min-w-0 flex-col p-3">
-            <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] overflow-hidden rounded-full ring-1 ring-white/10">
+            <div className="relative mx-auto aspect-square w-full max-w-[5.5rem] overflow-hidden rounded-full ring-1 ring-crimson/25">
               <PlayerAvatar id={p.avatarId} size={96} className="h-full w-full" />
             </div>
             <p className="mt-2 truncate text-center font-display text-sm font-semibold">
@@ -79,7 +79,7 @@ export function SpotItLobbyView({
               type="button"
               disabled={full}
               onClick={() => onAddBot()}
-              className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
             >
               <UserPlus size={12} /> Add bot
             </button>
@@ -87,7 +87,7 @@ export function SpotItLobbyView({
               type="button"
               disabled={state.autoPlayerCount === 0}
               onClick={onRemoveBot}
-              className="inline-flex items-center justify-center gap-1 rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-1 rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
             >
               <UserMinus size={12} /> Remove bot
             </button>
@@ -99,7 +99,7 @@ export function SpotItLobbyView({
                 type="button"
                 disabled={state.players.length >= n}
                 onClick={() => onAddBot(n)}
-                className="rounded-sm border border-white/10 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
+                className="rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
               >
                 Fill {n}
               </button>

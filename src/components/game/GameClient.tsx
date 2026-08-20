@@ -400,12 +400,10 @@ export function GameClient({ roomId }: { roomId: string }) {
     }, 2500);
   };
 
-  const nightTheme = state.phase === "night";
-
   return (
     <motion.div
       data-phase={state.phase}
-      animate={{ backgroundColor: nightTheme ? "#0a0806" : "#12100E" }}
+      animate={{ backgroundColor: "#E8DCC8" }}
       className="min-h-screen"
     >
       <SiteHeader
@@ -458,7 +456,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       )}
       {mafiaVoiceWarning && (
         <div className="mx-auto mb-4 max-w-6xl px-4 md:px-8">
-          <div className="rounded-sm border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <div className="rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3 text-sm text-crimson">
             Day breaks in under 10 seconds — mafia voice will close at dawn.
           </div>
         </div>
@@ -478,8 +476,8 @@ export function GameClient({ roomId }: { roomId: string }) {
 
       <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
         {voiceInvite && state.gameId === "mafia-city" && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-emerald-400/40 bg-emerald-400/10 px-4 py-3">
-            <p className="text-sm text-emerald-100">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3">
+            <p className="text-sm text-crimson">
               <span className="font-semibold">{voiceInvite.fromName}</span> wants
               you on {CHANNEL_LABELS[voiceInvite.channel]} voice.
             </p>
@@ -493,7 +491,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                   });
                   setVoiceInvite(null);
                 }}
-                className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/20 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-emerald-200"
+                className="inline-flex items-center gap-1 rounded-sm bg-crimson/20 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson"
               >
                 <Mic size={12} /> Join voice
               </button>
@@ -813,7 +811,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                 type="button"
                 disabled={quitting}
                 onClick={() => setQuitConfirmOpen(false)}
-                className="rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
+                className="rounded-sm border border-crimson/20 py-3 font-mono text-xs uppercase tracking-widest disabled:opacity-50"
               >
                 Cancel
               </button>
