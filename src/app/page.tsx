@@ -53,6 +53,7 @@ const GAME_CARDS: GameCard[] = [
     image:
       "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1600&q=80",
     badge: "Live",
+    moreInfo: true,
   },
   {
     id: "tic-tac-toe",
@@ -61,8 +62,9 @@ const GAME_CARDS: GameCard[] = [
     players: "2 Players",
     duration: "Turn-based",
     image:
-      "https://images.unsplash.com/photo-1606092195730-5d7b9af1efc5?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1616587894289-86480e533129?auto=format&fit=crop&w=1600&q=80",
     badge: "Live",
+    moreInfo: true,
   },
   {
     id: "connect-4",
@@ -73,6 +75,7 @@ const GAME_CARDS: GameCard[] = [
     image:
       "https://images.unsplash.com/photo-1553481187-be93c21490a9?auto=format&fit=crop&w=1600&q=80",
     badge: "Live",
+    moreInfo: true,
   },
   {
     id: "five-alive",
@@ -85,6 +88,7 @@ const GAME_CARDS: GameCard[] = [
     badge: "Under maintenance",
     badgeTone: "amber",
     disabled: true,
+    moreInfo: true,
   },
 ];
 
@@ -100,7 +104,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"create" | "join" | null>(null);
   const [joiningCode, setJoiningCode] = useState<string | null>(null);
-  const [rulesOpen, setRulesOpen] = useState(false);
+  const [rulesGameId, setRulesGameId] = useState<string | null>(null);
 
   const setPendingGameId = (gameId: string) => {
     createGameIdRef.current = gameId;
@@ -330,7 +334,7 @@ export default function HomePage() {
               {card.moreInfo && (
                 <button
                   type="button"
-                  onClick={() => setRulesOpen(true)}
+                  onClick={() => setRulesGameId(card.id)}
                   className="absolute bottom-6 right-6 z-10 rounded-sm border border-white/20 bg-void/60 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-ink backdrop-blur-sm transition hover:border-crimson/40 hover:text-crimson-glow md:bottom-8 md:right-8"
                 >
                   More info
@@ -341,7 +345,11 @@ export default function HomePage() {
         </div>
       </motion.main>
 
-      <GameRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
+      <GameRulesModal
+        open={!!rulesGameId}
+        gameId={rulesGameId}
+        onClose={() => setRulesGameId(null)}
+      />
 
       <ProfileModal
         open={modal}

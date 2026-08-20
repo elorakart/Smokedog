@@ -2,14 +2,133 @@
 
 import { GlassPanel } from "@/components/ui/primitives";
 
+type RulesSection = { title: string; body: string };
+
+type GameRules = {
+  title: string;
+  sections: RulesSection[];
+};
+
+const RULES_BY_GAME: Record<string, GameRules> = {
+  "mafia-city": {
+    title: "Mafia City — how it works",
+    sections: [
+      {
+        title: "The setup",
+        body: "4–12 players get secret roles. Most are Town — they want to find and lynch the Mafia. Mafia want to outnumber Town without getting caught.",
+      },
+      {
+        title: "Night",
+        body: "Special roles act in secret. Mafia pick a target. Doctor and Bodyguard protect people. Detective investigates alignments. Vigilante can shoot. Blackmailer silences someone for the next day.",
+      },
+      {
+        title: "Day",
+        body: "Discuss first, then vote in the final 15 seconds. Majority lynches a suspect — or vote skip to spare everyone. Miss your vote twice and you die from AFK.",
+      },
+      {
+        title: "Voice & chat",
+        body: "Town chat and voice open during day discussion. Mafia get a private channel at night only. Dead players use the graveyard.",
+      },
+      {
+        title: "Winning",
+        body: "Town wins when all Mafia are eliminated. Mafia win when they strictly outnumber the remaining Town.",
+      },
+    ],
+  },
+  "spot-it": {
+    title: "Spot It — how it works",
+    sections: [
+      {
+        title: "The race",
+        body: "Every player sees their own card and one shared center card. Exactly one symbol matches. Spot it and claim before anyone else.",
+      },
+      {
+        title: "Claiming",
+        body: "Tap the matching symbol on your card. First valid claim takes the center card into your pile and flips a new center.",
+      },
+      {
+        title: "Tower",
+        body: "Keep stacking wins. The tallest tower at the end of the deck wins the match.",
+      },
+      {
+        title: "Chat",
+        body: "Chat stays open for table talk. No voice channel in Spot It — speed is the whole game.",
+      },
+    ],
+  },
+  "tic-tac-toe": {
+    title: "Tic-Tac-Toe — how it works",
+    sections: [
+      {
+        title: "The board",
+        body: "Classic 3×3 grid. You and one opponent take turns placing marks. Hover a cell to preview your mark before committing.",
+      },
+      {
+        title: "Turns",
+        body: "A turn timer keeps the duel moving. Miss your window and the turn may pass — stay ready.",
+      },
+      {
+        title: "Winning",
+        body: "First to three in a row — horizontal, vertical, or diagonal — wins. Full board with no line is a draw.",
+      },
+    ],
+  },
+  "connect-4": {
+    title: "Connect 4 — how it works",
+    sections: [
+      {
+        title: "The drop",
+        body: "Pick a column; your disc falls with gravity to the lowest open slot. Hover a column to preview the landing spot.",
+      },
+      {
+        title: "Turns",
+        body: "Players alternate drops under a turn timer. Plan ahead — blocking and traps matter as much as your own four.",
+      },
+      {
+        title: "Winning",
+        body: "Connect four discs in a row — horizontal, vertical, or diagonal. Fill the grid with no four and it's a draw.",
+      },
+    ],
+  },
+  "five-alive": {
+    title: "5 Alive — how it works",
+    sections: [
+      {
+        title: "The stack",
+        body: "Keep a running total under 21. Play numbers carefully — busts cost lives.",
+      },
+      {
+        title: "Bombs",
+        body: "Bombs demand an instant 0. Miss the window and you take the hit.",
+      },
+      {
+        title: "Status",
+        body: "5 Alive is under maintenance right now. Rules stay here so you know what returns.",
+      },
+    ],
+  },
+};
+
 export function GameRulesModal({
   open,
+  gameId,
   onClose,
 }: {
   open: boolean;
+  gameId: string | null;
   onClose: () => void;
 }) {
-  if (!open) return null;
+  if (!open || !gameId) return null;
+
+  const rules = RULES_BY_GAME[gameId] ?? {
+    title: "How it works",
+    sections: [
+      {
+        title: "Field note",
+        body: "Rules for this operation are still being drafted. Create a room and learn on the floor.",
+      },
+    ],
+  };
 
   return (
     <div
@@ -18,60 +137,31 @@ export function GameRulesModal({
       onClick={onClose}
     >
       <div onClick={(e) => e.stopPropagation()}>
-      <GlassPanel className="max-h-[85vh] w-full max-w-lg overflow-y-auto p-6 sm:p-8">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
-          Field manual
-        </p>
-        <h2 className="mt-2 font-display text-2xl font-bold">Mafia City — how it works</h2>
+        <GlassPanel className="max-h-[85vh] w-full max-w-lg overflow-y-auto p-6 sm:p-8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson-glow">
+            Field manual
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-bold">{rules.title}</h2>
 
-        <div className="mt-6 space-y-4 text-sm text-ink-steel">
-          <section>
-            <h3 className="font-display text-base font-semibold text-ink">The setup</h3>
-            <p className="mt-1">
-              4–12 players get secret roles. Most are Town — they want to find and
-              lynch the Mafia. Mafia want to outnumber Town without getting caught.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-display text-base font-semibold text-ink">Night</h3>
-            <p className="mt-1">
-              Special roles act in secret. Mafia pick a target. Doctor and Bodyguard
-              protect people. Detective investigates alignments. Vigilante can shoot.
-              Blackmailer silences someone for the next day.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-display text-base font-semibold text-ink">Day</h3>
-            <p className="mt-1">
-              Discuss first, then vote in the final 15 seconds. Majority lynches a
-              suspect — or vote skip to spare everyone. Miss your vote twice and you
-              die from AFK.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-display text-base font-semibold text-ink">Voice & chat</h3>
-            <p className="mt-1">
-              Town chat and voice open during day discussion. Mafia get a private
-              channel at night only. Dead players use the graveyard.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-display text-base font-semibold text-ink">Winning</h3>
-            <p className="mt-1">
-              Town wins when all Mafia are eliminated. Mafia win when they strictly
-              outnumber the remaining Town.
-            </p>
-          </section>
-        </div>
+          <div className="mt-6 space-y-4 text-sm text-ink-steel">
+            {rules.sections.map((section) => (
+              <section key={section.title}>
+                <h3 className="font-display text-base font-semibold text-ink">
+                  {section.title}
+                </h3>
+                <p className="mt-1">{section.body}</p>
+              </section>
+            ))}
+          </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest"
-        >
-          Close
-        </button>
-      </GlassPanel>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-6 w-full rounded-sm border border-white/10 py-3 font-mono text-xs uppercase tracking-widest"
+          >
+            Close
+          </button>
+        </GlassPanel>
       </div>
     </div>
   );
