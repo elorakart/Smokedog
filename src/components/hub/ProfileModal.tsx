@@ -243,11 +243,7 @@ export function ProfileModal({
                   else submitJoin();
                 }}
               >
-                {isPending
-                  ? pendingLabel ?? "Processing…"
-                  : mode === "create"
-                    ? "Open a room"
-                    : "Join with code"}
+                {isPending ? pendingLabel ?? "Processing…" : "Stamp in"}
               </PrimaryButton>
             </GlassPanel>          </motion.div>
         </motion.div>
