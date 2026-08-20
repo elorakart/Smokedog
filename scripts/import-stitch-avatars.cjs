@@ -1,64 +1,39 @@
 /**
- * Import Stitch light-dossier avatar sheets into public/avatars/avatar-XX.webp
+ * Import Stitch circular mugshots into public/avatars/avatar-XX.webp
  *
- * Sheets (from stitch project 7822900312632106893):
- *   light-01..03 → 3×2 grids (18 portraits)
- *   light-pair   → 2 large circular portraits (avatars 18–19)
+ * Source (stitch project 16728949405283163881):
+ *   public/avatars/stitch-import/circles/circle-00.png … circle-19.png
+ *   Each is a 512×512 square with one centered circular portrait on cream.
  *
  * Exports are circle-masked WebPs: opaque circular mugshot + transparent outside.
- * Do not leave parchment corners baked into the bitmap.
+ * Do not leave parchment/cream corners baked into the bitmap.
  */
 const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
 
-const importDir = path.join(__dirname, "../public/avatars/stitch-import");
+const importDir = path.join(__dirname, "../public/avatars/stitch-import/circles");
 const sourceDir = path.join(__dirname, "../public/avatars/source");
 const outDir = path.join(__dirname, "../public/avatars");
 const OUT_SIZE = 256;
+const EXPECTED = 20;
 
-/** 3×2 labeled grids: pad away dossier labels, keep full circular frame. */
-const GRID_SHEETS = [
-  { file: "light-01.png", cols: 3, rows: 2, labelPadTop: 0.10, labelPadBottom: 0.32 },
-  { file: "light-02.png", cols: 3, rows: 2, labelPadTop: 0.16, labelPadBottom: 0.28 },
-  { file: "light-03.png", cols: 3, rows: 2, labelPadTop: 0.10, labelPadBottom: 0.32 },
-];
-
-/**
- * Large pair on light-pair.png (dossier portfolio 19/20).
- * Centers/radii from ring detection; pad keeps the black frame intact.
- */
-const LIGHT_PAIR = {
-  file: "light-pair.png",
-  portraits: [
-    { cx: 354, cy: 268, rad: 136 },
-    { cx: 664, cy: 268, rad: 135 },
-  ],
-  /** Keep ring intact but stay above dossier labels under the circles. */
-  pad: 6,
-};
-
-function isParchment(r, g, b, corner) {
+function isCream(r, g, b, corner) {
   const dr = r - corner[0];
   const dg = g - corner[1];
   const db = b - corner[2];
   const dist = Math.sqrt(dr * dr + dg * dg + db * db);
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return dist < 42 && lum > 150;
+  return dist < 48 && lum > 140;
 }
 
 /**
  * Find outer radius of the ink ring by scanning inward from the four edge midpoints.
- * Returns radius in pixels from image center to outer edge of the circle art.
  */
 function detectCircleRadius(data, width, height) {
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
-  const corner = [
-    data[0],
-    data[1],
-    data[2],
-  ];
+  const corner = [data[0], data[1], data[2]];
 
   const sample = (x, y) => {
     const ix = Math.max(0, Math.min(width - 1, Math.round(x)));
@@ -73,8 +48,7 @@ function detectCircleRadius(data, width, height) {
       const y = sy + dy * step;
       const [r, g, b] = sample(x, y);
       const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      // Hit ink ring (or dark silhouette at the rim)
-      if (!isParchment(r, g, b, corner) && lum < 90) {
+      if (!isCream(r, g, b, corner) && lum < 100) {
         return Math.hypot(x - cx, y - cy);
       }
     }
@@ -90,42 +64,26 @@ function detectCircleRadius(data, width, height) {
   ].filter((v) => v != null && v > 8);
 
   if (hits.length === 0) {
-    return Math.min(width, height) / 2;
+    return Math.min(width, height) / 2 - 4;
   }
-  // Prefer the tightest reliable ring (exclude outliers from labels/seals)
   hits.sort((a, b) => a - b);
-  const median = hits[Math.floor(hits.length / 2)];
-  return median;
+  return hits[Math.floor(hits.length / 2)];
 }
 
-async function exportCircle(input, left, top, size, outPath) {
-  const meta = await sharp(input).metadata();
-  const w = meta.width ?? size;
-  const h = meta.height ?? size;
-  const safeLeft = Math.max(0, Math.min(left, w - 1));
-  const safeTop = Math.max(0, Math.min(top, h - 1));
-  const safeSize = Math.min(size, w - safeLeft, h - safeTop);
-
-  const { data, info } = await sharp(input)
-    .extract({ left: safeLeft, top: safeTop, width: safeSize, height: safeSize })
+async function exportCircle(inputPath, outPath) {
+  const { data, info } = await sharp(inputPath)
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
   const ringR = detectCircleRadius(data, info.width, info.height);
-  // Tight square around the circle, keep 2px of ring edge
   const pad = 2;
-  const cropR = Math.min(
-    ringR + pad,
-    info.width / 2,
-    info.height / 2
-  );
+  const cropR = Math.min(ringR + pad, info.width / 2, info.height / 2);
   const cropSize = Math.max(8, Math.floor(cropR * 2));
   const cropLeft = Math.max(0, Math.round((info.width - cropSize) / 2));
   const cropTop = Math.max(0, Math.round((info.height - cropSize) / 2));
   const finalSize = Math.min(cropSize, info.width - cropLeft, info.height - cropTop);
 
-  // Build tight RGBA crop then circular soft mask
   const cropped = Buffer.alloc(finalSize * finalSize * 4);
   for (let y = 0; y < finalSize; y++) {
     for (let x = 0; x < finalSize; x++) {
@@ -160,80 +118,58 @@ async function exportCircle(input, left, top, size, outPath) {
     .resize(OUT_SIZE, OUT_SIZE, { kernel: "lanczos3", fit: "fill" })
     .webp({ quality: 92, alphaQuality: 100 })
     .toFile(outPath);
+
+  return { ringR, finalSize };
 }
 
 async function main() {
+  if (!fs.existsSync(importDir)) {
+    throw new Error(`Missing import dir: ${importDir}`);
+  }
   fs.mkdirSync(outDir, { recursive: true });
   fs.mkdirSync(sourceDir, { recursive: true });
 
-  // Stage to avoid OneDrive locks on overwrite.
   const stageDir = path.join(outDir, `_stage_${Date.now()}`);
   fs.mkdirSync(stageDir, { recursive: true });
 
-  let idx = 0;
-  const staged = [];
-
-  for (const sheet of GRID_SHEETS) {
-    const srcPath = path.join(importDir, sheet.file);
+  const files = [];
+  for (let i = 0; i < EXPECTED; i++) {
+    const name = `circle-${String(i).padStart(2, "0")}.png`;
+    const srcPath = path.join(importDir, name);
     if (!fs.existsSync(srcPath)) {
-      throw new Error(`Missing sheet: ${srcPath}`);
+      throw new Error(`Missing circle: ${srcPath}`);
     }
-    fs.copyFileSync(srcPath, path.join(sourceDir, `stitch-${sheet.file}`));
+    files.push({ idx: i, srcPath, name });
+  }
 
-    const meta = await sharp(srcPath).metadata();
-    const w = meta.width ?? 1024;
-    const h = meta.height ?? 1024;
-    const cellW = Math.floor(w / sheet.cols);
-    const cellH = Math.floor(h / sheet.rows);
+  const staged = [];
+  for (const f of files) {
+    const destName = `avatar-${String(f.idx).padStart(2, "0")}.webp`;
+    const stagedPath = path.join(stageDir, destName);
+    const stats = await exportCircle(f.srcPath, stagedPath);
+    fs.copyFileSync(f.srcPath, path.join(sourceDir, `stitch-circle-${String(f.idx).padStart(2, "0")}.png`));
+    staged.push(destName);
+    console.log(
+      `${destName} ringR=${stats.ringR.toFixed(1)} crop=${stats.finalSize}`
+    );
+  }
 
-    for (let row = 0; row < sheet.rows; row++) {
-      for (let col = 0; col < sheet.cols; col++) {
-        const padTop = Math.floor(cellH * sheet.labelPadTop);
-        const padBottom = Math.floor(cellH * sheet.labelPadBottom);
-        const padX = Math.floor(cellW * 0.06);
-        const availW = cellW - padX * 2;
-        const availH = cellH - padTop - padBottom;
-        const size = Math.min(availW, availH);
-        const left = col * cellW + Math.floor((cellW - size) / 2);
-        const top = row * cellH + padTop + Math.floor((availH - size) / 2);
-        const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
-        const stagedPath = path.join(stageDir, name);
-        await exportCircle(srcPath, left, top, size, stagedPath);
-        staged.push(name);
-        idx++;
+  // Drop obsolete light-sheet sources from the previous project import.
+  for (const obsolete of [
+    "stitch-light-01.png",
+    "stitch-light-02.png",
+    "stitch-light-03.png",
+    "stitch-light-pair.png",
+    "stitch-dark-pair.png",
+  ]) {
+    const p = path.join(sourceDir, obsolete);
+    if (fs.existsSync(p)) {
+      try {
+        fs.unlinkSync(p);
+      } catch {
+        /* OneDrive lock */
       }
     }
-  }
-
-  const pairPath = path.join(importDir, LIGHT_PAIR.file);
-  if (!fs.existsSync(pairPath)) {
-    throw new Error(`Missing sheet: ${pairPath}`);
-  }
-  fs.copyFileSync(pairPath, path.join(sourceDir, "stitch-light-pair.png"));
-
-  for (const p of LIGHT_PAIR.portraits) {
-    const size = Math.round((p.rad + LIGHT_PAIR.pad) * 2);
-    const left = Math.round(p.cx - size / 2);
-    const top = Math.round(p.cy - size / 2);
-    const name = `avatar-${String(idx).padStart(2, "0")}.webp`;
-    const stagedPath = path.join(stageDir, name);
-    await exportCircle(pairPath, left, top, size, stagedPath);
-    staged.push(name);
-    idx++;
-  }
-
-  // Remove obsolete dark-pair source if present.
-  const darkSrc = path.join(sourceDir, "stitch-dark-pair.png");
-  if (fs.existsSync(darkSrc)) {
-    try {
-      fs.unlinkSync(darkSrc);
-    } catch {
-      /* ignore OneDrive lock */
-    }
-  }
-
-  if (idx !== 20) {
-    console.warn(`Expected 20 avatars, got ${idx}`);
   }
 
   for (const name of staged) {
@@ -247,7 +183,7 @@ async function main() {
     fs.writeFileSync(dest, fs.readFileSync(src));
   }
   fs.rmSync(stageDir, { recursive: true, force: true });
-  console.log(`Imported ${idx} Stitch light-dossier circle avatars`);
+  console.log(`Imported ${staged.length} Stitch circular mugshots (project 16728949405283163881)`);
 }
 
 main().catch((err) => {
