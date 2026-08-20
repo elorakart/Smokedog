@@ -3,84 +3,86 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+/**
+ * LEDGER — single direction pass
+ * Tokens from mockups 04 (dossier cover) + 05 (sealed envelopes)
+ * Ink black · manila · dried crimson · display serif + typewriter mono
+ */
+
+const INK = "#1a1510";
+const MANILA = "#E8DCC8";
+const PAPER = "#F4EBD8";
+const CRIMSON = "#8B1E1E";
+const CRIMSON_SOFT = "#C45C4A";
+const DESK = "#12100E";
+
 type Mockup = {
   id: string;
-  direction: string;
   title: string;
   screen: string;
-  vibe: string;
+  note: string;
 };
 
 const MOCKUPS: Mockup[] = [
   {
-    id: "01",
-    direction: "Signal Desk",
-    title: "Broadcast hub",
-    screen: "Homepage",
-    vibe: "Charcoal · signal red · phosphor",
-  },
-  {
-    id: "02",
-    direction: "Signal Desk",
-    title: "Open frequency",
-    screen: "Lobby browser",
-    vibe: "Scanline · room codes · mono",
-  },
-  {
-    id: "03",
-    direction: "Signal Desk",
-    title: "Night roster",
-    screen: "In-game night",
-    vibe: "Ticker strip · channel rack",
-  },
-  {
-    id: "04",
-    direction: "Ledger",
+    id: "L01",
     title: "Dossier cover",
     screen: "Homepage",
-    vibe: "Ink · manila · dried crimson",
+    note: "Brand-first seal · single primary CTA",
   },
   {
-    id: "05",
-    direction: "Ledger",
-    title: "Sealed envelopes",
+    id: "L02",
+    title: "Open case files",
+    screen: "Lobby browser",
+    note: "Index of live rooms below the fold",
+  },
+  {
+    id: "L03",
+    title: "Stamp your name",
+    screen: "Create / join modal",
+    note: "Secondary join as stamped form field",
+  },
+  {
+    id: "L04",
+    title: "Waiting room",
+    screen: "Pre-game lobby",
+    note: "Roster as signed dossier pages",
+  },
+  {
+    id: "L05",
+    title: "Sealed envelope",
     screen: "Role reveal",
-    vibe: "Stamp · typewriter · paper",
+    note: "Stamp impress · typewriter copy",
   },
   {
-    id: "06",
-    direction: "Ledger",
+    id: "L06",
+    title: "Night dossier",
+    screen: "Night phase",
+    note: "Tabs · action on paper · voice as channel strip",
+  },
+  {
+    id: "L07",
+    title: "Day hearing",
+    screen: "Day discussion",
+    note: "Portraits as file photos · sticky notes off",
+  },
+  {
+    id: "L08",
+    title: "Verdict ballot",
+    screen: "Vote phase",
+    note: "Lynch as stamped ballot · skip as spare stamp",
+  },
+  {
+    id: "L09",
     title: "City chronicle",
     screen: "Game over",
-    vibe: "Case file · page turn",
+    note: "Emotional center · typed log",
   },
   {
-    id: "07",
-    direction: "Neon Alley",
-    title: "Neon lockup",
-    screen: "Homepage",
-    vibe: "Teal night · magenta · amber",
-  },
-  {
-    id: "08",
-    direction: "Neon Alley",
-    title: "Alley portraits",
-    screen: "In-game day",
-    vibe: "Sticky chat · rain shimmer",
-  },
-  {
-    id: "09",
-    direction: "Arena Grid",
-    title: "Arena title",
-    screen: "Homepage",
-    vibe: "Void · ice · crimson accent",
-  },
-  {
-    id: "10",
-    direction: "Arena Grid",
-    title: "Scorebug HUD",
-    screen: "In-game vote",
-    vibe: "Whistle · timer roll · comms",
+    id: "L10",
+    title: "Field manuals",
+    screen: "More info / rules",
+    note: "Same paper system as reveal",
   },
 ];
 
@@ -106,159 +108,264 @@ function Frame({
   );
 }
 
-function SignalDeskHome() {
+function PaperGrain({ dark }: { dark?: boolean }) {
   return (
-    <Frame label="01 · signal-desk / home">
-      <div className="absolute inset-0">
-        <img
-          src="https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1600&q=80"
-          alt=""
-          className="h-full w-full object-cover opacity-55"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,120,0.03)_1px,transparent_1px)] bg-[size:100%_4px]" />
-        <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12">
-          <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#7CFFB2]">
-            SIGNAL DESK // LIVE
-          </p>
-          <h3 className="mt-3 font-[family-name:var(--font-montserrat)] text-4xl font-extrabold tracking-tight text-white md:text-6xl">
-            SMOKEDOG
-          </h3>
-          <p className="mt-3 max-w-md text-sm text-white/70">
-            Private rooms. Public blood.
-          </p>
-          <div className="mt-6 flex gap-3">
-            <span className="bg-[#E61919] px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-white">
-              Create
-            </span>
-            <span className="border border-white/30 px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-white/80">
-              Join
-            </span>
-          </div>
-        </div>
-      </div>
-    </Frame>
+    <div
+      className="pointer-events-none absolute inset-0 opacity-[0.12]"
+      style={{
+        backgroundImage: dark
+          ? "url(https://images.unsplash.com/photo-1585504198199-20277593b94f?auto=format&fit=crop&w=1200&q=60)"
+          : "radial-gradient(circle at 20% 20%, rgba(26,21,16,0.08), transparent 40%), radial-gradient(circle at 80% 70%, rgba(139,30,30,0.06), transparent 35%)",
+        backgroundSize: "cover",
+        filter: dark ? "grayscale(0.7) contrast(1.15)" : undefined,
+      }}
+    />
   );
 }
 
-function SignalDeskLobby() {
+function Stamp({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <Frame label="02 · signal-desk / lobbies">
-      <div className="absolute inset-0 bg-[#0B0E12] p-6 md:p-8">
-        <div className="flex items-end justify-between border-b border-[#7CFFB2]/20 pb-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#7CFFB2]">
-              Global frequency
-            </p>
-            <h3 className="mt-1 text-2xl font-bold text-white">Open parties</h3>
-          </div>
-          <span className="border border-[#E61919]/50 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#E61919]">
-            Quick join
-          </span>
-        </div>
-        <div className="mt-4 space-y-2">
-          {["K7M2", "X9QP", "R4NL"].map((code, i) => (
-            <div
-              key={code}
-              className="flex items-center justify-between border border-white/10 bg-white/[0.03] px-4 py-3"
-              style={{ transform: `translateX(${i * 4}px)` }}
-            >
-              <div className="flex items-center gap-3">
-                <span className="size-8 rounded-full bg-white/10" />
-                <div>
-                  <p className="font-mono text-sm tracking-[0.2em] text-[#E61919]">
-                    {code}
-                  </p>
-                  <p className="text-xs text-white/50">Mafia City · 6/10</p>
-                </div>
-              </div>
-              <span className="font-mono text-[9px] uppercase text-[#7CFFB2]">
-                Live
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function SignalDeskNight() {
-  return (
-    <Frame label="03 · signal-desk / night">
-      <div className="absolute inset-0 flex flex-col bg-[#060910]">
-        <div className="flex items-center justify-between border-b border-white/10 bg-black/60 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em]">
-          <span className="text-[#7CFFB2]">NIGHT 2</span>
-          <span className="animate-pulse text-[#E61919]">01:24</span>
-          <span className="text-white/40">MAFIA CHANNEL OPEN</span>
-        </div>
-        <div className="grid flex-1 grid-cols-[1fr_140px]">
-          <div className="grid grid-cols-4 gap-2 p-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex flex-col items-center rounded-sm border border-white/10 bg-white/[0.03] p-2"
-              >
-                <span className="aspect-square w-full rounded-full bg-gradient-to-b from-white/20 to-white/5" />
-                <span className="mt-1 font-mono text-[8px] text-white/50">
-                  OP_{i + 1}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="border-l border-white/10 bg-black/40 p-3">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-[#7CFFB2]">
-              Channel rack
-            </p>
-            {["Viper", "You", "Crimson"].map((n) => (
-              <div
-                key={n}
-                className="mt-2 flex items-center gap-2 rounded-sm border border-[#7CFFB2]/30 bg-[#7CFFB2]/10 px-2 py-1.5"
-              >
-                <span className="size-5 rounded-full bg-white/20" />
-                <span className="font-mono text-[9px] text-white">{n}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </Frame>
+    <span
+      className={`inline-block rotate-[-8deg] border-2 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] ${className}`}
+      style={{ borderColor: CRIMSON, color: CRIMSON }}
+    >
+      {children}
+    </span>
   );
 }
 
 function LedgerHome() {
   return (
-    <Frame label="04 · ledger / home">
-      <div className="absolute inset-0 bg-[#1a1510]">
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              "url(https://images.unsplash.com/photo-1585504198199-20277593b94f?auto=format&fit=crop&w=1600&q=80)",
-            backgroundSize: "cover",
-            filter: "grayscale(0.6) contrast(1.1)",
-          }}
-        />
-        <div className="absolute inset-0 bg-[#1a1510]/75" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-          <div className="border border-[#8B1E1E] bg-[#E8DCC8]/95 px-10 py-12 text-[#1a1510] shadow-2xl">
+    <Frame label="L01 · ledger / homepage">
+      <div className="absolute inset-0" style={{ background: INK }}>
+        <PaperGrain dark />
+        <div className="absolute inset-0" style={{ background: `${INK}cc` }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center md:p-10">
+          <div
+            className="relative w-full max-w-md border px-8 py-10 shadow-2xl md:px-12 md:py-12"
+            style={{ background: MANILA, borderColor: CRIMSON, color: INK }}
+          >
+            <Stamp className="absolute -right-2 -top-3 bg-[#F4EBD8]/90">
+              Sealed
+            </Stamp>
             <p className="font-mono text-[10px] uppercase tracking-[0.4em]">
-              Case file // sealed
+              Case file // SMOKEDOG
             </p>
-            <h3 className="mt-4 font-serif text-5xl font-bold tracking-tight">
+            <h3 className="mt-4 font-serif text-5xl font-bold tracking-tight md:text-6xl">
               SMOKEDOG
             </h3>
-            <div className="mx-auto mt-4 h-px w-24 bg-[#8B1E1E]" />
-            <p className="mt-4 max-w-xs text-sm text-[#1a1510]/70">
+            <div
+              className="mx-auto mt-4 h-px w-24"
+              style={{ background: CRIMSON }}
+            />
+            <p className="mt-4 max-w-xs mx-auto text-sm leading-relaxed opacity-70">
               Open a room. Stamp your name. Trust no dossier.
             </p>
-            <span className="mt-6 inline-block bg-[#8B1E1E] px-5 py-2 font-mono text-[10px] uppercase tracking-widest text-[#E8DCC8]">
+            <span
+              className="mt-7 inline-block px-6 py-2.5 font-mono text-[10px] uppercase tracking-widest"
+              style={{ background: CRIMSON, color: MANILA }}
+            >
               Open a room
             </span>
-            <p className="mt-3 font-mono text-[9px] uppercase tracking-widest text-[#1a1510]/50">
-              Join with code
+            <p className="mt-4 font-mono text-[9px] uppercase tracking-[0.28em] opacity-45">
+              Join with code ↓
             </p>
           </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerLobbies() {
+  return (
+    <Frame label="L02 · ledger / lobbies">
+      <div className="absolute inset-0 flex" style={{ background: DESK }}>
+        <div className="flex w-full flex-col p-5 md:p-7">
+          <div className="flex items-end justify-between border-b pb-3" style={{ borderColor: `${MANILA}33` }}>
+            <div>
+              <p
+                className="font-mono text-[10px] uppercase tracking-[0.3em]"
+                style={{ color: CRIMSON_SOFT }}
+              >
+                Index
+              </p>
+              <h3
+                className="mt-1 font-serif text-2xl font-bold"
+                style={{ color: MANILA }}
+              >
+                Open case files
+              </h3>
+            </div>
+            <span
+              className="border px-3 py-1.5 font-mono text-[9px] uppercase tracking-widest"
+              style={{ borderColor: CRIMSON, color: CRIMSON_SOFT }}
+            >
+              Quick stamp
+            </span>
+          </div>
+          <div className="mt-4 space-y-2">
+            {[
+              { code: "K7M2", host: "Viper", fill: "6/10" },
+              { code: "X9QP", host: "Nova", fill: "4/12" },
+              { code: "R4NL", host: "TheDon", fill: "8/10" },
+            ].map((row) => (
+              <div
+                key={row.code}
+                className="flex items-center justify-between border px-4 py-3"
+                style={{
+                  background: `${MANILA}0d`,
+                  borderColor: `${MANILA}22`,
+                  color: MANILA,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className="font-mono text-sm tracking-[0.25em]"
+                    style={{ color: CRIMSON_SOFT }}
+                  >
+                    {row.code}
+                  </span>
+                  <span className="text-xs opacity-55">
+                    Mafia City · {row.host} · {row.fill}
+                  </span>
+                </div>
+                <span className="font-mono text-[9px] uppercase tracking-widest opacity-50">
+                  Enter
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerModal() {
+  return (
+    <Frame label="L03 · ledger / create-join">
+      <div className="absolute inset-0" style={{ background: `${INK}e6` }}>
+        <PaperGrain dark />
+        <div className="absolute inset-0 flex items-center justify-center p-6">
+          <div
+            className="w-full max-w-sm border-2 p-6 shadow-2xl"
+            style={{ background: PAPER, borderColor: INK, color: INK }}
+          >
+            <p
+              className="font-mono text-[10px] uppercase tracking-[0.3em]"
+              style={{ color: CRIMSON }}
+            >
+              Intake form
+            </p>
+            <h3 className="mt-2 font-serif text-2xl font-bold">Stamp your name</h3>
+            <div className="mt-5 space-y-3">
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-widest opacity-50">
+                  Operator name
+                </p>
+                <div
+                  className="mt-1 border-b border-dashed py-2 font-mono text-sm"
+                  style={{ borderColor: `${INK}55` }}
+                >
+                  Balmeek
+                </div>
+              </div>
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-widest opacity-50">
+                  Room code (join)
+                </p>
+                <div
+                  className="mt-1 border-b border-dashed py-2 font-mono text-sm tracking-[0.35em]"
+                  style={{ borderColor: `${INK}55` }}
+                >
+                  ____
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <span
+                className="flex-1 py-2.5 text-center font-mono text-[10px] uppercase tracking-widest"
+                style={{ background: CRIMSON, color: MANILA }}
+              >
+                Open a room
+              </span>
+              <span
+                className="flex-1 border py-2.5 text-center font-mono text-[10px] uppercase tracking-widest"
+                style={{ borderColor: INK }}
+              >
+                Join with code
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerWaiting() {
+  const names = ["Viper", "You", "Nova", "Crimson", "Owl", "Rex"];
+  return (
+    <Frame label="L04 · ledger / lobby">
+      <div className="absolute inset-0 flex flex-col" style={{ background: DESK }}>
+        <div
+          className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: `${MANILA}22` }}
+        >
+          <div>
+            <p
+              className="font-mono text-[9px] uppercase tracking-[0.3em]"
+              style={{ color: CRIMSON_SOFT }}
+            >
+              Room K7M2 · Mafia City
+            </p>
+            <h3 className="font-serif text-xl font-bold" style={{ color: MANILA }}>
+              Waiting room
+            </h3>
+          </div>
+          <span
+            className="px-3 py-1.5 font-mono text-[9px] uppercase tracking-widest"
+            style={{ background: CRIMSON, color: MANILA }}
+          >
+            Start case
+          </span>
+        </div>
+        <div className="grid flex-1 grid-cols-3 gap-2 p-4 md:grid-cols-6">
+          {names.map((n, i) => (
+            <div
+              key={n}
+              className="flex flex-col items-center border p-2"
+              style={{
+                background: PAPER,
+                borderColor: INK,
+                color: INK,
+                transform: `rotate(${i % 2 === 0 ? -1 : 1}deg)`,
+              }}
+            >
+              <div
+                className="aspect-square w-full rounded-sm"
+                style={{ background: `${INK}22` }}
+              />
+              <p className="mt-1 font-mono text-[9px] uppercase tracking-wide">
+                {n}
+              </p>
+              {i === 0 && (
+                <span
+                  className="mt-0.5 font-mono text-[7px] uppercase"
+                  style={{ color: CRIMSON }}
+                >
+                  Host
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </Frame>
@@ -267,24 +374,34 @@ function LedgerHome() {
 
 function LedgerReveal() {
   return (
-    <Frame label="05 · ledger / reveal">
-      <div className="absolute inset-0 flex items-center justify-center bg-[#E8DCC8] p-8">
-        <div className="relative w-full max-w-sm border-2 border-[#1a1510] bg-[#F4EBD8] p-8">
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#8B1E1E]">
+    <Frame label="L05 · ledger / role-reveal">
+      <div
+        className="absolute inset-0 flex items-center justify-center p-6"
+        style={{ background: MANILA }}
+      >
+        <div
+          className="relative w-full max-w-sm border-2 p-8"
+          style={{ background: PAPER, borderColor: INK, color: INK }}
+        >
+          <p
+            className="font-mono text-[10px] uppercase tracking-[0.3em]"
+            style={{ color: CRIMSON }}
+          >
             Envelope sealed
           </p>
-          <h3 className="mt-6 font-serif text-4xl font-bold text-[#1a1510]">
-            Detective
-          </h3>
-          <p className="mt-3 text-sm leading-relaxed text-[#1a1510]/70">
+          <h3 className="mt-6 font-serif text-4xl font-bold">Detective</h3>
+          <p className="mt-3 text-sm leading-relaxed opacity-70">
             Investigate one operator each night. Learn town or mafia — never the
             role.
           </p>
-          <div className="absolute -right-3 -top-3 rotate-12 border-2 border-[#8B1E1E] px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-[#8B1E1E]">
-            Town
+          <div className="absolute -right-3 -top-3">
+            <Stamp>Town</Stamp>
           </div>
-          <div className="mt-8 h-1 w-full bg-[#1a1510]/10" />
-          <p className="mt-3 font-mono text-[9px] uppercase text-[#1a1510]/40">
+          <div
+            className="mt-8 h-1 w-full"
+            style={{ background: `${INK}14` }}
+          />
+          <p className="mt-3 font-mono text-[9px] uppercase opacity-40">
             Reveal ends in 0:14
           </p>
         </div>
@@ -293,189 +410,341 @@ function LedgerReveal() {
   );
 }
 
+function LedgerNight() {
+  return (
+    <Frame label="L06 · ledger / night">
+      <div className="absolute inset-0 flex flex-col" style={{ background: DESK }}>
+        <div
+          className="flex items-center gap-4 border-b px-4 py-2"
+          style={{ borderColor: `${MANILA}22` }}
+        >
+          {["Night", "Day"].map((tab, i) => (
+            <span
+              key={tab}
+              className="font-mono text-[10px] uppercase tracking-[0.25em]"
+              style={{
+                color: i === 0 ? MANILA : `${MANILA}55`,
+                borderBottom: i === 0 ? `2px solid ${CRIMSON}` : "none",
+                paddingBottom: 4,
+              }}
+            >
+              {tab}
+            </span>
+          ))}
+          <span
+            className="ml-auto font-mono text-xs tracking-widest"
+            style={{ color: CRIMSON_SOFT }}
+          >
+            01:24
+          </span>
+        </div>
+        <div className="grid flex-1 grid-cols-[1fr_130px]">
+          <div className="p-4">
+            <p
+              className="font-mono text-[9px] uppercase tracking-widest"
+              style={{ color: CRIMSON_SOFT }}
+            >
+              Select a target — Mafia kill
+            </p>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="border p-1.5 text-center"
+                  style={{
+                    background: i === 3 ? PAPER : `${MANILA}10`,
+                    borderColor: i === 3 ? CRIMSON : `${MANILA}22`,
+                    color: i === 3 ? INK : MANILA,
+                  }}
+                >
+                  <div
+                    className="mx-auto aspect-square w-10 rounded-sm"
+                    style={{ background: `${INK}33` }}
+                  />
+                  <p className="mt-1 font-mono text-[8px]">OP_{i + 1}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            className="border-l p-3"
+            style={{ borderColor: `${MANILA}22`, background: `${INK}` }}
+          >
+            <p
+              className="font-mono text-[8px] uppercase tracking-widest"
+              style={{ color: CRIMSON_SOFT }}
+            >
+              Mafia channel
+            </p>
+            {["Viper", "You", "Don"].map((n) => (
+              <div
+                key={n}
+                className="mt-2 flex items-center gap-2 border px-2 py-1"
+                style={{ borderColor: `${MANILA}22`, color: MANILA }}
+              >
+                <span
+                  className="size-4 rounded-sm"
+                  style={{ background: `${MANILA}33` }}
+                />
+                <span className="font-mono text-[8px]">{n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerDay() {
+  return (
+    <Frame label="L07 · ledger / day">
+      <div className="absolute inset-0 flex flex-col" style={{ background: DESK }}>
+        <div
+          className="flex items-center justify-between border-b px-4 py-2"
+          style={{ borderColor: `${MANILA}22` }}
+        >
+          <p className="font-serif text-lg font-bold" style={{ color: MANILA }}>
+            Day 2 · Hearing
+          </p>
+          <p className="font-mono text-[10px]" style={{ color: CRIMSON_SOFT }}>
+            Discuss · vote opens in 0:42
+          </p>
+        </div>
+        <div className="grid flex-1 grid-cols-[1fr_150px]">
+          <div className="grid grid-cols-3 gap-3 p-4 md:grid-cols-4">
+            {["Viper", "You", "Nova", "Owl", "Rex", "Ash"].map((n, i) => (
+              <div
+                key={n}
+                className="border p-2 text-center"
+                style={{
+                  background: PAPER,
+                  borderColor: INK,
+                  color: INK,
+                  opacity: i === 5 ? 0.35 : 1,
+                }}
+              >
+                <div
+                  className="mx-auto aspect-square w-12 rounded-sm"
+                  style={{ background: `${INK}18` }}
+                />
+                <p className="mt-1 font-mono text-[9px] uppercase">{n}</p>
+                {i === 5 && (
+                  <p className="font-mono text-[7px]" style={{ color: CRIMSON }}>
+                    Dead
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          <div
+            className="space-y-2 border-l p-3"
+            style={{
+              borderColor: `${MANILA}22`,
+              background: `${MANILA}08`,
+            }}
+          >
+            <p
+              className="font-mono text-[8px] uppercase tracking-widest"
+              style={{ color: CRIMSON_SOFT }}
+            >
+              Town wire
+            </p>
+            {[
+              "Viper was quiet last night.",
+              "Check Nova.",
+              "I am Doctor — trust.",
+            ].map((t) => (
+              <div
+                key={t}
+                className="border px-2 py-1.5 font-mono text-[9px] leading-snug"
+                style={{
+                  background: PAPER,
+                  borderColor: INK,
+                  color: INK,
+                }}
+              >
+                {t}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerVote() {
+  return (
+    <Frame label="L08 · ledger / vote">
+      <div className="absolute inset-0 flex flex-col" style={{ background: DESK }}>
+        <div
+          className="flex items-center justify-between border-b px-4 py-2"
+          style={{ borderColor: CRIMSON, background: `${CRIMSON}22` }}
+        >
+          <p
+            className="font-mono text-[10px] uppercase tracking-[0.3em]"
+            style={{ color: MANILA }}
+          >
+            Verdict · ballot open
+          </p>
+          <div className="flex items-center gap-3">
+            <span
+              className="font-mono text-sm font-bold tracking-widest"
+              style={{ color: CRIMSON_SOFT }}
+            >
+              0:11
+            </span>
+            <span
+              className="border px-2 py-1 font-mono text-[8px] uppercase tracking-widest"
+              style={{ borderColor: MANILA, color: MANILA }}
+            >
+              Host · skip timer
+            </span>
+          </div>
+        </div>
+        <div className="grid flex-1 grid-cols-4 gap-2 p-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="relative border p-2 text-center"
+              style={{
+                background: i === 2 ? PAPER : `${MANILA}0d`,
+                borderColor: i === 2 ? CRIMSON : `${MANILA}22`,
+                color: i === 2 ? INK : MANILA,
+              }}
+            >
+              {i === 2 && (
+                <div className="absolute -right-1 -top-1">
+                  <Stamp>Lynched?</Stamp>
+                </div>
+              )}
+              <div
+                className="mx-auto aspect-square w-10 rounded-sm"
+                style={{ background: `${INK}25` }}
+              />
+              <p className="mt-1 font-mono text-[8px]">P{i + 1}</p>
+              <p className="font-mono text-[8px] opacity-50">{i === 2 ? "3 votes" : "—"}</p>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 pb-3">
+          <span
+            className="inline-block border px-4 py-2 font-mono text-[9px] uppercase tracking-widest"
+            style={{ borderColor: `${MANILA}44`, color: `${MANILA}99` }}
+          >
+            Stamp skip — spare all
+          </span>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
 function LedgerChronicle() {
   return (
-    <Frame label="06 · ledger / gameover">
-      <div className="absolute inset-0 bg-[#12100E] p-6 md:p-8">
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#C45C4A]">
+    <Frame label="L09 · ledger / game-over">
+      <div className="absolute inset-0 p-5 md:p-8" style={{ background: DESK }}>
+        <p
+          className="font-mono text-[10px] uppercase tracking-[0.3em]"
+          style={{ color: CRIMSON_SOFT }}
+        >
           Debrief
         </p>
-        <h3 className="mt-2 font-serif text-3xl font-bold text-[#E8DCC8]">
+        <h3
+          className="mt-2 font-serif text-3xl font-bold md:text-4xl"
+          style={{ color: MANILA }}
+        >
           The Town holds
         </h3>
-        <div className="mt-6 border border-[#E8DCC8]/20 bg-[#E8DCC8]/5 p-4">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[#C45C4A]">
+        <div
+          className="mt-5 border p-4"
+          style={{ background: `${MANILA}0a`, borderColor: `${MANILA}28` }}
+        >
+          <p
+            className="font-mono text-[10px] uppercase tracking-widest"
+            style={{ color: CRIMSON_SOFT }}
+          >
             City chronicle
           </p>
-          <ul className="mt-3 space-y-2 font-mono text-xs text-[#E8DCC8]/80">
-            <li>NIGHT 1 — Crimson was blackmailed by Nova with Blackmailer role.</li>
-            <li>NIGHT 1 — Viper was eliminated overnight by TheDon with Mafia Boss role.</li>
+          <ul
+            className="mt-3 space-y-2 font-mono text-xs leading-relaxed"
+            style={{ color: `${MANILA}cc` }}
+          >
+            <li>
+              NIGHT 1 — Crimson was blackmailed by Nova with Blackmailer role.
+            </li>
+            <li>
+              NIGHT 1 — Viper was eliminated overnight by TheDon with Mafia Boss
+              role.
+            </li>
             <li>DAY 1 — No majority — no lynch.</li>
             <li>DAY 2 — NightOwl was lynched.</li>
           </ul>
         </div>
-      </div>
-    </Frame>
-  );
-}
-
-function NeonHome() {
-  return (
-    <Frame label="07 · neon-alley / home">
-      <div className="absolute inset-0">
-        <img
-          src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80"
-          alt=""
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-[#041A22]/70" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-          <h3
-            className="font-[family-name:var(--font-montserrat)] text-5xl font-extrabold tracking-[0.08em] text-[#FF2D95] md:text-7xl"
-            style={{ textShadow: "0 0 24px rgba(255,45,149,0.55)" }}
+        <div className="mt-4 flex gap-2">
+          <span
+            className="px-4 py-2 font-mono text-[9px] uppercase tracking-widest"
+            style={{ background: CRIMSON, color: MANILA }}
           >
-            SMOKEDOG
-          </h3>
-          <p className="mt-4 text-sm text-[#F5C542]/90">
-            Wet asphalt. Hot signage. Cold blood.
-          </p>
-          <div className="mt-8 flex gap-3">
-            <span className="bg-[#FF2D95] px-5 py-2.5 font-mono text-[10px] uppercase tracking-widest text-white">
-              Create party
-            </span>
-            <span className="border border-[#F5C542]/60 px-5 py-2.5 font-mono text-[10px] uppercase tracking-widest text-[#F5C542]">
-              Join
-            </span>
-          </div>
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function NeonInGame() {
-  return (
-    <Frame label="08 · neon-alley / day">
-      <div className="absolute inset-0 grid grid-cols-[1fr_160px] bg-[#061820]">
-        <div className="p-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#F5C542]">
-            Day 2 · discussion
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="text-center">
-                <div
-                  className="mx-auto aspect-square w-16 rounded-full border-2 border-[#FF2D95]/50 bg-white/10"
-                  style={{ boxShadow: "0 0 12px rgba(255,45,149,0.25)" }}
-                />
-                <p className="mt-1 font-mono text-[9px] text-white/70">Face {i + 1}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-2 border-l border-[#F5C542]/20 bg-black/30 p-3">
-          <p className="font-mono text-[9px] uppercase text-[#F5C542]">Sticky chat</p>
-          {["Who voted Viper?", "Doctor quiet…", "Check NightOwl"].map((t) => (
-            <div
-              key={t}
-              className="rotate-[-1deg] bg-[#F5C542] px-2 py-1.5 text-[10px] text-[#061820]"
-            >
-              {t}
-            </div>
-          ))}
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function ArenaHome() {
-  return (
-    <Frame label="09 · arena-grid / home">
-      <div className="absolute inset-0 bg-black">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 50% 80%, #333 0%, transparent 55%), repeating-linear-gradient(90deg, #111 0 2px, transparent 2px 40px), repeating-linear-gradient(0deg, #111 0 2px, transparent 2px 40px)",
-          }}
-        />
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.5em] text-white/40">
-            Arena
-          </p>
-          <h3 className="mt-2 font-[family-name:var(--font-montserrat)] text-5xl font-extrabold uppercase tracking-tight text-white md:text-6xl">
-            SMOKEDOG
-          </h3>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <span className="bg-white px-5 py-2.5 font-mono text-[10px] uppercase tracking-widest text-black">
-              Create match
-            </span>
-            <span className="border border-white/40 px-5 py-2.5 font-mono text-[10px] uppercase tracking-widest text-white">
-              Spectate lobbies
-            </span>
-          </div>
-          <p className="mt-10 font-mono text-[9px] uppercase tracking-[0.3em] text-white/30">
-            Lobbies below the fold ↓
-          </p>
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function ArenaHud() {
-  return (
-    <Frame label="10 · arena-grid / vote">
-      <div className="absolute inset-0 bg-[#050505]">
-        <div className="flex items-center justify-between border-b border-white/10 bg-black px-4 py-2">
-          <span className="font-[family-name:var(--font-montserrat)] text-sm font-bold uppercase tracking-wider text-white">
-            SMOKEDOG
+            Rematch
           </span>
-          <div className="flex items-center gap-4 font-mono text-xs">
-            <span className="text-white/50">VOTE 3</span>
-            <span className="rounded-sm bg-[#E61919] px-2 py-0.5 font-bold text-white">
-              0:11
-            </span>
-            <span className="border border-white/30 px-2 py-0.5 text-[9px] uppercase tracking-widest text-white/70">
-              Skip timer
-            </span>
-          </div>
+          <span
+            className="border px-4 py-2 font-mono text-[9px] uppercase tracking-widest"
+            style={{ borderColor: `${MANILA}40`, color: MANILA }}
+          >
+            Leave room
+          </span>
         </div>
-        <div className="grid grid-cols-[1fr_150px] gap-3 p-4">
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className={`rounded-sm border p-2 ${
-                  i === 2
-                    ? "scale-105 border-[#E61919] bg-[#E61919]/10"
-                    : "border-white/10 bg-white/[0.03]"
-                }`}
-              >
-                <div className="aspect-square rounded-full bg-white/15" />
-                <p className="mt-1 text-center font-mono text-[8px] text-white/60">
-                  P{i + 1}
-                </p>
-              </div>
-            ))}
+      </div>
+    </Frame>
+  );
+}
+
+function LedgerRules() {
+  return (
+    <Frame label="L10 · ledger / more-info">
+      <div className="absolute inset-0 flex items-center justify-center p-6" style={{ background: `${INK}e8` }}>
+        <div
+          className="w-full max-w-md border-2 p-6"
+          style={{ background: PAPER, borderColor: INK, color: INK }}
+        >
+          <p
+            className="font-mono text-[10px] uppercase tracking-[0.3em]"
+            style={{ color: CRIMSON }}
+          >
+            Field manual
+          </p>
+          <h3 className="mt-2 font-serif text-2xl font-bold">
+            Mafia City — how it works
+          </h3>
+          <div className="mt-4 space-y-3 text-sm opacity-75">
+            <div>
+              <p className="font-serif font-semibold opacity-100">Night</p>
+              <p className="mt-0.5">
+                Roles act in secret. Mafia kill. Doctor protects. Detective
+                investigates.
+              </p>
+            </div>
+            <div>
+              <p className="font-serif font-semibold opacity-100">Day</p>
+              <p className="mt-0.5">
+                Discuss, then vote. Majority lynches — or stamp skip to spare.
+              </p>
+            </div>
+            <div>
+              <p className="font-serif font-semibold opacity-100">Winning</p>
+              <p className="mt-0.5">
+                Town clears all Mafia. Mafia win by outnumbering Town.
+              </p>
+            </div>
           </div>
-          <div className="border border-white/10 bg-black/50 p-3">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-white/40">
-              Comms
-            </p>
-            {["Host", "Balmeek", "Viper"].map((n, i) => (
-              <div
-                key={n}
-                className={`mt-2 flex items-center gap-2 rounded-sm px-2 py-1 ${
-                  i === 1 ? "ring-1 ring-emerald-400/60" : ""
-                }`}
-              >
-                <span className="size-5 rounded-full bg-white/20" />
-                <span className="font-mono text-[9px] text-white">{n}</span>
-              </div>
-            ))}
-          </div>
+          <span
+            className="mt-5 inline-block w-full border py-2.5 text-center font-mono text-[10px] uppercase tracking-widest"
+            style={{ borderColor: INK }}
+          >
+            Close dossier
+          </span>
         </div>
       </div>
     </Frame>
@@ -483,16 +752,16 @@ function ArenaHud() {
 }
 
 const RENDERERS: Record<string, () => React.ReactElement> = {
-  "01": SignalDeskHome,
-  "02": SignalDeskLobby,
-  "03": SignalDeskNight,
-  "04": LedgerHome,
-  "05": LedgerReveal,
-  "06": LedgerChronicle,
-  "07": NeonHome,
-  "08": NeonInGame,
-  "09": ArenaHome,
-  "10": ArenaHud,
+  L01: LedgerHome,
+  L02: LedgerLobbies,
+  L03: LedgerModal,
+  L04: LedgerWaiting,
+  L05: LedgerReveal,
+  L06: LedgerNight,
+  L07: LedgerDay,
+  L08: LedgerVote,
+  L09: LedgerChronicle,
+  L10: LedgerRules,
 };
 
 export default function MockupsPage() {
@@ -503,20 +772,24 @@ export default function MockupsPage() {
           <div>
             <Link
               href="/"
-              className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#E61919]"
+              className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#C45C4A]"
             >
               ← SMOKEDOG Arena
             </Link>
-            <h1 className="mt-3 font-[family-name:var(--font-montserrat)] text-3xl font-extrabold tracking-tight md:text-4xl">
-              Redesign mockups
+            <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight md:text-4xl">
+              Ledger — full site
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-white/55">
-              Ten comps across Signal Desk, Ledger, Neon Alley, and Arena Grid.
-              Brand-first heroes. No purple defaults.
+            <p className="mt-2 max-w-2xl text-sm text-white/55">
+              One direction built from{" "}
+              <span className="text-[#E8DCC8]">04 Dossier cover</span> and{" "}
+              <span className="text-[#E8DCC8]">05 Sealed envelopes</span>. Ink ·
+              manila · dried crimson. Confirm this set and we ship it to
+              production, then delete{" "}
+              <span className="font-mono text-white/40">/mockups</span>.
             </p>
           </div>
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/35">
-            10 screens · 4 directions
+            10 screens · Ledger only
           </p>
         </div>
       </header>
@@ -534,24 +807,37 @@ export default function MockupsPage() {
             >
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#E61919]">
-                    {m.id} · {m.direction}
+                  <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#C45C4A]">
+                    {m.id} · Ledger
                   </p>
-                  <h2 className="mt-1 font-[family-name:var(--font-montserrat)] text-xl font-bold">
+                  <h2 className="mt-1 font-serif text-xl font-bold">
                     {m.title}
-                    <span className="ml-2 font-normal text-white/40">
+                    <span className="ml-2 font-sans font-normal text-white/40">
                       / {m.screen}
                     </span>
                   </h2>
                 </div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                  {m.vibe}
+                  {m.note}
                 </p>
               </div>
               <Comp />
             </motion.section>
           );
         })}
+
+        <section className="border border-[#E8DCC8]/20 bg-[#E8DCC8]/5 p-6 md:p-8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#C45C4A]">
+            Next step
+          </p>
+          <h2 className="mt-2 font-serif text-2xl font-bold text-[#E8DCC8]">
+            Reply “ship Ledger” to confirm
+          </h2>
+          <p className="mt-2 max-w-xl text-sm text-white/55">
+            On confirmation we apply these tokens and patterns to the live hub +
+            Mafia City screens, then remove /mockups entirely.
+          </p>
+        </section>
       </main>
     </div>
   );
