@@ -405,14 +405,19 @@ export function useVoiceChat(
     };
   }, [joined, monitorLevels]);
 
+  // Keep leave/cleanup on unmount or socket swap only — do NOT depend on `joined`
+  // or joining flips true→cleanupAll→leave and the avatar vanishes.
+  const joinedRef = useRef(false);
+  joinedRef.current = joined;
+
   useEffect(() => {
     return () => {
-      if (socket && channelRef.current && joined) {
+      if (socket && channelRef.current && joinedRef.current) {
         socket.emit("voice:leave", { roomId, channel: channelRef.current });
       }
       cleanupAll();
     };
-  }, [socket, roomId, joined, cleanupAll]);
+  }, [socket, roomId, cleanupAll]);
 
   const leave = useCallback(() => {
     if (socket && channelRef.current) {
@@ -438,6 +443,12 @@ export function useVoiceChat(
       });
       localStreamRef.current = stream;
       channelRef.current = channel;
+      setJoined(true);
+      setParticipants((prev) =>
+        playerIdRef.current && !prev.includes(playerIdRef.current)
+          ? [...prev, playerIdRef.current]
+          : prev
+      );
       await ensureAudioCtx();
       await attachAnalyser("__local__", stream);
       socket.emit("voice:join", { roomId, channel });

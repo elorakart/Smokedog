@@ -126,6 +126,13 @@ export function ChatPanel({
   }
 
   const speaking = new Set(voice.speakingIds);
+  const voiceRoster = useMemo(() => {
+    const ids = [...voiceInChannel];
+    if (you?.id && voice.joined && !ids.includes(you.id)) {
+      ids.unshift(you.id);
+    }
+    return ids;
+  }, [voiceInChannel, voice.joined, you?.id]);
 
   return (
     <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col">
@@ -187,7 +194,7 @@ export function ChatPanel({
               )}
             </div>
             <span className="max-w-[55%] truncate text-right font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-              {Math.max(voiceInChannel.length, voice.joined ? 1 : 0)} in voice
+              {Math.max(voiceRoster.length, voice.joined ? 1 : 0)} in voice
               {voice.participantLabels.length > 0 && (
                 <span className="block normal-case tracking-normal text-ink-steel/80">
                   {voice.participantLabels.slice(0, 3).join(", ")}
@@ -197,9 +204,9 @@ export function ChatPanel({
             </span>
           </div>
 
-          {voiceInChannel.length > 0 && (
+          {voiceRoster.length > 0 && (
             <div className="grid grid-cols-3 gap-2 border-b border-crimson/20 px-3 py-2 sm:grid-cols-4">
-              {voiceInChannel.map((id) => {
+              {voiceRoster.map((id) => {
                 const player = state.players.find((p) => p.id === id);
                 const name = player?.name ?? "Operator";
                 const isSpeaking = speaking.has(id);
