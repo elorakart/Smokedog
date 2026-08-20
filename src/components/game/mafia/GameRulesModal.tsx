@@ -23,7 +23,7 @@ const RULES_BY_GAME: Record<string, GameRules> = {
       },
       {
         title: "Day",
-        body: "Discuss first, then vote in the final 15 seconds. Majority lynches a suspect — or vote skip to spare everyone. Miss your vote twice and you die from AFK.",
+        body: "Discuss first, then vote in the final 15 seconds. Whoever has the most votes alone is lynched — a tie spares everyone. Skip is an option and wins only if it leads alone. Miss your vote twice and you die from AFK.",
       },
       {
         title: "Voice & chat",

@@ -426,18 +426,9 @@ export class GameRuntime {
     return votesIn >= eligible.length;
   }
 
-  /** Dead villagers keep a vote — do not lock the lynch until they have cast (or timer ends). */
-  private deadVillagersHaveVoted(room: Room): boolean {
-    const deadVillagers = room.players.filter(
-      (p) => !p.alive && playerCanDayVote(p)
-    );
-    return deadVillagers.every((p) => room.votes[p.id] != null);
-  }
-
   private maybeFinishDayFromVotes(room: Room) {
-    const lynchedId = tallyLynch(room.players, room.votes);
-    if (!lynchedId) return;
-    if (!this.deadVillagersHaveVoted(room)) return;
+    // Plurality can resolve with few votes — wait until every eligible voter has cast.
+    if (!this.canSkipDay(room)) return;
     this.finishDayPhase(room);
   }
 
@@ -1454,13 +1445,13 @@ export class GameRuntime {
       return;
     }
     if (!lynchedId) {
-      log(room, "No majority. The city lets the day die without a hanging.");
-      this.addChronicle(room, "day", "No majority — no lynch.");
+      log(room, "The vote ties. The city lets the day die without a hanging.");
+      this.addChronicle(room, "day", "Vote tied — no lynch.");
       this.setAnnouncement(
         room,
         "info",
-        "No majority",
-        "No suspect received enough votes."
+        "Tied vote",
+        "No one held the most votes alone."
       );
       return;
     }

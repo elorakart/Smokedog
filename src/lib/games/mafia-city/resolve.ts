@@ -1,5 +1,4 @@
 import type { Faction, NightAction, Player, Role } from "@/lib/types";
-import { SKIP_VOTE_ID } from "@/lib/types";
 import { factionOf, isMafiaRole } from "@/lib/games/mafia-city/roles";
 
 export interface NightDeath {
@@ -293,10 +292,6 @@ export function winCheck(players: Player[]): "town" | "mafia" | null {
   return null;
 }
 
-export function majorityThreshold(livingCount: number): number {
-  return Math.floor(livingCount / 2) + 1;
-}
-
 /** Living non-blackmailed players, plus dead villagers (who keep a vote). */
 export function playerCanDayVote(p: Player): boolean {
   if (p.alive) return !p.blackmailed;
@@ -308,12 +303,15 @@ export function eligibleVoters(players: Player[]): Player[] {
   return players.filter(playerCanDayVote);
 }
 
+/**
+ * Plurality lynch: the unique top vote-getter is eliminated.
+ * Skip is a normal option — unique top skip means no hang.
+ * Any tie for first (including vs skip) means no lynch.
+ */
 export function tallyLynch(
   players: Player[],
   votes: Record<string, string>
 ): string | null {
-  const alive = living(players);
-  const needed = majorityThreshold(alive.length);
   const counts = new Map<string, number>();
 
   for (const voter of eligibleVoters(players)) {
@@ -322,13 +320,9 @@ export function tallyLynch(
     counts.set(target, (counts.get(target) ?? 0) + 1);
   }
 
-  const skipVotes = counts.get(SKIP_VOTE_ID) ?? 0;
-  if (skipVotes >= needed) return SKIP_VOTE_ID;
-
   let best: { id: string; n: number } | null = null;
   let tie = false;
   for (const [id, n] of counts) {
-    if (id === SKIP_VOTE_ID) continue;
     if (!best || n > best.n) {
       best = { id, n };
       tie = false;
@@ -336,6 +330,6 @@ export function tallyLynch(
       tie = true;
     }
   }
-  if (!best || tie || best.n < needed) return null;
+  if (!best || tie || best.n < 1) return null;
   return best.id;
 }

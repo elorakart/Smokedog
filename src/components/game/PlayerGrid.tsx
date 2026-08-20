@@ -285,7 +285,7 @@ export function VotePanel({
       <p className="mt-1 text-sm text-ink-steel">
         {dead && !deadVillager
           ? "You cannot vote — watch the tally. Town voice is closed during voting."
-          : "Majority of the living hangs a suspect, or skip to spare the city. Town voice is closed during voting."}
+          : "Most votes alone hangs a suspect — a tie spares everyone. Skip counts like any other option. Town voice is closed during voting."}
       </p>
       <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Votes in: {votesIn}/{votesNeeded}
