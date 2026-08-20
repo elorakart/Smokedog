@@ -19,6 +19,7 @@ import { ActionPrompt } from "@/components/game/ActionPrompt";
 import { ActionDialog } from "@/components/game/mafia/ActionDialog";
 import { PhaseResultPopup } from "@/components/game/mafia/PhaseResultPopup";
 import { DetectivePanel } from "@/components/game/mafia/DetectivePanel";
+import { AnnouncementsPanel } from "@/components/game/AnnouncementsPanel";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
@@ -842,20 +843,7 @@ export function GameClient({ roomId }: { roomId: string }) {
                   {state.detectiveLog && (
                     <DetectivePanel log={state.detectiveLog} />
                   )}
-                  <div data-lenis-prevent className="max-h-48 overflow-y-auto">
-                    <GlassPanel className="p-4">
-                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                      Announcements
-                    </h3>
-                    <ul className="mt-2 space-y-1 text-sm">
-                      {state.logs.map((l) => (
-                        <li key={l.id} className="text-ink-steel">
-                          {l.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </GlassPanel>
-                  </div>
+                  <AnnouncementsPanel logs={state.logs} />
                   {state.detectiveResult && (
                     <GlassPanel className="p-4">
                       <p className="font-mono text-[10px] uppercase text-crimson-glow">

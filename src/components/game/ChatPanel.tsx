@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Mic, MicOff, PhoneOff } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Mic, MicOff, PhoneOff } from "lucide-react";
+import { motion } from "framer-motion";
 import type { ChatChannel, ChatMessage, PublicGameState } from "@/lib/types";
 import { GlassPanel } from "@/components/ui/primitives";
 import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
+import { ScrollToLatestPill } from "@/components/ui/ScrollToLatestPill";
 import {
   availableChannels,
   canAccessChannel,
@@ -13,10 +14,9 @@ import {
   canViewTownChat,
   CHANNEL_LABELS,
 } from "@/lib/chat-access";
+import { useScrollToLatest } from "@/hooks/useScrollToLatest";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import type { GameSocket } from "@/lib/socket/client";
-
-const NEAR_BOTTOM_PX = 48;
 
 export function ChatPanel({
   state,
@@ -84,64 +84,13 @@ export function ChatPanel({
   const messages = state.chat.filter((m) => m.channel === active);
   const [text, setText] = useState("");
 
-  const listRef = useRef<HTMLDivElement>(null);
-  const pinnedRef = useRef(true);
-  const lastMsgIdRef = useRef<string | null>(null);
-  const [unread, setUnread] = useState(0);
-
-  const isNearBottom = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
-  }, []);
-
-  const scrollToLatest = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    pinnedRef.current = true;
-    setUnread(0);
-  }, []);
-
-  const onListScroll = useCallback(() => {
-    const near = isNearBottom();
-    pinnedRef.current = near;
-    if (near) setUnread(0);
-  }, [isNearBottom]);
-
-  useEffect(() => {
-    pinnedRef.current = true;
-    setUnread(0);
-    lastMsgIdRef.current = null;
-    requestAnimationFrame(() => scrollToLatest());
-  }, [active, scrollToLatest]);
-
-  useEffect(() => {
-    const latest = messages[messages.length - 1];
-    const latestId = latest?.id ?? null;
-    if (latestId === lastMsgIdRef.current) return;
-
-    const prevId = lastMsgIdRef.current;
-    lastMsgIdRef.current = latestId;
-    if (!prevId || !latest) {
-      if (pinnedRef.current) requestAnimationFrame(() => scrollToLatest());
-      return;
-    }
-
-    const prevIndex = messages.findIndex((m) => m.id === prevId);
-    const arrived =
-      prevIndex >= 0 ? messages.slice(prevIndex + 1) : messages.slice(-1);
-    const fromOthers = arrived.filter((m) => m.playerId !== you?.id);
-
-    if (pinnedRef.current || latest.playerId === you?.id) {
-      requestAnimationFrame(() => scrollToLatest());
-      return;
-    }
-
-    if (fromOthers.length > 0) {
-      setUnread((n) => n + fromOthers.length);
-    }
-  }, [messages, you?.id, scrollToLatest]);
+  const getOwnerId = useCallback((m: ChatMessage) => m.playerId, []);
+  const { listRef, unread, onListScroll, scrollToLatest, markPinned } =
+    useScrollToLatest(messages, {
+      resetKey: active,
+      selfId: you?.id,
+      getOwnerId,
+    });
 
   const voice = useVoiceChat(
     socket,
@@ -177,7 +126,7 @@ export function ChatPanel({
     if (!text.trim() || !canSendActive) return;
     onSend(active, text);
     setText("");
-    pinnedRef.current = true;
+    markPinned();
     requestAnimationFrame(() => scrollToLatest());
   };
 
@@ -374,23 +323,7 @@ export function ChatPanel({
           <div aria-hidden className="h-px w-full" />
         </div>
 
-        <AnimatePresence>
-          {unread > 0 && (
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              onClick={scrollToLatest}
-              className="absolute bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-sm border-2 border-crimson bg-crimson px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-manila shadow-stamp transition hover:opacity-90"
-            >
-              <ChevronDown size={12} />
-              {unread === 1
-                ? "1 unread message"
-                : `${unread} unread messages`}
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <ScrollToLatestPill unread={unread} onClick={scrollToLatest} />
       </div>
 
       <form
