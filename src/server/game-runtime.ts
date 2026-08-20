@@ -1217,24 +1217,27 @@ export class GameRuntime {
         .map((d) => room.players.find((x) => x.id === d.playerId)?.name)
         .filter(Boolean);
       log(room, `Someone was eliminated overnight.`);
-      this.addChronicle(
-        room,
-        "night",
-        `${names.join(", ") || "Someone"} was eliminated overnight.`
-      );
+      for (const d of result.deaths) {
+        const p = room.players.find((x) => x.id === d.playerId);
+        if (p) {
+          this.addChronicle(
+            room,
+            "night",
+            `${p.name} was eliminated overnight${d.reason ? ` — ${d.reason}` : ""}.`
+          );
+          this.leaveMafiaRooms(p, room.id);
+          this.removeFromAllVoice(room, p.id);
+        }
+      }
+      if (names.length === 0) {
+        this.addChronicle(room, "night", "Someone was eliminated overnight.");
+      }
       this.setAnnouncement(
         room,
         "bad",
         "Night results",
         `${result.deaths.length} operator${result.deaths.length > 1 ? "s were" : " was"} eliminated overnight.`
       );
-      for (const d of result.deaths) {
-        const p = room.players.find((x) => x.id === d.playerId);
-        if (p) {
-          this.leaveMafiaRooms(p, room.id);
-          this.removeFromAllVoice(room, p.id);
-        }
-      }
     }
 
     for (const p of room.players) {

@@ -108,9 +108,19 @@ export function GameClient({ roomId }: { roomId: string }) {
       setState((prev) => {
         if (!prev) return prev;
         if (prev.chat.some((m) => m.id === message.id)) return prev;
+        // Drop matching optimistic local message (same author/text/channel)
+        const withoutOptimistic = prev.chat.filter(
+          (m) =>
+            !(
+              m.id.startsWith("local-") &&
+              m.playerId === message.playerId &&
+              m.channel === message.channel &&
+              m.text === message.text
+            )
+        );
         return {
           ...prev,
-          chat: [...prev.chat, message].slice(-50),
+          chat: [...withoutOptimistic, message].slice(-50),
         };
       });
     };
@@ -291,8 +301,29 @@ export function GameClient({ roomId }: { roomId: string }) {
       wildValue: payload.wildValue,
       pass: payload.pass,
     });
-  const emitChat = (channel: ChatChannel, text: string) =>
-    socket.emit("chat:send", { roomId: state.roomId, channel, text });
+  const emitChat = (channel: ChatChannel, text: string) => {
+    const trimmed = text.trim().slice(0, 240);
+    if (!trimmed || !state.you) {
+      socket.emit("chat:send", { roomId: state.roomId, channel, text });
+      return;
+    }
+    const optimistic: ChatMessage = {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      channel,
+      playerId: state.you.id,
+      name: state.you.id
+        ? state.players.find((p) => p.id === state.you!.id)?.name ?? "You"
+        : "You",
+      text: trimmed,
+      at: Date.now(),
+    };
+    setState((prev) =>
+      prev
+        ? { ...prev, chat: [...prev.chat, optimistic].slice(-50) }
+        : prev
+    );
+    socket.emit("chat:send", { roomId: state.roomId, channel, text: trimmed });
+  };
 
   const voiceChannel =
     state.gameId !== "five-alive" &&

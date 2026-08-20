@@ -17,6 +17,12 @@ export function ActionDialog({
   useEffect(() => {
     playActionNeeded();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const lenis = (window as unknown as { lenis?: { scrollTo: (y: number) => void } }).lenis;
+      lenis?.scrollTo(0);
+    } catch {
+      /* optional */
+    }
     const t = setTimeout(onDismiss, 5000);
     return () => clearTimeout(t);
   }, [title, detail, onDismiss]);
