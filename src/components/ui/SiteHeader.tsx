@@ -50,7 +50,7 @@ export function SiteHeader({
     ) : null);
 
   const className =
-    "relative flex flex-col gap-2 border-b border-crimson/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-4 md:px-10";
+    "relative flex items-center justify-between gap-3 border-b border-crimson/20 px-3 py-2.5 sm:px-6 sm:py-4 md:px-10";
 
   if (animate) {
     return (
@@ -61,10 +61,8 @@ export function SiteHeader({
       >
         <ArenaBrand />
         {trailing && (
-          <div className="w-full min-w-0 overflow-x-auto sm:w-auto sm:overflow-visible">
-            <div className="flex min-w-max items-center justify-end gap-2 sm:min-w-0 sm:flex-wrap">
-              {trailing}
-            </div>
+          <div className="min-w-0 shrink">
+            {trailing}
           </div>
         )}
       </motion.header>
@@ -74,13 +72,7 @@ export function SiteHeader({
   return (
     <header className={className}>
       <ArenaBrand />
-      {trailing && (
-        <div className="w-full min-w-0 overflow-x-auto sm:w-auto sm:overflow-visible">
-          <div className="flex min-w-max items-center justify-end gap-2 sm:min-w-0 sm:flex-wrap">
-            {trailing}
-          </div>
-        </div>
-      )}
+      {trailing && <div className="min-w-0 shrink">{trailing}</div>}
     </header>
   );
 }

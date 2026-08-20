@@ -1,7 +1,16 @@
 "use client";
 
-import { Copy, LogOut, Pause, Play, Shield, SkipForward } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  Copy,
+  LogOut,
+  Menu,
+  Pause,
+  Play,
+  Shield,
+  SkipForward,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { CopyToast } from "@/components/ui/CopyToast";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import type { Phase, PublicGameState } from "@/lib/types";
@@ -32,10 +41,29 @@ export function GameHud({
   quitting?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   const remaining = state.phaseEndsAt
     ? Math.ceil((state.phaseEndsAt - now) / 1000)
@@ -83,34 +111,133 @@ export function GameHud({
     state.phase !== "lobby" &&
     state.phase !== "gameover";
 
+  const urgent =
+    remaining <= 10 && !state.paused && !!state.phaseEndsAt;
+
+  const timerClass = `inline-flex min-w-[4.75rem] shrink-0 items-center justify-center rounded-sm border bg-surface/80 px-2.5 py-1.5 font-mono text-sm tabular-nums tracking-normal sm:min-w-[5.25rem] sm:px-3 sm:py-2 sm:text-sm ${
+    urgent
+      ? "animate-pulse border-crimson text-crimson"
+      : "border-crimson/20 text-crimson"
+  }`;
+
+  const menuItemClass =
+    "flex w-full items-center gap-2 rounded-sm border border-crimson/20 bg-manila px-3 py-2.5 text-left font-mono text-[10px] uppercase tracking-widest text-crimson transition hover:border-crimson/40 hover:bg-crimson/[0.04] disabled:opacity-50";
+
   return (
     <>
       <CopyToast show={copied} message="Room code copied" />
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-1.5 md:gap-3">
+
+      {/* Mobile: timer + overflow menu */}
+      <div className="relative flex items-center justify-end gap-2 md:hidden" ref={menuRef}>
+        {showTimer && (
+          <div className={timerClass} aria-live="polite">
+            {state.paused ? "PAUSE" : format(remaining)}
+          </div>
+        )}
+        {state.gameId === "spot-it" && state.paused && (
+          <div className={timerClass}>PAUSE</div>
+        )}
+        <button
+          type="button"
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMenuOpen((v) => !v)}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-crimson/30 bg-manila text-crimson"
+        >
+          {menuOpen ? <X size={16} /> : <Menu size={16} />}
+        </button>
+
+        {menuOpen && (
+          <div className="absolute right-0 top-full z-40 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-sm border-2 border-crimson bg-manila p-2 shadow-stamp">
+            <p className="px-2 pb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-crimson/60">
+              {phaseLabel[state.phase]}
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  copy(state.roomId);
+                }}
+                className={menuItemClass}
+              >
+                <Copy size={12} />
+                Code {state.roomId}
+              </button>
+              {showMidGameSettings && (
+                <div className="rounded-sm border border-crimson/20 p-1">
+                  <MidGameSettings
+                    settings={state.settings}
+                    onUpdate={onSettings}
+                  />
+                </div>
+              )}
+              {canSkipTimer && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSkipTimer?.();
+                    setMenuOpen(false);
+                  }}
+                  className={menuItemClass}
+                >
+                  <SkipForward size={12} />
+                  Skip timer
+                </button>
+              )}
+              {showPause && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (state.paused) onResume();
+                    else onPause();
+                    setMenuOpen(false);
+                  }}
+                  className={menuItemClass}
+                >
+                  {state.paused ? <Play size={12} /> : <Pause size={12} />}
+                  {state.paused ? "Resume" : "Pause"}
+                </button>
+              )}
+              {state.you?.isHost && (
+                <div className="flex items-center gap-2 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson/70">
+                  <Shield size={12} /> Host
+                </div>
+              )}
+              <button
+                type="button"
+                disabled={quitting}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onQuit();
+                }}
+                className={menuItemClass}
+              >
+                <LogOut size={12} />
+                {quitting ? "Leaving…" : "Quit"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: full toolbar */}
+      <div className="hidden w-full min-w-0 flex-wrap items-center justify-end gap-1.5 md:flex md:gap-3">
         <button
           type="button"
           onClick={() => copy(state.roomId)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/20 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
+          className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-crimson/20 bg-surface/80 px-3 py-2 font-mono text-xs tracking-[0.2em]"
         >
-          {state.roomId} <Copy size={11} className="sm:h-3 sm:w-3" />
+          {state.roomId} <Copy size={12} />
         </button>
         {showTimer && (
-          <div
-            className={`shrink-0 rounded-sm border bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest sm:px-3 sm:py-2 sm:text-sm ${
-              remaining <= 10 && !state.paused && !!state.phaseEndsAt
-                ? "animate-pulse border-crimson text-crimson-glow"
-                : "border-crimson/20 text-crimson-glow"
-            }`}
-          >
+          <div className={timerClass} aria-live="polite">
             {state.paused ? "PAUSED" : format(remaining)}
           </div>
         )}
         {state.gameId === "spot-it" && state.paused && (
-          <div className="shrink-0 rounded-sm border border-crimson/40 bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest text-crimson sm:px-3 sm:py-2 sm:text-sm">
-            PAUSED
-          </div>
+          <div className={timerClass}>PAUSED</div>
         )}
-        <div className="shrink-0 rounded-sm border border-crimson/20 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
+        <div className="shrink-0 rounded-sm border border-crimson/20 bg-surface/80 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em]">
           {phaseLabel[state.phase]}
         </div>
         {showMidGameSettings && (
@@ -120,39 +247,38 @@ export function GameHud({
           <button
             type="button"
             onClick={onSkipTimer}
-            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-crimson sm:px-3 sm:py-2 sm:text-[10px]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson"
             title="Skip remaining timer"
           >
-            <SkipForward size={11} />
-            <span className="hidden sm:inline">Skip timer</span>
+            <SkipForward size={12} />
+            Skip timer
           </button>
         )}
         {showPause && (
-            <button
-              type="button"
-              onClick={state.paused ? onResume : onPause}
-              className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-crimson-glow sm:px-3 sm:py-2 sm:text-[10px]"
-            >
-              {state.paused ? <Play size={11} /> : <Pause size={11} />}
-              <span className="hidden sm:inline">
-                {state.paused ? "Resume" : "Pause"}
-              </span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={state.paused ? onResume : onPause}
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson"
+          >
+            {state.paused ? <Play size={12} /> : <Pause size={12} />}
+            {state.paused ? "Resume" : "Pause"}
+          </button>
+        )}
         {state.you?.isHost && (
-          <span className="hidden shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-ink-steel md:inline-flex md:text-[10px]">
-            <Shield size={11} /> Host
+          <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-crimson/70">
+            <Shield size={12} /> Host
           </span>
         )}
         <button
           type="button"
           disabled={quitting}
           onClick={onQuit}
-          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/20 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson-glow disabled:opacity-50 sm:px-3 sm:py-2 sm:text-[10px]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/20 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-crimson/80 transition hover:border-crimson/40 hover:text-crimson disabled:opacity-50"
         >
-          <LogOut size={11} />
+          <LogOut size={12} />
           {quitting ? "Leaving…" : "Quit"}
         </button>
-      </div>    </>
+      </div>
+    </>
   );
 }
