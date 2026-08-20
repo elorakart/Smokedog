@@ -37,3 +37,7 @@ next-env.d.ts
 
 # stitch reference dumps
 /stitch-ref
+
+public/avatars/_lightened/
+public/avatars/_stage_*/
+public/avatars/_preview-*
