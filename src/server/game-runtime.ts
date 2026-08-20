@@ -29,6 +29,7 @@ import {
   SKIP_VOTE_ID,
 } from "@/lib/types";
 import { generateRoomCode, RoomError, validateRoomCode } from "@/lib/room-code";
+import { uniquePlayerName } from "@/lib/player-name";
 import { getGameModule, resolveGameId } from "@/lib/games/registry";
 import {
   nextBotName,
@@ -857,7 +858,12 @@ export class GameRuntime {
     const existing = room.players.find((p) => p.id === opts.playerId);
     if (existing) {
       existing.socketId = opts.socketId;
-      existing.name = opts.name.trim().slice(0, 18) || existing.name;
+      const others = room.players
+        .filter((p) => p.id !== opts.playerId)
+        .map((p) => p.name);
+      existing.name =
+        uniquePlayerName(opts.name.trim() || existing.name, others) ||
+        existing.name;
       existing.avatarId = opts.avatarId;
       if (room.phase === "lobby") existing.ready = true;
       this.playerRoom.set(opts.playerId, room.id);
@@ -874,14 +880,16 @@ export class GameRuntime {
     if (room.players.length >= mod.maxPlayers) {
       throw new RoomError("FULL", "That lobby is full.");
     }
-    if (room.players.some((p) => p.name.toLowerCase() === opts.name.trim().toLowerCase())) {
-      throw new RoomError("NAME_TAKEN", "That display name is taken in this room.");
-    }
+
+    const name = uniquePlayerName(
+      opts.name,
+      room.players.map((p) => p.name)
+    );
 
     room.players.push({
       id: opts.playerId,
       socketId: opts.socketId,
-      name: opts.name.trim().slice(0, 18) || "Operator",
+      name,
       avatarId: opts.avatarId,
       alive: true,
       isHost: false,
