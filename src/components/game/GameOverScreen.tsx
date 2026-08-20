@@ -27,7 +27,6 @@ export function GameOverScreen({
   const youWonFiveAlive =
     !!fiveAliveWinner && !!state.you && state.you.id === fiveAliveWinner.id;
 
-  const boardWinner = state.players.find((p) => p.id === state.boardWinnerId);
   const youWonBoard =
     !!state.you &&
     (state.boardDraw
@@ -104,39 +103,59 @@ export function GameOverScreen({
   }
 
   if (isBoard) {
+    const winnerId = state.boardWinnerId ?? state.connect4?.winnerId ?? null;
+    const boardWinner =
+      state.players.find((p) => p.id === winnerId) ??
+      state.players.find((p) => p.id === state.boardWinnerId);
     const title = state.boardDraw
       ? "Draw"
       : `${boardWinner?.name ?? "Someone"} wins`;
     const subtitle =
       state.gameId === "spot-it"
         ? "Most cards claimed."
-        : "Match complete.";
+        : state.gameId === "connect-4"
+          ? "Four in a row."
+          : "Match complete.";
+    const youWon =
+      !!state.you &&
+      (state.boardDraw ? false : winnerId === state.you.id);
+
     return (
-      <div className="mx-auto max-w-3xl py-10">
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-crimson-glow">
-          {state.boardDraw ? "Draw" : youWonBoard ? "Victory" : "Defeat"}
+      <div className="mx-auto w-full max-w-3xl px-1 py-6 sm:py-10">
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-crimson">
+          {state.boardDraw ? "Draw" : youWon ? "Victory" : "Defeat"}
         </p>
-        <h1 className="mt-2 font-display text-5xl font-bold">{title}</h1>
-        <p className="mt-3 text-ink-steel">{subtitle}</p>
+        <h1 className="mt-2 font-display text-4xl font-bold text-crimson sm:text-5xl">
+          {title}
+        </h1>
+        <p className="mt-3 text-crimson/70">{subtitle}</p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(state.recap ?? state.players).map((p) => (
             <GlassPanel key={p.id} className="flex items-center gap-3 p-3">
               <div className="overflow-hidden rounded-sm ring-1 ring-crimson/25">
                 <PlayerAvatar id={p.avatarId} size={56} />
               </div>
-              <div>
-                <p className="font-display font-semibold">{p.name}</p>
+              <div className="min-w-0">
+                <p className="truncate font-display font-semibold text-crimson">
+                  {p.name}
+                </p>
                 {state.spotIt && (
-                  <p className="mt-1 font-mono text-xs text-crimson-glow">
+                  <p className="mt-1 font-mono text-xs text-crimson">
                     {state.spotIt.scores.find((s) => s.playerId === p.id)?.score ??
                       0}{" "}
                     cards
                   </p>
                 )}
-                {state.connect4?.colors[p.id] && (
+                {state.connect4?.colors?.[p.id] && (
                   <p className="mt-1 font-mono text-xs text-crimson">
                     {state.connect4.colors[p.id] === "R" ? "Red" : "Yellow"}
-                    {state.boardWinnerId === p.id ? " · Winner" : ""}
+                    {winnerId === p.id ? " · Winner" : ""}
+                  </p>
+                )}
+                {state.ttt?.marks?.[p.id] && (
+                  <p className="mt-1 font-mono text-xs text-crimson">
+                    Mark {state.ttt.marks[p.id]}
+                    {winnerId === p.id ? " · Winner" : ""}
                   </p>
                 )}
                 {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
@@ -144,15 +163,19 @@ export function GameOverScreen({
             </GlassPanel>
           ))}
         </div>
-        {state.you?.isHost && (
+        {state.you?.isHost ? (
           <PrimaryButton
-            className="mt-8"
+            className="mt-8 w-full sm:w-auto"
             loading={returning}
             disabled={returning}
             onClick={onReturn}
           >
             {returning ? "Returning…" : "Return to Lobby"}
           </PrimaryButton>
+        ) : (
+          <p className="mt-8 font-mono text-[10px] uppercase tracking-widest text-crimson/50">
+            Waiting for host to return to lobby…
+          </p>
         )}
       </div>
     );

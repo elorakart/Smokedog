@@ -86,7 +86,7 @@ export function GameHud({
   return (
     <>
       <CopyToast show={copied} message="Room code copied" />
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-1.5 md:gap-3">
         <button
           type="button"
           onClick={() => copy(state.roomId)}
@@ -134,13 +134,13 @@ export function GameHud({
               className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/40 px-2 py-1.5 font-mono text-[9px] uppercase tracking-widest text-crimson-glow sm:px-3 sm:py-2 sm:text-[10px]"
             >
               {state.paused ? <Play size={11} /> : <Pause size={11} />}
-              <span className="hidden xs:inline sm:inline">
+              <span className="hidden sm:inline">
                 {state.paused ? "Resume" : "Pause"}
               </span>
             </button>
           )}
         {state.you?.isHost && (
-          <span className="hidden shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-ink-steel sm:inline-flex sm:text-[10px]">
+          <span className="hidden shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-ink-steel md:inline-flex md:text-[10px]">
             <Shield size={11} /> Host
           </span>
         )}
@@ -153,7 +153,6 @@ export function GameHud({
           <LogOut size={11} />
           {quitting ? "Leaving…" : "Quit"}
         </button>
-      </div>
-    </>
+      </div>    </>
   );
 }

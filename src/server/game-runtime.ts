@@ -2519,7 +2519,7 @@ export class GameRuntime {
   private scheduleBoardGameOver(
     roomId: string,
     gameId: "connect-4" | "tic-tac-toe",
-    delayMs = 900
+    delayMs = 700
   ) {
     setTimeout(() => {
       const room = this.getRoom(roomId);

@@ -2,22 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import type { ChatChannel, PublicGameState } from "@/lib/types";
+import type { PublicGameState } from "@/lib/types";
 import { TurnIndicator } from "@/components/game/board/TurnIndicator";
-import { ChatPanel } from "@/components/game/ChatPanel";
-import type { GameSocket } from "@/lib/socket/client";
 import { C4_COLS, C4_ROWS } from "@/lib/games/connect-4/logic";
 
 export function Connect4Board({
   state,
-  socket,
   onDrop,
-  onSendChat,
 }: {
   state: PublicGameState;
-  socket: GameSocket | null;
   onDrop: (column: number) => void;
-  onSendChat: (channel: ChatChannel, text: string) => void;
 }) {
   const c4 = state.connect4;
   const [hoverCol, setHoverCol] = useState<number | null>(null);
@@ -47,116 +41,130 @@ export function Connect4Board({
 
   const discClass = (color: "R" | "Y" | null | undefined) =>
     color === "R"
-      ? "bg-crimson shadow-[0_0_14px_rgba(139,30,30,0.45)]"
+      ? "bg-crimson shadow-[0_0_10px_rgba(139,30,30,0.4)]"
       : color === "Y"
-        ? "bg-[#E8B84A] shadow-[0_0_14px_rgba(232,184,74,0.45)] ring-1 ring-[#C4921A]/50"
+        ? "bg-[#E8B84A] shadow-[0_0_10px_rgba(232,184,74,0.4)] ring-1 ring-[#C4921A]/40"
         : "bg-crimson/10";
 
   const winnerName =
-    c4.winnerId &&
-    state.players.find((p) => p.id === c4.winnerId)?.name;
+    c4.winnerId && state.players.find((p) => p.id === c4.winnerId)?.name;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div>
-        {finished ? (
-          <div className="rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">
-              {c4.result === "draw" ? "Draw" : "Match over"}
-            </p>
-            <p className="mt-1 font-display text-xl font-bold text-crimson">
-              {c4.result === "draw"
-                ? "Board is full — no winner."
-                : `${winnerName ?? "Someone"} connects four!`}
-            </p>
-          </div>
-        ) : (
-          <TurnIndicator
-            name={turnPlayer?.name ?? "…"}
-            detail={
-              myColor ? `You are ${myColor === "R" ? "Red" : "Yellow"}` : undefined
-            }
-            secondsLeft={secondsLeft}
-            yours={myTurn}
-          />
-        )}
-        <div className="mx-auto mt-6 w-full max-w-xl">
-          <div className="mb-2 grid grid-cols-7 gap-1.5 px-1">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-2 sm:gap-3">
+      {finished ? (
+        <div className="rounded-sm border border-crimson/40 bg-crimson/10 px-3 py-2 sm:px-4 sm:py-3">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">
+            {c4.result === "draw" ? "Draw" : "Match over"}
+          </p>
+          <p className="mt-0.5 font-display text-lg font-bold text-crimson sm:text-xl">
+            {c4.result === "draw"
+              ? "Board is full — no winner."
+              : `${winnerName ?? "Someone"} connects four!`}
+          </p>
+        </div>
+      ) : (
+        <TurnIndicator
+          name={turnPlayer?.name ?? "…"}
+          detail={
+            myColor ? `You are ${myColor === "R" ? "Red" : "Yellow"}` : undefined
+          }
+          secondsLeft={secondsLeft}
+          yours={myTurn}
+        />
+      )}
+
+      {/* Fit board in remaining viewport: max height leaves room for header + turn bar */}
+      <div
+        className="mx-auto w-full"
+        style={{
+          maxWidth: "min(100%, 28rem, calc((100dvh - 11rem) * 7 / 6))",
+        }}
+      >
+        {myTurn && (
+          <div className="mb-1 grid grid-cols-7 gap-1 px-0.5 sm:mb-1.5 sm:gap-1.5">
             {Array.from({ length: C4_COLS }).map((_, col) => (
-              <div key={col} className="flex h-8 items-center justify-center">
-                {myTurn && hoverCol === col && myColor && (
+              <div key={col} className="flex h-5 items-center justify-center sm:h-7">
+                {hoverCol === col && myColor && (
                   <motion.div
                     layoutId="c4-ghost"
-                    className={`size-7 rounded-full ${discClass(myColor)} opacity-70`}
+                    className={`size-4 rounded-full sm:size-6 ${discClass(myColor)} opacity-70`}
                   />
                 )}
               </div>
             ))}
           </div>
-          <div className="rounded-md border border-crimson/30 bg-crimson/15 p-2 shadow-inner">
-            <div className="grid grid-cols-7 gap-1.5">
-              {Array.from({ length: C4_COLS }).map((_, col) => (
-                <button
-                  key={col}
-                  type="button"
-                  disabled={!myTurn}
-                  onMouseEnter={() => setHoverCol(col)}
-                  onMouseLeave={() => setHoverCol(null)}
-                  onClick={() => onDrop(col)}
-                  className="grid grid-rows-6 gap-1.5"
-                >
-                  {Array.from({ length: C4_ROWS }).map((_, visualRow) => {
-                    const row = C4_ROWS - 1 - visualRow;
-                    const cell = c4.board[row]?.[col] ?? null;
-                    const key = `${row}-${col}`;
-                    const isWin = winning.has(key);
-                    const isLast =
-                      c4.lastDrop?.col === col && c4.lastDrop?.row === row;
-                    return (
-                      <div
-                        key={key}
-                        className={`relative aspect-square overflow-hidden rounded-full bg-manila ${
-                          dimOthers && cell && !isWin ? "opacity-35" : ""
-                        }`}
-                      >
-                        {cell && (
-                          <motion.div
-                            className={`absolute inset-[8%] rounded-full ${discClass(cell)} ${
-                              isWin ? "animate-pulse ring-2 ring-manila" : ""
-                            }`}
-                            initial={
-                              isLast
-                                ? { y: -((C4_ROWS - row) * 28 + 40) }
-                                : false
-                            }
-                            animate={{ y: 0 }}
-                            transition={
-                              isLast
-                                ? {
-                                    type: "spring",
-                                    stiffness: 520,
-                                    damping: 28,
-                                    mass: 0.55,
-                                  }
-                                : { duration: 0 }
-                            }
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </button>
-              ))}
-            </div>
+        )}
+
+        <div className="rounded-md border border-crimson/30 bg-crimson/15 p-1.5 shadow-inner sm:p-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            {Array.from({ length: C4_COLS }).map((_, col) => (
+              <button
+                key={col}
+                type="button"
+                disabled={!myTurn}
+                aria-label={`Drop in column ${col + 1}`}
+                onMouseEnter={() => setHoverCol(col)}
+                onMouseLeave={() => setHoverCol(null)}
+                onClick={() => onDrop(col)}
+                className="grid grid-rows-6 gap-1 sm:gap-1.5"
+              >
+                {Array.from({ length: C4_ROWS }).map((_, visualRow) => {
+                  const row = C4_ROWS - 1 - visualRow;
+                  const cell = c4.board[row]?.[col] ?? null;
+                  const key = `${row}-${col}`;
+                  const isWin = winning.has(key);
+                  const isLast =
+                    c4.lastDrop?.col === col && c4.lastDrop?.row === row;
+                  return (
+                    <div
+                      key={key}
+                      className={`relative aspect-square overflow-hidden rounded-full bg-manila ${
+                        dimOthers && cell && !isWin ? "opacity-35" : ""
+                      }`}
+                    >
+                      {cell && (
+                        <motion.div
+                          className={`absolute inset-[8%] rounded-full ${discClass(cell)} ${
+                            isWin ? "animate-pulse ring-2 ring-manila" : ""
+                          }`}
+                          initial={
+                            isLast ? { y: -((C4_ROWS - row) * 22 + 28) } : false
+                          }
+                          animate={{ y: 0 }}
+                          transition={
+                            isLast
+                              ? {
+                                  type: "spring",
+                                  stiffness: 560,
+                                  damping: 30,
+                                  mass: 0.5,
+                                }
+                              : { duration: 0 }
+                          }
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </button>
+            ))}
           </div>
         </div>
+
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-wider text-crimson/70 sm:mt-3">
+          {state.players.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1.5">
+              <span
+                className={`size-2.5 rounded-full ${
+                  c4.colors[p.id] === "R" ? "bg-crimson" : "bg-[#E8B84A]"
+                }`}
+              />
+              {p.name}
+              {p.id === state.you?.id ? " (you)" : ""}
+            </span>
+          ))}
+        </div>
       </div>
-      <ChatPanel
-        state={state}
-        socket={socket}
-        onSend={onSendChat}
-        enableVoice={false}
-      />
     </div>
   );
 }

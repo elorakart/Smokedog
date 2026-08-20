@@ -29,7 +29,6 @@ import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { SiteHeader } from "@/components/ui/SiteHeader";
-import { phaseSwap } from "@/components/ui/motion";
 import { availableChannels, canUseTownVoice, CHANNEL_LABELS } from "@/lib/chat-access";
 import { pendingPlayerAction } from "@/lib/action-prompt";
 import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
@@ -474,7 +473,13 @@ export function GameClient({ roomId }: { roomId: string }) {
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl px-4 pb-16 md:px-8">
+      <main
+        className={`mx-auto max-w-6xl px-3 pb-8 sm:px-4 sm:pb-16 md:px-8 ${
+          state.gameId === "connect-4" && state.phase === "connect4_play"
+            ? "pb-4"
+            : ""
+        }`}
+      >
         {voiceInvite && state.gameId === "mafia-city" && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3">
             <p className="text-sm text-crimson">
@@ -506,13 +511,24 @@ export function GameClient({ roomId }: { roomId: string }) {
           </div>
         )}
         <ActionPrompt state={state} />
+        {state.phase === "gameover" ? (
+          <GameOverScreen
+            state={state}
+            returning={returningToLobby}
+            onReturn={() => {
+              if (returningToLobby) return;
+              setReturningToLobby(true);
+              socket.emit("lobby:return", { roomId: state.roomId });
+            }}
+          />
+        ) : (
         <AnimatePresence mode="wait">
           <motion.div
             key={state.phase}
-            variants={phaseSwap}
-            initial="initial"
-            animate="animate"
-            exit="exit"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
           >
             {state.phase === "lobby" && (
               <>
@@ -601,11 +617,9 @@ export function GameClient({ roomId }: { roomId: string }) {
             {state.gameId === "connect-4" && state.phase === "connect4_play" && (
               <Connect4Board
                 state={state}
-                socket={socket}
                 onDrop={(column) =>
                   socket.emit("connect4:drop", { roomId: state.roomId, column })
                 }
-                onSendChat={emitChat}
               />
             )}
 
@@ -772,22 +786,10 @@ export function GameClient({ roomId }: { roomId: string }) {
                 </div>
               </div>
             )}
-
-            {state.phase === "gameover" && (
-              <GameOverScreen
-                state={state}
-                returning={returningToLobby}
-                onReturn={() => {
-                  if (returningToLobby) return;
-                  setReturningToLobby(true);
-                  socket.emit("lobby:return", { roomId: state.roomId });
-                }}
-              />
-            )}
           </motion.div>
         </AnimatePresence>
+        )}
       </main>
-
       {quitConfirmOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 p-4 backdrop-blur-[20px]"
