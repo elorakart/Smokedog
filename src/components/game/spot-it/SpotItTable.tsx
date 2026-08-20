@@ -38,6 +38,7 @@ export function SpotItTable({
   if (!spot) return null;
 
   const pick = (symbolId: number) => {
+    if (state.paused) return;
     setFlash(symbolId);
     onMatch(symbolId);
   };
@@ -54,13 +55,16 @@ export function SpotItTable({
               Match the center card
             </h2>
           </div>
-          <StatusChip tone="live">{spot.deckRemaining} in deck</StatusChip>
+          <div className="flex items-center gap-2">
+            {state.paused && <StatusChip tone="afk">Paused</StatusChip>}
+            <StatusChip tone="live">{spot.deckRemaining} in deck</StatusChip>
+          </div>
         </div>
 
         <div
           className={`mt-8 flex flex-col items-center gap-8 md:flex-row md:justify-center ${
             shake ? "animate-[shake_0.35s_ease-in-out]" : ""
-          }`}
+          } ${state.paused ? "pointer-events-none opacity-60" : ""}`}
         >
           <div className="text-center">
             <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
@@ -82,13 +86,13 @@ export function SpotItTable({
                 size="lg"
                 onPick={pick}
                 flashId={flash}
+                disabled={state.paused}
               />
             ) : (
               <p className="text-sm text-ink-steel">No card</p>
             )}
           </div>
         </div>
-
         <GlassPanel className="mt-8 p-4">
           <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
             Scores

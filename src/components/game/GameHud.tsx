@@ -72,6 +72,17 @@ export function GameHud({
     state.phase !== "lobby" &&
     state.phase !== "gameover";
 
+  const showTimer =
+    state.phase !== "lobby" &&
+    state.phase !== "gameover" &&
+    state.gameId !== "spot-it" &&
+    (!!state.phaseEndsAt || state.paused);
+
+  const showPause =
+    !!state.you?.isHost &&
+    state.phase !== "lobby" &&
+    state.phase !== "gameover";
+
   return (
     <>
       <CopyToast show={copied} message="Room code copied" />
@@ -79,22 +90,27 @@ export function GameHud({
         <button
           type="button"
           onClick={() => copy(state.roomId)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-manila/20 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-crimson/20 bg-surface/80 px-2 py-1.5 font-mono text-[10px] tracking-[0.15em] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:tracking-[0.2em]"
         >
           {state.roomId} <Copy size={11} className="sm:h-3 sm:w-3" />
         </button>
-        {state.phase !== "lobby" && state.phase !== "gameover" && (
+        {showTimer && (
           <div
             className={`shrink-0 rounded-sm border bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest sm:px-3 sm:py-2 sm:text-sm ${
-              remaining <= 10 && !state.paused
+              remaining <= 10 && !state.paused && !!state.phaseEndsAt
                 ? "animate-pulse border-crimson text-crimson-glow"
-                : "border-manila/20 text-crimson-glow"
+                : "border-crimson/20 text-crimson-glow"
             }`}
           >
             {state.paused ? "PAUSED" : format(remaining)}
           </div>
         )}
-        <div className="shrink-0 rounded-sm border border-manila/20 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
+        {state.gameId === "spot-it" && state.paused && (
+          <div className="shrink-0 rounded-sm border border-crimson/40 bg-surface/80 px-2 py-1.5 font-mono text-xs tracking-widest text-crimson sm:px-3 sm:py-2 sm:text-sm">
+            PAUSED
+          </div>
+        )}
+        <div className="shrink-0 rounded-sm border border-crimson/20 bg-surface/80 px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] sm:px-3 sm:py-2 sm:text-[10px] sm:tracking-[0.18em]">
           {phaseLabel[state.phase]}
         </div>
         {showMidGameSettings && (
@@ -111,9 +127,7 @@ export function GameHud({
             <span className="hidden sm:inline">Skip timer</span>
           </button>
         )}
-        {state.you?.isHost &&
-          state.phase !== "lobby" &&
-          state.phase !== "gameover" && (
+        {showPause && (
             <button
               type="button"
               onClick={state.paused ? onResume : onPause}

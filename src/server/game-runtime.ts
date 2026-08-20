@@ -2276,10 +2276,15 @@ export class GameRuntime {
   pause(roomId: string, hostId: string) {
     const room = this.getRoom(roomId);
     if (!room || !this.requireHost(room, hostId)) return;
-    if (room.paused || !room.phaseEndsAt) return;
+    if (room.paused) return;
+    // Timed phases store remaining ms; untimed games (e.g. Spot It) pause without a clock.
+    if (room.phaseEndsAt) {
+      room.pausedRemainingMs = Math.max(0, room.phaseEndsAt - Date.now());
+      room.phaseEndsAt = null;
+    } else {
+      room.pausedRemainingMs = null;
+    }
     room.paused = true;
-    room.pausedRemainingMs = Math.max(0, room.phaseEndsAt - Date.now());
-    room.phaseEndsAt = null;
     this.clearTimer(room);
     log(room, "The host paused the game.");
     this.emitRoom(room);
@@ -2290,9 +2295,11 @@ export class GameRuntime {
     if (!room || !this.requireHost(room, hostId)) return;
     if (!room.paused) return;
     room.paused = false;
-    const ms = room.pausedRemainingMs ?? 0;
+    const ms = room.pausedRemainingMs;
     room.pausedRemainingMs = null;
-    room.phaseEndsAt = Date.now() + ms;
+    if (typeof ms === "number") {
+      room.phaseEndsAt = Date.now() + ms;
+    }
     log(room, "The host resumed the game.");
     this.schedule(room);
     this.scheduleBots(room);

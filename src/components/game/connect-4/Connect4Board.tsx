@@ -43,10 +43,10 @@ export function Connect4Board({
 
   const discClass = (color: "R" | "Y" | null | undefined) =>
     color === "R"
-      ? "bg-crimson shadow-[0_0_16px_rgba(230,25,25,0.45)]"
+      ? "bg-crimson shadow-[0_0_14px_rgba(139,30,30,0.45)]"
       : color === "Y"
-        ? "bg-crimson shadow-glow"
-        : "bg-crimson/5";
+        ? "bg-[#E8B84A] shadow-[0_0_14px_rgba(232,184,74,0.45)] ring-1 ring-[#C4921A]/50"
+        : "bg-crimson/10";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -99,7 +99,7 @@ export function Connect4Board({
                         {cell && (
                           <motion.div
                             className={`absolute inset-[8%] rounded-full ${discClass(cell)} ${
-                              isWin ? "animate-pulse ring-2 ring-white/70" : ""
+                              isWin ? "animate-pulse ring-2 ring-manila" : ""
                             }`}
                             initial={
                               isLast
