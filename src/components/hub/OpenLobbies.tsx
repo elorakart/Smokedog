@@ -65,7 +65,7 @@ export function OpenLobbies({
   const firstOpen = filtered[0];
 
   return (
-    <motion.section variants={fadeUp} className="mt-12">
+    <motion.section variants={fadeUp} className="mt-2">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-crimson-glow">

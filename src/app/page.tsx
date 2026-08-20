@@ -228,48 +228,8 @@ export default function HomePage() {
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="relative mx-auto max-w-6xl px-6 pb-16 md:px-10"
+        className="relative mx-auto max-w-6xl px-6 pb-16 pt-6 md:px-10 md:pt-8"
       >
-        <motion.section
-          variants={fadeUp}
-          className="relative mt-6 flex flex-col items-center justify-center py-10 text-center md:py-14"
-        >
-          <div className="relative w-full max-w-lg border-2 border-crimson bg-manila px-8 py-10 text-crimson shadow-stamp md:px-12 md:py-12">
-            <span className="animate-stamp absolute -right-2 -top-3 border-2 border-crimson bg-manila px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-crimson -rotate-[8deg]">
-              Sealed
-            </span>
-            <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-crimson/70">
-              Case file // SMOKEDOG
-            </p>
-            <h1 className="mt-4 font-display text-5xl font-bold tracking-tight md:text-6xl">
-              SMOKEDOG
-            </h1>
-            <div className="mx-auto mt-4 h-px w-24 bg-crimson" />
-            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-crimson/70">
-              Open a room. Stamp your name. Trust no dossier.
-            </p>
-            <button
-              type="button"
-              disabled={!!pending}
-              onClick={() => openCreate("mafia-city")}
-              className="mt-7 inline-block bg-crimson px-6 py-2.5 font-mono text-[10px] uppercase tracking-widest text-manila transition hover:opacity-90 disabled:opacity-40"
-            >
-              Open a room
-            </button>
-            <button
-              type="button"
-              disabled={!!pending}
-              onClick={() => {
-                setPrefillCode("");
-                setModalMode("join");
-                setModal(true);
-              }}
-              className="mt-4 block w-full font-mono text-[9px] uppercase tracking-[0.28em] text-crimson/50 transition hover:text-crimson"
-            >
-              Join with code
-            </button>
-          </div>
-        </motion.section>
         <OpenLobbies
           onJoin={joinWithProfile}
           joiningCode={joiningCode}
