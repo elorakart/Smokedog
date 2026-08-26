@@ -4,9 +4,13 @@ export type Role =
   | "detective"
   | "bodyguard"
   | "vigilante"
+  | "soldier"
+  | "juggler"
+  | "drunk"
   | "mafia_boss"
   | "mafia_goon"
-  | "blackmailer";
+  | "blackmailer"
+  | "poisoner";
 
 export type Faction = "town" | "mafia";
 export type Phase =
@@ -31,7 +35,8 @@ export type NightActionType =
   | "detective_inspect"
   | "bodyguard_protect"
   | "vigilante_shoot"
-  | "blackmail";
+  | "blackmail"
+  | "poison";
 
 export type RoleDistribution = {
   villager: number;
@@ -39,9 +44,22 @@ export type RoleDistribution = {
   detective: number;
   bodyguard: number;
   vigilante: number;
+  soldier: number;
+  juggler: number;
+  drunk: number;
   mafia_boss: number;
   mafia_goon: number;
   blackmailer: number;
+  poisoner: number;
+};
+
+/** Day-scoped personal intel (cleared when the next night begins). */
+export type DayIntel = {
+  kind: "detective" | "juggler" | "other";
+  title: string;
+  detail: string;
+  cycle: number;
+  at: number;
 };
 
 export interface RoomSettings {
@@ -66,6 +84,8 @@ export type MafiaNightIntel = {
   bossTargetName?: string;
   goonTargetId?: string;
   goonTargetName?: string;
+  poisonTargetId?: string;
+  poisonTargetName?: string;
 };
 
 export type ChronicleEntry = {
@@ -102,6 +122,12 @@ export interface Player {
   afkCount: number;
   blackmailed: boolean;
   bulletsLeft?: number;
+  /** True for one night after Poisoner marks them. */
+  poisoned?: boolean;
+  /** Drunk only: the town power role they believe they are. */
+  fakeRole?: Role;
+  /** Juggler: true after their once-per-game day action. */
+  jugglerUsed?: boolean;
   // 5 Alive: remaining lives. Mafia City ignores this.
   lives?: number;
   isBot: boolean;
@@ -181,7 +207,10 @@ export interface PublicGameState {
   announcement?: PhaseAnnouncement | null;
   mafiaTeam?: PublicPlayer[];
   mafiaNightIntel?: MafiaNightIntel;
+  /** @deprecated Prefer dayIntel — kept empty for older clients. */
   detectiveLog?: DetectiveLogEntry[];
+  dayIntel?: DayIntel | null;
+  jugglerAvailable?: boolean;
   chronicle?: ChronicleEntry[];
   afkGraceEndsAt?: number | null;
   afkGracePlayerId?: string | null;
@@ -315,6 +344,7 @@ export type ClientToServerEvents = {
   }) => void;
   "day:vote": (payload: { roomId: string; targetId: string }) => void;
   "day:voteSkip": (payload: { roomId: string }) => void;
+  "day:juggle": (payload: { roomId: string; targetIds: string[] }) => void;
   "fivealive:playCard": (payload: {
     roomId: string;
     cardId?: string | null;

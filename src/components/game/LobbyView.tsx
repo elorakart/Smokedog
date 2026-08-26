@@ -6,7 +6,11 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitives";
 import { popIn, stagger } from "@/components/ui/motion";
 import type { PublicGameState, RoleDistribution, RoomSettings } from "@/lib/types";
-import { defaultRoleDistribution } from "@/lib/games/mafia-city/balance";
+import {
+  defaultRoleDistribution,
+  normalizeRoleDistribution,
+  ROLE_KEYS,
+} from "@/lib/games/mafia-city/balance";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
 
 function RoleDistributionEditor({
@@ -18,23 +22,24 @@ function RoleDistributionEditor({
   playerCount: number;
   onChange: (dist: RoleDistribution) => void;
 }) {
-  const specialKeys = (
-    Object.keys(dist) as (keyof RoleDistribution)[]
-  ).filter((k) => k !== "villager");
+  const normalized = normalizeRoleDistribution(dist, playerCount);
+  const specialKeys = ROLE_KEYS.filter((k) => k !== "villager").filter(
+    (k) => k !== "juggler" || playerCount > 10
+  );
 
   const bump = (key: keyof RoleDistribution, delta: number) => {
-    const next = { ...dist };
+    const next = { ...normalized };
     if (key === "mafia_boss" && delta < 0 && next.mafia_boss <= 1) return;
+    if (key === "juggler" && playerCount <= 10) return;
     next[key] = Math.max(key === "mafia_boss" ? 1 : 0, next[key] + delta);
-    const assigned = specialKeys.reduce((s, k) => s + next[k], 0);
+    const assigned = ROLE_KEYS.filter((k) => k !== "villager").reduce(
+      (s, k) => s + next[k],
+      0
+    );
     next.villager = Math.max(0, playerCount - assigned);
     if (assigned + next.villager !== playerCount) return;
     onChange(next);
   };
-
-  const entries = (
-    Object.entries(dist) as [keyof RoleDistribution, number][]
-  ).filter(([, n]) => n > 0);
 
   return (
     <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-3">
@@ -65,7 +70,9 @@ function RoleDistributionEditor({
               >
                 −
               </button>
-              <span className="w-4 text-center font-mono">{dist[role]}</span>
+              <span className="w-4 text-center font-mono">
+                {normalized[role]}
+              </span>
               <button
                 type="button"
                 onClick={() => bump(role, 1)}
@@ -77,15 +84,24 @@ function RoleDistributionEditor({
           </li>
         ))}
       </ul>
+      {playerCount <= 10 && (
+        <p className="mt-2 font-mono text-[10px] text-ink-steel">
+          Juggler unlocks above 10 players
+        </p>
+      )}
       <p className="mt-2 font-mono text-[10px] text-ink-steel">
-        {dist.villager}× Villager (auto-filled)
+        {normalized.villager}× Villager (auto-filled)
       </p>
       <ul className="mt-2 grid grid-cols-2 gap-1 text-xs text-ink-steel">
-        {entries.map(([role, count]) => (
-          <li key={role}>
-            {count}× {ROLE_META[role].label}
-          </li>
-        ))}
+        {(
+          Object.entries(normalized) as [keyof RoleDistribution, number][]
+        )
+          .filter(([, n]) => n > 0)
+          .map(([role, count]) => (
+            <li key={role}>
+              {count}× {ROLE_META[role].label}
+            </li>
+          ))}
       </ul>
     </div>
   );

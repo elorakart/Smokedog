@@ -9,8 +9,9 @@ export const NIGHT_ACTION_PROMPTS: Record<
   doctor_protect: "Choose someone to heal",
   detective_inspect: "Investigate an alignment",
   bodyguard_protect: "Stand in front of someone",
-  vigilante_shoot: "Fire a round",
+  vigilante_shoot: "Fire a round — or skip this night",
   blackmail: "Silence a civilian",
+  poison: "Poison someone's power for the night",
 };
 
 export const NIGHT_ACTION_LOCKED: Record<
@@ -21,8 +22,10 @@ export const NIGHT_ACTION_LOCKED: Record<
   doctor_protect: (name) => `You will heal ${name}`,
   detective_inspect: (name) => `You are investigating ${name}`,
   bodyguard_protect: (name) => `You are guarding ${name}`,
-  vigilante_shoot: (name) => `You aimed at ${name}`,
+  vigilante_shoot: (name) =>
+    name === "__skip__" ? "You skipped your shot tonight" : `You aimed at ${name}`,
   blackmail: (name) => `You silenced ${name}`,
+  poison: (name) => `You poisoned ${name}`,
 };
 
 export function pendingPlayerAction(state: PublicGameState): {
@@ -48,20 +51,18 @@ export function pendingPlayerAction(state: PublicGameState): {
     };
   }
 
+  // Vote cue lives in the single "Voting has started" announcement — no second dialog.
   if (state.phase === "day" && state.daySubPhase === "vote") {
-    if (you.blackmailed) return null;
-    if (!you.alive && !deadVillagerVote) return null;
-    if (state.votes[you.id]) return null;
-    if (!you.alive && deadVillagerVote) {
+    return null;
+  }
+
+  if (state.phase === "day" && state.daySubPhase === "discussion") {
+    if (state.jugglerAvailable) {
       return {
-        title: "Dead villager vote",
-        detail: "You may still cast a lynch vote or skip",
+        title: "Juggle ready",
+        detail: "Pick four players once this game to learn how many are evil.",
       };
     }
-    return {
-      title: "Vote needed",
-      detail: "Cast your lynch vote or skip before time runs out",
-    };
   }
 
   return null;

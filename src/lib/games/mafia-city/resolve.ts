@@ -1,5 +1,12 @@
 import type { Faction, NightAction, Player, Role } from "@/lib/types";
-import { factionOf, isMafiaRole } from "@/lib/games/mafia-city/roles";
+import { SKIP_VOTE_ID } from "@/lib/types";
+import {
+  effectiveRole,
+  factionOf,
+  isEvilRole,
+  isMafiaRole,
+  nightActionForPlayer,
+} from "@/lib/games/mafia-city/roles";
 
 export interface NightDeath {
   playerId: string;
@@ -9,6 +16,14 @@ export interface NightDeath {
   actorRole: Role | null;
 }
 
+export type NightPowerLog = {
+  actorId: string;
+  actorRole: Role;
+  type: string;
+  targetId: string | null;
+  outcome: string;
+};
+
 export interface NightResolution {
   deaths: NightDeath[];
   silencedId: string | null;
@@ -17,9 +32,13 @@ export interface NightResolution {
     investigatorId: string;
     targetId: string;
     faction: Faction;
+    interrupted: boolean;
   } | null;
   doctorSavedTargetId: string | null;
   doctorId: string | null;
+  powerLogs: NightPowerLog[];
+  poisonClearedTargetId: string | null;
+  soldierBlockedTargetId: string | null;
 }
 
 function living(players: Player[]): Player[] {
@@ -32,6 +51,11 @@ function byId(players: Player[], id?: string | null): Player | undefined {
 
 function mafiaKillActions(actions: NightAction[]): NightAction[] {
   return actions.filter((a) => a.type === "mafia_kill");
+}
+
+/** ~90% chance the Drunk's action is false / inert. */
+function drunkLies(): boolean {
+  return Math.random() < 0.9;
 }
 
 /** Final mafia hit: exactly one victim. Boss pick wins over goon. */
@@ -52,11 +76,9 @@ function mafiaKillTarget(
     ? kills.find((a) => a.playerId === goon.id)
     : undefined;
 
-  // Boss submitted → boss target only (goon vote ignored for kill).
   if (boss && bossAction) {
     return { targetId: bossAction.targetId, attackerId: boss.id };
   }
-  // Boss silent → goon target.
   if (goon && goonAction) {
     return { targetId: goonAction.targetId, attackerId: goon.id };
   }
@@ -67,7 +89,6 @@ function mafiaKillTarget(
     : null;
 }
 
-/** When bodyguard protects A, the mafia member who targeted A dies (goon if both hit A). */
 function mafiaAttackerOnTarget(
   players: Player[],
   actions: NightAction[],
@@ -93,28 +114,174 @@ export function resolveNight(
   players: Player[],
   actions: NightAction[]
 ): NightResolution {
-  const blackmail = actions.find((a) => a.type === "blackmail");
-  const blackmailer = byId(players, blackmail?.playerId);
-  const silenced = byId(players, blackmail?.targetId);
-  const silencedId =
-    silenced && silenced.alive && !isMafiaRole(silenced.role)
-      ? silenced.id
-      : null;
-  const blackmailerId =
-    silencedId && blackmailer?.alive && blackmailer.role === "blackmailer"
-      ? blackmailer.id
-      : null;
-  if (silencedId) {
-    const target = byId(players, silencedId);
-    if (target) target.blackmailed = true;
+  const powerLogs: NightPowerLog[] = [];
+  const logPower = (
+    actor: Player,
+    type: string,
+    targetId: string | null,
+    outcome: string
+  ) => {
+    powerLogs.push({
+      actorId: actor.id,
+      actorRole: actor.role ?? effectiveRole(actor) ?? "villager",
+      type,
+      targetId,
+      outcome,
+    });
+  };
+
+  // Reset poison flags from prior night, then apply tonight's poison.
+  for (const p of players) p.poisoned = false;
+
+  const poisonAction = actions.find((a) => a.type === "poison");
+  const poisoner = byId(players, poisonAction?.playerId);
+  if (
+    poisonAction &&
+    poisoner?.alive &&
+    poisoner.role === "poisoner" &&
+    poisonAction.targetId !== poisoner.id
+  ) {
+    const target = byId(players, poisonAction.targetId);
+    if (target?.alive) {
+      target.poisoned = true;
+      logPower(
+        poisoner,
+        "poison",
+        target.id,
+        `Poisoned ${target.name} for the night.`
+      );
+    }
+  } else if (poisonAction && poisoner) {
+    logPower(poisoner, "poison", poisonAction.targetId, "Poison failed.");
   }
 
+  let poisonClearedTargetId: string | null = null;
+  let doctorProtect: string | undefined;
+  let doctorActor: Player | undefined;
+  let doctorSavedTargetId: string | null = null;
+  let doctorId: string | null = null;
+
   const doctorAction = actions.find((a) => a.type === "doctor_protect");
-  const doctorProtect = doctorAction?.targetId;
-  const doctorActor = byId(players, doctorAction?.playerId);
-  const bgProtect = actions.find((a) => a.type === "bodyguard_protect")
-    ?.targetId;
-  const bodyguard = living(players).find((p) => p.role === "bodyguard");
+  if (doctorAction) {
+    doctorActor = byId(players, doctorAction.playerId);
+    const isDrunkDoc = doctorActor?.role === "drunk";
+    const realDoc =
+      doctorActor?.alive &&
+      (doctorActor.role === "doctor" ||
+        (isDrunkDoc && doctorActor.fakeRole === "doctor"));
+
+    if (doctorActor && realDoc) {
+      if (doctorActor.poisoned) {
+        logPower(
+          doctorActor,
+          "doctor_protect",
+          doctorAction.targetId,
+          "Investigation interrupted — Doctor was poisoned; protect failed."
+        );
+      } else if (isDrunkDoc && drunkLies()) {
+        logPower(
+          doctorActor,
+          "doctor_protect",
+          doctorAction.targetId,
+          "Drunk Doctor believed they protected someone — no effect."
+        );
+      } else {
+        const target = byId(players, doctorAction.targetId);
+        if (target?.alive) {
+          if (target.poisoned) {
+            target.poisoned = false;
+            poisonClearedTargetId = target.id;
+            logPower(
+              doctorActor,
+              "doctor_protect",
+              target.id,
+              `Protected ${target.name} and cleared poison.`
+            );
+          } else {
+            logPower(
+              doctorActor,
+              "doctor_protect",
+              target.id,
+              `Protected ${target.name}.`
+            );
+          }
+          doctorProtect = target.id;
+        }
+      }
+    }
+  }
+
+  // Blackmail
+  let silencedId: string | null = null;
+  let blackmailerId: string | null = null;
+  const blackmail = actions.find((a) => a.type === "blackmail");
+  const blackmailer = byId(players, blackmail?.playerId);
+  if (
+    blackmail &&
+    blackmailer?.alive &&
+    blackmailer.role === "blackmailer"
+  ) {
+    if (blackmailer.poisoned) {
+      logPower(
+        blackmailer,
+        "blackmail",
+        blackmail.targetId,
+        "Blackmail interrupted — Poisoner blocked their power."
+      );
+    } else {
+      const silenced = byId(players, blackmail.targetId);
+      if (silenced?.alive && !isMafiaRole(silenced.role)) {
+        silenced.blackmailed = true;
+        silencedId = silenced.id;
+        blackmailerId = blackmailer.id;
+        logPower(
+          blackmailer,
+          "blackmail",
+          silenced.id,
+          `Blackmailed ${silenced.name}.`
+        );
+      } else {
+        logPower(blackmailer, "blackmail", blackmail.targetId, "Blackmail failed.");
+      }
+    }
+  }
+
+  // Bodyguard protect registration
+  let bgProtect: string | undefined;
+  const bgAction = actions.find((a) => a.type === "bodyguard_protect");
+  const bodyguard = byId(players, bgAction?.playerId);
+  if (bgAction && bodyguard?.alive) {
+    const isDrunkBg =
+      bodyguard.role === "drunk" && bodyguard.fakeRole === "bodyguard";
+    const realBg = bodyguard.role === "bodyguard" || isDrunkBg;
+    if (realBg) {
+      if (bodyguard.poisoned) {
+        logPower(
+          bodyguard,
+          "bodyguard_protect",
+          bgAction.targetId,
+          "Bodyguard was poisoned — guard failed."
+        );
+      } else if (isDrunkBg && drunkLies()) {
+        logPower(
+          bodyguard,
+          "bodyguard_protect",
+          bgAction.targetId,
+          "Drunk Bodyguard believed they guarded — no effect."
+        );
+      } else {
+        bgProtect = bgAction.targetId;
+        logPower(
+          bodyguard,
+          "bodyguard_protect",
+          bgAction.targetId,
+          `Guarding target.`
+        );
+      }
+    }
+  }
+  const activeBodyguard =
+    bodyguard?.alive && bgProtect ? bodyguard : null;
 
   const deathMeta = new Map<
     string,
@@ -132,25 +299,48 @@ export function resolveNight(
     deathMeta.set(id, { reason, actorId, actorRole });
   };
 
-  let doctorSavedTargetId: string | null = null;
-  let doctorId: string | null = null;
+  let soldierBlockedTargetId: string | null = null;
 
   const mafiaHit = mafiaKillTarget(players, actions);
-  // Guarantee a single mafia murder attempt this night (boss/goon share one kill).
   if (mafiaHit) {
     const target = byId(players, mafiaHit.targetId);
     const attacker = byId(players, mafiaHit.attackerId);
     if (target?.alive && attacker?.alive) {
-      if (doctorProtect === target.id) {
+      logPower(
+        attacker,
+        "mafia_kill",
+        target.id,
+        `Mafia marked ${target.name}.`
+      );
+
+      const soldierImmune =
+        target.role === "soldier" && !target.poisoned;
+
+      if (soldierImmune) {
+        soldierBlockedTargetId = target.id;
+        logPower(
+          attacker,
+          "mafia_kill",
+          target.id,
+          `${target.name} (Soldier) shrugged off the mafia hit.`
+        );
+      } else if (doctorProtect === target.id) {
         doctorSavedTargetId = target.id;
         doctorId =
-          doctorActor?.alive && doctorActor.role === "doctor"
+          doctorActor?.alive &&
+          (doctorActor.role === "doctor" ||
+            (doctorActor.role === "drunk" &&
+              doctorActor.fakeRole === "doctor"))
             ? doctorActor.id
             : living(players).find((p) => p.role === "doctor")?.id ?? null;
-      } else if (bodyguard && bgProtect === target.id && bodyguard.alive) {
-        if (bodyguard.id !== target.id) {
+      } else if (
+        activeBodyguard &&
+        bgProtect === target.id &&
+        activeBodyguard.alive
+      ) {
+        if (activeBodyguard.id !== target.id) {
           markDead(
-            bodyguard.id,
+            activeBodyguard.id,
             "Died intercepting an attack",
             attacker.id,
             attacker.role ?? null
@@ -161,12 +351,12 @@ export function resolveNight(
             target.id
           );
           const mafiaAttacker = byId(players, mafiaAttackerId);
-          if (mafiaAttacker && mafiaAttacker.id !== bodyguard.id) {
+          if (mafiaAttacker && mafiaAttacker.id !== activeBodyguard.id) {
             if (doctorProtect !== mafiaAttacker.id) {
               markDead(
                 mafiaAttacker.id,
                 "Killed while attacking a protected target",
-                bodyguard.id,
+                activeBodyguard.id,
                 "bodyguard"
               );
             }
@@ -183,69 +373,154 @@ export function resolveNight(
     }
   }
 
+  // Vigilante
   const vig = actions.find((a) => a.type === "vigilante_shoot");
   if (vig) {
     const shooter = byId(players, vig.playerId);
-    const vigTarget = byId(players, vig.targetId);
-    if (
+    const isDrunkVig =
+      shooter?.role === "drunk" && shooter.fakeRole === "vigilante";
+    const realVig =
       shooter?.alive &&
-      vigTarget?.alive &&
-      (shooter.bulletsLeft ?? 0) > 0 &&
-      vig.playerId !== vig.targetId
-    ) {
-      shooter.bulletsLeft = (shooter.bulletsLeft ?? 1) - 1;
-      if (doctorProtect === vigTarget.id) {
-        doctorSavedTargetId = vigTarget.id;
-        doctorId =
-          doctorActor?.alive && doctorActor.role === "doctor"
-            ? doctorActor.id
-            : living(players).find((p) => p.role === "doctor")?.id ?? null;
-      } else if (
-        bodyguard &&
-        bgProtect === vigTarget.id &&
-        bodyguard.alive &&
-        bodyguard.id !== vigTarget.id
-      ) {
-        markDead(
-          bodyguard.id,
-          "Died intercepting an attack",
-          shooter.id,
-          shooter.role ?? null
+      (shooter.role === "vigilante" || isDrunkVig);
+
+    if (shooter && realVig) {
+      if (vig.targetId === SKIP_VOTE_ID) {
+        logPower(shooter, "vigilante_shoot", null, "Skipped the night — no shot.");
+      } else if (shooter.poisoned) {
+        logPower(
+          shooter,
+          "vigilante_shoot",
+          vig.targetId,
+          "Vigilante was poisoned — shot interrupted."
         );
-        if (doctorProtect !== shooter.id) {
-          markDead(
-            shooter.id,
-            "Killed while attacking a protected target",
-            bodyguard.id,
-            "bodyguard"
-          );
+      } else if (isDrunkVig && drunkLies()) {
+        logPower(
+          shooter,
+          "vigilante_shoot",
+          vig.targetId,
+          "Drunk Vigilante believed they fired — no bullet left the chamber."
+        );
+        // Still burn a fake bullet feel? Don't change real bullets for drunk.
+      } else if ((shooter.bulletsLeft ?? 0) > 0 || isDrunkVig) {
+        const vigTarget = byId(players, vig.targetId);
+        if (
+          vigTarget?.alive &&
+          vig.playerId !== vig.targetId
+        ) {
+          if (!isDrunkVig) {
+            shooter.bulletsLeft = (shooter.bulletsLeft ?? 1) - 1;
+          }
+          if (doctorProtect === vigTarget.id) {
+            doctorSavedTargetId = vigTarget.id;
+            doctorId =
+              doctorActor?.alive &&
+              (doctorActor.role === "doctor" ||
+                (doctorActor.role === "drunk" &&
+                  doctorActor.fakeRole === "doctor"))
+                ? doctorActor.id
+                : living(players).find((p) => p.role === "doctor")?.id ??
+                  null;
+            logPower(
+              shooter,
+              "vigilante_shoot",
+              vigTarget.id,
+              `Shot at ${vigTarget.name} — blocked by Doctor.`
+            );
+          } else if (
+            activeBodyguard &&
+            bgProtect === vigTarget.id &&
+            activeBodyguard.alive &&
+            activeBodyguard.id !== vigTarget.id
+          ) {
+            markDead(
+              activeBodyguard.id,
+              "Died intercepting an attack",
+              shooter.id,
+              shooter.role ?? null
+            );
+            if (doctorProtect !== shooter.id) {
+              markDead(
+                shooter.id,
+                "Killed while attacking a protected target",
+                activeBodyguard.id,
+                "bodyguard"
+              );
+            }
+            logPower(
+              shooter,
+              "vigilante_shoot",
+              vigTarget.id,
+              `Shot at ${vigTarget.name} — Bodyguard intercepted.`
+            );
+          } else {
+            markDead(
+              vigTarget.id,
+              "Gunned down overnight",
+              shooter.id,
+              shooter.role ?? null
+            );
+            logPower(
+              shooter,
+              "vigilante_shoot",
+              vigTarget.id,
+              `Shot ${vigTarget.name}.`
+            );
+          }
         }
+      }
+    }
+  }
+
+  // Detective
+  let detective: NightResolution["detective"] = null;
+  const detectiveAction = actions.find((a) => a.type === "detective_inspect");
+  const investigator = byId(players, detectiveAction?.playerId);
+  if (detectiveAction && investigator) {
+    const isDrunkDet =
+      investigator.role === "drunk" && investigator.fakeRole === "detective";
+    const realDet =
+      investigator.role === "detective" || isDrunkDet;
+    const inspected = byId(players, detectiveAction.targetId);
+
+    if (realDet && inspected?.role && investigator.id !== inspected.id) {
+      if (investigator.poisoned) {
+        detective = {
+          investigatorId: investigator.id,
+          targetId: inspected.id,
+          faction: factionOf(inspected.role),
+          interrupted: true,
+        };
+        logPower(
+          investigator,
+          "detective_inspect",
+          inspected.id,
+          "Investigation interrupted — Detective was poisoned."
+        );
       } else {
-        markDead(
-          vigTarget.id,
-          "Gunned down overnight",
-          shooter.id,
-          shooter.role ?? null
+        let faction = factionOf(inspected.role);
+        if (isDrunkDet && drunkLies()) {
+          faction = faction === "mafia" ? "town" : "mafia";
+        }
+        detective = {
+          investigatorId: investigator.id,
+          targetId: inspected.id,
+          faction,
+          interrupted: false,
+        };
+        logPower(
+          investigator,
+          "detective_inspect",
+          inspected.id,
+          isDrunkDet
+            ? `Drunk Detective read ${inspected.name} as ${faction}.`
+            : `Investigated ${inspected.name} — ${faction}.`
         );
       }
     }
   }
 
-  // Detective learns the result even if they die the same night — they already acted.
-  const detectiveAction = actions.find((a) => a.type === "detective_inspect");
-  const investigator = byId(players, detectiveAction?.playerId);
-  const inspected = byId(players, detectiveAction?.targetId);
-  const detective =
-    !!detectiveAction &&
-    investigator?.role === "detective" &&
-    inspected?.role &&
-    investigator.id !== inspected.id
-      ? {
-          investigatorId: investigator.id,
-          targetId: inspected.id,
-          faction: factionOf(inspected.role),
-        }
-      : null;
+  // Clear poison at end of night (1-night duration).
+  for (const p of players) p.poisoned = false;
 
   return {
     deaths: [...deathMeta.entries()].map(([playerId, meta]) => ({
@@ -259,6 +534,9 @@ export function resolveNight(
     detective,
     doctorSavedTargetId,
     doctorId,
+    powerLogs,
+    poisonClearedTargetId,
+    soldierBlockedTargetId,
   };
 }
 
@@ -267,12 +545,13 @@ export function validNightTargets(
   actor: Player
 ): Player[] {
   const others = living(players).filter((p) => p.id !== actor.id);
-  switch (actor.role) {
+  const role = effectiveRole(actor);
+  switch (role) {
     case "doctor":
     case "bodyguard":
-      return others;
     case "detective":
     case "vigilante":
+    case "poisoner":
       return others;
     case "blackmailer":
       return others.filter((p) => !isMafiaRole(p.role));
@@ -299,15 +578,13 @@ export function playerCanDayVote(p: Player): boolean {
   return p.role === "villager";
 }
 
-/** Roster for the day vote tally — not the full seat count. */
 export function eligibleVoters(players: Player[]): Player[] {
   return players.filter(playerCanDayVote);
 }
 
 /**
- * Plurality lynch: the unique top vote-getter is eliminated.
- * Skip is a normal option — unique top skip means no hang.
- * Any tie for first (including vs skip) means no lynch.
+ * Plurality vote-out: the unique top vote-getter is eliminated.
+ * Skip is a normal option — unique top skip means no elimination.
  */
 export function tallyLynch(
   players: Player[],
@@ -334,3 +611,40 @@ export function tallyLynch(
   if (!best || tie || best.n < 1) return null;
   return best.id;
 }
+
+export function countEvilAmong(
+  players: Player[],
+  targetIds: string[]
+): number {
+  let n = 0;
+  for (const id of targetIds) {
+    const p = byId(players, id);
+    if (p && isEvilRole(p.role)) n += 1;
+  }
+  return n;
+}
+
+/** Promote Poisoner/Blackmailer to Goon when Boss dies and no Goon remains. */
+export function promoteMafiaAfterBossDeath(
+  players: Player[],
+  deadBossId: string
+): { promoted: Player; fromRole: Role } | null {
+  const boss = byId(players, deadBossId);
+  if (!boss || boss.role !== "mafia_boss" || boss.alive) return null;
+
+  const livingGoon = living(players).find((p) => p.role === "mafia_goon");
+  if (livingGoon) return null;
+
+  const candidates = living(players).filter(
+    (p) => p.role === "poisoner" || p.role === "blackmailer"
+  );
+  if (candidates.length === 0) return null;
+
+  const pick =
+    candidates[Math.floor(Math.random() * candidates.length)]!;
+  const fromRole = pick.role!;
+  pick.role = "mafia_goon";
+  return { promoted: pick, fromRole };
+}
+
+export { nightActionForPlayer, effectiveRole };

@@ -15,19 +15,23 @@ const RULES_BY_GAME: Record<string, GameRules> = {
     sections: [
       {
         title: "The setup",
-        body: "4–12 players get secret roles. Most are Town — they want to find and lynch the Mafia. Mafia want to outnumber Town without getting caught.",
+        body: "4–12 players get secret roles. Most are Town — they want to find and vote out the Mafia. Mafia want to outnumber Town without getting caught. Hosts can add Poisoner, Drunk, Soldier, and Juggler (Juggler needs more than 10 players).",
       },
       {
         title: "Night",
-        body: "Special roles act in secret. Mafia pick a target. Doctor and Bodyguard protect people. Detective investigates alignments. Vigilante can shoot. Blackmailer silences someone for the next day.",
+        body: "Special roles act in secret. Mafia pick a kill. Doctor and Bodyguard protect. Detective investigates. Vigilante can shoot or skip a night. Blackmailer silences someone for the next day. Poisoner blocks a target’s power for one night (Doctor clearing the same person removes poison). Soldier shrugs off the mafia kill unless poisoned that night.",
       },
       {
         title: "Day",
-        body: "Discuss first, then vote in the final 15 seconds. Whoever has the most votes alone is lynched — a tie spares everyone. Skip is an option and wins only if it leads alone. Miss your vote twice and you die from AFK.",
+        body: "Discuss first, then vote in the final 15 seconds. Whoever has the most votes alone is voted out — a tie spares everyone. Skip is an option and wins only if it leads alone. Miss your vote twice and you die from AFK. Juggler may once pick four players; town sees the targets, only the Juggler learns how many are evil.",
+      },
+      {
+        title: "Drunk & succession",
+        body: "Drunk believes they hold a town power role (that real role is removed from the deck) — their results are usually wrong. If the Mafia Boss dies with no Goon left, a living Poisoner or Blackmailer is promoted to Goon and loses their old power. All mafia see their teammates.",
       },
       {
         title: "Voice & chat",
-        body: "Town chat and voice open during day discussion. Mafia get a private channel at night only. Dead players use the graveyard.",
+        body: "Town chat and voice open during day discussion. Mafia get a private channel at night only. Dead players use the graveyard. Personal intel is shown once as a popup and via an eye icon for that day only.",
       },
       {
         title: "Winning",

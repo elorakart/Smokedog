@@ -42,7 +42,7 @@ export function announcementForViewer(
     }
     return {
       ...announcement,
-      detail: "Cast your lynch vote or skip. Town voice is now closed.",
+      detail: "Cast your vote or skip. Town voice is now closed.",
     };
   }
 
@@ -95,11 +95,11 @@ export function announcementForViewer(
     return announcement;
   }
 
-  if (titleLower === "lynch result") {
+  if (titleLower === "vote result" || titleLower === "lynch result") {
     if (!alive && yourName && detail.includes(yourName)) {
       return {
         ...announcement,
-        title: "You were lynched",
+        title: "You were voted out",
         detail: "The city voted you out. Spectate from the graveyard.",
       };
     }
@@ -112,7 +112,11 @@ export function announcementForViewer(
     return announcement;
   }
 
-  if (titleLower === "no lynch" || titleLower === "tied vote") {
+  if (
+    titleLower === "no one voted out" ||
+    titleLower === "no lynch" ||
+    titleLower === "tied vote"
+  ) {
     if (!alive) {
       return {
         ...announcement,
@@ -122,7 +126,6 @@ export function announcementForViewer(
     return announcement;
   }
 
-  // Generic fallback: never push action verbs at pure spectators.
   if (!alive && !deadVillagerVote) {
     const actiony =
       /cast your|choose|mark someone|investigate|vote or skip|town voice is open/i.test(

@@ -5,8 +5,8 @@ import type {
   ChatMessage,
   ChronicleEntry,
   ClientToServerEvents,
+  DayIntel,
   DaySubPhase,
-  DetectiveLogEntry,
   GameLog,
   MafiaNightIntel,
   NightAction,
@@ -42,12 +42,14 @@ import {
 import {
   factionOf,
   isMafiaRole,
-  nightActionFor,
+  effectiveRole,
+  nightActionForPlayer,
   ROLE_META,
 } from "@/lib/games/mafia-city/roles";
 import {
+  assignMafiaCityRoles,
   bulletsForLobby,
-  defaultRoleDistribution,
+  normalizeRoleDistribution,
 } from "@/lib/games/mafia-city/balance";
 import {
   generateDobbleDeck,
@@ -88,8 +90,10 @@ function isChatOnlyGame(gameId: string): boolean {
   );
 }
 import {
+  countEvilAmong,
   eligibleVoters,
   playerCanDayVote,
+  promoteMafiaAfterBossDeath,
   resolveNight,
   tallyLynch,
   validNightTargets,
@@ -132,7 +136,7 @@ interface Room {
   chronicle: ChronicleEntry[];
   announcement: PhaseAnnouncement | null;
   mafiaNightIntel: MafiaNightIntel;
-  detectiveLog: DetectiveLogEntry[];
+  dayIntelByPlayer: Record<string, DayIntel>;
   afkGraceEndsAt: number | null;
   afkGracePlayerId: string | null;
   winner: "town" | "mafia" | null;
@@ -290,14 +294,19 @@ export class GameRuntime {
       : null;
     const revealAll = room.phase === "gameover";
     const viewerIsMafia = you?.role ? isMafiaRole(you.role) : false;
-    const viewerIsDetective = you?.role === "detective";
-    const viewerIsTown = you?.role ? !isMafiaRole(you.role) : false;
     const five = room.gameId === "five-alive" ? room.fiveAlive : undefined;
     const rolePreview =
       room.phase === "lobby"
-        ? room.settings.roleDistribution ??
-          defaultRoleDistribution(room.players.length)
+        ? normalizeRoleDistribution(
+            room.settings.roleDistribution,
+            room.players.length
+          )
         : null;
+    const displayRole = you
+      ? revealAll
+        ? you.role
+        : effectiveRole(you)
+      : undefined;
     return {
       roomId: room.id,
       gameId: room.gameId,
@@ -317,7 +326,7 @@ export class GameRuntime {
       you: you
         ? {
             id: you.id,
-            role: you.role,
+            role: displayRole,
             faction: you.role ? factionOf(you.role) : undefined,
             bulletsLeft: you.bulletsLeft,
             alive: you.alive,
@@ -356,10 +365,14 @@ export class GameRuntime {
         viewerIsMafia && room.phase === "night"
           ? room.mafiaNightIntel
           : undefined,
-      detectiveLog:
-        viewerIsDetective && room.detectiveLog.length > 0
-          ? room.detectiveLog
-          : undefined,
+      dayIntel: you ? room.dayIntelByPlayer[you.id] ?? null : null,
+      jugglerAvailable:
+        !!you &&
+        you.alive &&
+        you.role === "juggler" &&
+        !you.jugglerUsed &&
+        room.phase === "day" &&
+        room.daySubPhase === "discussion",
       chronicle: revealAll ? room.chronicle : undefined,
       afkGraceEndsAt: room.afkGraceEndsAt,
       afkGracePlayerId: room.afkGracePlayerId,
@@ -756,7 +769,7 @@ export class GameRuntime {
       room,
       "info",
       "Voting has started",
-      "Lynch votes are open. Town voice is now closed."
+      "Cast your vote or skip. Town voice is now closed."
     );
     log(room, `Day ${room.cycle} — voting open for ${DAY_VOTE_SECONDS}s.`);
     room.phaseEndsAt = Date.now() + DAY_VOTE_SECONDS * 1000;
@@ -818,7 +831,7 @@ export class GameRuntime {
       chronicle: [],
       announcement: null,
       mafiaNightIntel: {},
-      detectiveLog: [],
+      dayIntelByPlayer: {},
       afkGraceEndsAt: null,
       afkGracePlayerId: null,
       winner: null,
@@ -957,7 +970,10 @@ export class GameRuntime {
         );
       }
       if (patch.roleDistribution !== undefined) {
-        room.settings.roleDistribution = patch.roleDistribution;
+        room.settings.roleDistribution = normalizeRoleDistribution(
+          patch.roleDistribution,
+          room.players.length
+        );
       }
     }
     this.emitRoom(room);
@@ -1047,15 +1063,20 @@ export class GameRuntime {
       return;
     }
 
-    const roles = mod.assignRoles(room.players.length, room.settings);
+    const deals = assignMafiaCityRoles(room.players.length, room.settings);
     const bullets = bulletsForLobby(room.players.length, room.settings);
     room.players.forEach((p, i) => {
-      p.role = roles[i];
+      const deal = deals[i]!;
+      p.role = deal.role;
+      p.fakeRole = deal.fakeRole;
+      p.jugglerUsed = false;
+      p.poisoned = false;
       p.alive = true;
       p.ready = false;
       p.afkCount = 0;
       p.blackmailed = false;
-      p.bulletsLeft = p.role === "vigilante" ? bullets : undefined;
+      p.bulletsLeft =
+        effectiveRole(p) === "vigilante" ? bullets : undefined;
       this.leaveMafiaRooms(p, room.id);
       this.joinMafiaRoom(p, room.id);
     });
@@ -1069,7 +1090,7 @@ export class GameRuntime {
     room.chronicle = [];
     room.announcement = null;
     room.mafiaNightIntel = {};
-    room.detectiveLog = [];
+    room.dayIntelByPlayer = {};
     room.daySubPhase = null;
     room.afkGraceEndsAt = null;
     room.afkGracePlayerId = null;
@@ -1078,9 +1099,11 @@ export class GameRuntime {
 
     for (const p of room.players) {
       if (!p.socketId || !p.role) continue;
-      const meta = ROLE_META[p.role];
+      const displayRole =
+        p.role === "drunk" && p.fakeRole ? p.fakeRole : p.role;
+      const meta = ROLE_META[displayRole];
       this.io.to(p.socketId).emit("role:reveal", {
-        role: p.role,
+        role: displayRole,
         faction: meta.faction,
         ability: meta.ability,
       });
@@ -1164,6 +1187,7 @@ export class GameRuntime {
     room.nightActions = [];
     room.votes = {};
     room.detectiveByPlayer = {};
+    room.dayIntelByPlayer = {};
     room.daySubPhase = null;
     room.mafiaNightIntel = {};
     room.afkGraceEndsAt = null;
@@ -1216,7 +1240,7 @@ export class GameRuntime {
 
   private playersNeedingNightAction(room: Room): Player[] {
     return living(room).filter((p) => {
-      const type = nightActionFor(p.role) as NightActionType | null;
+      const type = nightActionForPlayer(p) as NightActionType | null;
       if (!type) return false;
       if (type === "vigilante_shoot" && (p.bulletsLeft ?? 0) <= 0) return false;
       if (room.nightActions.some((a) => a.playerId === p.id)) return false;
@@ -1249,8 +1273,31 @@ export class GameRuntime {
     this.leaveMafiaRooms(player, room.id);
     this.removeFromAllVoice(room, player.id);
     this.addChronicle(room, room.phase === "night" ? "night" : "day", `${player.name} died due to AFK`);
+    this.maybePromoteMafiaAfterBossDeath(room, playerId);
     this.emitRoom(room);
     this.maybeWin(room);
+  }
+
+  private maybePromoteMafiaAfterBossDeath(room: Room, deadPlayerId: string) {
+    const promotion = promoteMafiaAfterBossDeath(room.players, deadPlayerId);
+    if (!promotion) return;
+    const { promoted, fromRole } = promotion;
+    const fromLabel = ROLE_META[fromRole].label;
+    this.addChronicle(
+      room,
+      room.phase === "night" ? "night" : "day",
+      `Boss promoted ${promoted.name} from ${fromLabel} to Goon.`
+    );
+    const detail = `${promoted.name} was promoted from ${fromLabel} to Mafia Goon.`;
+    for (const p of room.players) {
+      if (!p.alive || !isMafiaRole(p.role) || !p.socketId) continue;
+      this.emitNightPowerResult(p.socketId, {
+        tone: "info",
+        title: "Mafia succession",
+        detail,
+      });
+    }
+    this.joinMafiaRoom(promoted, room.id);
   }
 
   private handlePhaseTimeoutAfk(room: Room) {
@@ -1288,6 +1335,10 @@ export class GameRuntime {
       if (action.type === "blackmail") {
         intel.blackmailTargetId = target.id;
         intel.blackmailTargetName = target.name;
+      }
+      if (action.type === "poison") {
+        intel.poisonTargetId = target.id;
+        intel.poisonTargetName = target.name;
       }
       if (action.type === "mafia_kill" && actor.role === "mafia_boss") {
         intel.bossTargetId = target.id;
@@ -1346,11 +1397,52 @@ export class GameRuntime {
       const target = room.players.find((p) => p.id === result.detective!.targetId);
       const inv = room.players.find((p) => p.id === result.detective!.investigatorId);
       if (inv?.socketId && target) {
-        this.io.to(inv.socketId).emit("detective:result", {
-          targetId: result.detective.targetId,
-          targetName: target.name,
-          faction: result.detective.faction,
-          cycle,
+        if (result.detective.interrupted) {
+          this.emitNightPowerResult(inv.socketId, {
+            tone: "bad",
+            title: `${nightLabel} — investigation interrupted`,
+            detail: "Poison blocked your investigation. You learned nothing.",
+          });
+        } else {
+          this.io.to(inv.socketId).emit("detective:result", {
+            targetId: result.detective.targetId,
+            targetName: target.name,
+            faction: result.detective.faction,
+            cycle,
+          });
+        }
+      }
+    }
+
+    if (result.poisonClearedTargetId) {
+      const cleared = room.players.find(
+        (p) => p.id === result.poisonClearedTargetId
+      );
+      const doctor =
+        (result.doctorId
+          ? room.players.find((p) => p.id === result.doctorId)
+          : null) ??
+        room.players.find((p) => p.role === "doctor");
+      if (doctor?.socketId && cleared) {
+        this.emitNightPowerResult(doctor.socketId, {
+          tone: "good",
+          title: `${nightLabel} — poison cleared`,
+          detail: `You protected ${cleared.name} and cleared poison.`,
+        });
+      }
+    }
+
+    const poisonAction = room.nightActions.find((a) => a.type === "poison");
+    if (poisonAction) {
+      const poisoner = room.players.find((p) => p.id === poisonAction.playerId);
+      const poisonLog = result.powerLogs.find(
+        (pl) => pl.type === "poison" && pl.actorId === poisoner?.id
+      );
+      if (poisoner?.socketId && poisonLog) {
+        this.emitNightPowerResult(poisoner.socketId, {
+          tone: poisonLog.outcome.includes("Poisoned") ? "good" : "info",
+          title: `${nightLabel} — poison`,
+          detail: poisonLog.outcome,
         });
       }
     }
@@ -1394,6 +1486,13 @@ export class GameRuntime {
     const vigAction = room.nightActions.find((a) => a.type === "vigilante_shoot");
     if (vigAction) {
       const vig = room.players.find((p) => p.id === vigAction.playerId);
+      if (vig?.socketId && vigAction.targetId === SKIP_VOTE_ID) {
+        this.emitNightPowerResult(vig.socketId, {
+          tone: "info",
+          title: `${nightLabel} — no shot`,
+          detail: "You held your fire tonight.",
+        });
+      }
       const target = room.players.find((p) => p.id === vigAction.targetId);
       if (vig?.socketId && target) {
         const kill = result.deaths.find(
@@ -1463,6 +1562,9 @@ export class GameRuntime {
     if (intel.blackmailTargetName) {
       intelParts.push(`Blackmail on ${intel.blackmailTargetName}`);
     }
+    if (intel.poisonTargetName) {
+      intelParts.push(`Poison on ${intel.poisonTargetName}`);
+    }
     if (intelParts.length > 0) {
       for (const p of room.players) {
         if (!p.alive || !p.socketId || !isMafiaRole(p.role)) continue;
@@ -1479,71 +1581,60 @@ export class GameRuntime {
     this.handlePhaseTimeoutAfk(room);
     const result = resolveNight(room.players, room.nightActions);
 
+    for (const pl of result.powerLogs) {
+      const actor = room.players.find((p) => p.id === pl.actorId);
+      const name = actor?.name ?? "Someone";
+      this.addChronicle(room, "night", `${name}: ${pl.outcome}`);
+    }
+
     if (result.detective) {
       const target = room.players.find((p) => p.id === result.detective!.targetId);
-      room.detectiveByPlayer[result.detective.investigatorId] = {
-        targetId: result.detective.targetId,
-        faction: result.detective.faction,
-      };
-      if (target) {
-        room.detectiveLog.push({
-          id: randomUUID(),
-          targetId: target.id,
-          targetName: target.name,
-          faction: result.detective.faction,
-          at: Date.now(),
-          cycle: room.cycle,
-        });
-        const by = this.byActorRolePhrase(
-          room,
-          result.detective.investigatorId,
-          "detective"
-        );
-        this.addChronicle(
-          room,
-          "night",
-          `${target.name} was investigated${by} — ${result.detective.faction}.`
-        );
+      const inv = room.players.find(
+        (p) => p.id === result.detective!.investigatorId
+      );
+      if (inv && target) {
+        if (result.detective.interrupted) {
+          room.dayIntelByPlayer[inv.id] = {
+            kind: "detective",
+            title: `Night ${room.cycle} — investigation interrupted`,
+            detail: "Your investigation was blocked — you learned nothing.",
+            cycle: room.cycle,
+            at: Date.now(),
+          };
+        } else {
+          room.detectiveByPlayer[inv.id] = {
+            targetId: result.detective.targetId,
+            faction: result.detective.faction,
+          };
+          room.dayIntelByPlayer[inv.id] = {
+            kind: "detective",
+            title: `Night ${room.cycle} — investigation`,
+            detail: `${target.name} is ${result.detective.faction}.`,
+            cycle: room.cycle,
+            at: Date.now(),
+          };
+        }
       }
     }
 
     this.emitPersonalNightPowerResults(room, result);
 
-    if (result.doctorSavedTargetId) {
-      const saved = room.players.find((p) => p.id === result.doctorSavedTargetId);
-      if (saved) {
-        const by = this.byActorRolePhrase(room, result.doctorId, "doctor");
-        this.addChronicle(
-          room,
-          "night",
-          `${saved.name} was saved${by || " by the Doctor"}.`
-        );
-      }
-    }
-
     if (result.silencedId) {
       const p = room.players.find((x) => x.id === result.silencedId);
       if (p) {
         log(room, `${p.name} has been blackmailed into silence.`);
-        const by = this.byActorRolePhrase(
-          room,
-          result.blackmailerId,
-          "blackmailer"
-        );
-        this.addChronicle(
-          room,
-          "night",
-          `${p.name} was blackmailed${by}.`
-        );
       }
     }
+
+    const deadBossIds: string[] = [];
 
     if (result.deaths.length === 0) {
       log(room, "The night passes without blood.");
       if (
         !result.doctorSavedTargetId &&
         !result.detective &&
-        !result.silencedId
+        !result.silencedId &&
+        result.powerLogs.length === 0
       ) {
         this.addChronicle(room, "night", "The night passed quietly.");
       }
@@ -1568,6 +1659,7 @@ export class GameRuntime {
       for (const d of result.deaths) {
         const p = room.players.find((x) => x.id === d.playerId);
         if (p) {
+          if (p.role === "mafia_boss") deadBossIds.push(p.id);
           const by = this.byActorRolePhrase(room, d.actorId, d.actorRole);
           this.addChronicle(
             room,
@@ -1589,6 +1681,10 @@ export class GameRuntime {
       );
     }
 
+    for (const bossId of deadBossIds) {
+      this.maybePromoteMafiaAfterBossDeath(room, bossId);
+    }
+
     for (const p of room.players) {
       if (!p.alive) this.leaveMafiaRooms(p, room.id);
     }
@@ -1598,14 +1694,19 @@ export class GameRuntime {
     this.handlePhaseTimeoutAfk(room);
     const lynchedId = tallyLynch(room.players, room.votes);
     if (lynchedId === SKIP_VOTE_ID) {
-      log(room, "The city votes to skip the lynch.");
-      this.addChronicle(room, "day", "No one was lynched — vote skipped.");
-      this.setAnnouncement(room, "info", "No lynch", "The city voted to skip.");
+      log(room, "The city votes to skip.");
+      this.addChronicle(room, "day", "No one was voted out — vote skipped.");
+      this.setAnnouncement(
+        room,
+        "info",
+        "Vote result",
+        "No one was voted out."
+      );
       return;
     }
     if (!lynchedId) {
-      log(room, "The vote ties. The city lets the day die without a hanging.");
-      this.addChronicle(room, "day", "Vote tied — no lynch.");
+      log(room, "The vote ties. The city lets the day die without an elimination.");
+      this.addChronicle(room, "day", "Vote tied — no one was voted out.");
       this.setAnnouncement(
         room,
         "info",
@@ -1616,17 +1717,21 @@ export class GameRuntime {
     }
     const target = room.players.find((p) => p.id === lynchedId);
     if (!target || !target.alive) return;
+    const wasBoss = target.role === "mafia_boss";
     target.alive = false;
-    log(room, `The city lynches ${target.name}.`);
-    this.addChronicle(room, "day", `${target.name} was lynched.`);
+    log(room, `The city voted out ${target.name}.`);
+    this.addChronicle(room, "day", `${target.name} was voted out.`);
     this.setAnnouncement(
       room,
       "bad",
-      "Lynch result",
+      "Vote result",
       `${target.name} was eliminated by vote.`
     );
     this.leaveMafiaRooms(target, room.id);
     this.removeFromAllVoice(room, target.id);
+    if (wasBoss) {
+      this.maybePromoteMafiaAfterBossDeath(room, target.id);
+    }
   }
 
   private onTimeout(roomId: string) {
@@ -2055,12 +2160,17 @@ export class GameRuntime {
     if (!room || room.phase !== "night" || room.paused) return;
     const actor = room.players.find((p) => p.id === playerId);
     if (!actor?.alive) return;
-    const expected = nightActionFor(actor.role);
+    const expected = nightActionForPlayer(actor);
     if (expected !== type) return;
     if (type === "vigilante_shoot" && (actor.bulletsLeft ?? 0) <= 0) return;
-    const legal = validNightTargets(room.players, actor);
-    if (!legal.some((p) => p.id === targetId)) {
-      return;
+    if (
+      type !== "vigilante_shoot" ||
+      targetId !== SKIP_VOTE_ID
+    ) {
+      const legal = validNightTargets(room.players, actor);
+      if (!legal.some((p) => p.id === targetId)) {
+        return;
+      }
     }
     room.nightActions = room.nightActions.filter((a) => a.playerId !== playerId);
     room.nightActions.push({ playerId, type, targetId, auto: false });
@@ -2068,6 +2178,71 @@ export class GameRuntime {
     if (room.afkGracePlayerId === playerId) {
       room.afkGracePlayerId = null;
       room.afkGraceEndsAt = null;
+    }
+    this.emitRoom(room);
+  }
+
+  submitJuggle(roomId: string, playerId: string, targetIds: string[]) {
+    const room = this.getRoom(roomId);
+    if (
+      !room ||
+      room.phase !== "day" ||
+      room.daySubPhase !== "discussion" ||
+      room.paused
+    ) {
+      return;
+    }
+    const juggler = room.players.find((p) => p.id === playerId);
+    if (
+      !juggler?.alive ||
+      juggler.role !== "juggler" ||
+      juggler.jugglerUsed
+    ) {
+      return;
+    }
+    const unique = [...new Set(targetIds)];
+    if (unique.length !== 4) return;
+    const livingIds = new Set(living(room).map((p) => p.id));
+    if (!unique.every((id) => livingIds.has(id))) return;
+
+    const evilCount = countEvilAmong(room.players, unique);
+    juggler.jugglerUsed = true;
+
+    const names = unique
+      .map((id) => room.players.find((p) => p.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    const nameList =
+      names.length <= 1
+        ? names[0] ?? "someone"
+        : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+    log(room, `The Juggler juggled ${nameList}.`);
+    this.setAnnouncement(
+      room,
+      "info",
+      "Juggler acted",
+      `The Juggler juggled ${nameList}.`
+    );
+    this.addChronicle(
+      room,
+      "day",
+      `The Juggler juggled ${nameList}.`
+    );
+
+    const intelDetail = `${evilCount} of these 4 are evil.`;
+    room.dayIntelByPlayer[juggler.id] = {
+      kind: "juggler",
+      title: `Day ${room.cycle} — juggle result`,
+      detail: intelDetail,
+      cycle: room.cycle,
+      at: Date.now(),
+    };
+    if (juggler.socketId) {
+      this.emitNightPowerResult(juggler.socketId, {
+        tone: "good",
+        title: `Day ${room.cycle} — juggle result`,
+        detail: intelDetail,
+      });
     }
     this.emitRoom(room);
   }
@@ -2455,6 +2630,9 @@ export class GameRuntime {
     this.clearTimer(room);
     for (const p of room.players) {
       p.role = undefined;
+      p.fakeRole = undefined;
+      p.jugglerUsed = undefined;
+      p.poisoned = undefined;
       p.alive = true;
       if (room.gameId === "five-alive") {
         p.lives = 5;
@@ -2481,7 +2659,7 @@ export class GameRuntime {
     room.chronicle = [];
     room.announcement = null;
     room.mafiaNightIntel = {};
-    room.detectiveLog = [];
+    room.dayIntelByPlayer = {};
     room.afkGraceEndsAt = null;
     room.afkGracePlayerId = null;
     room.fiveAlive = undefined;

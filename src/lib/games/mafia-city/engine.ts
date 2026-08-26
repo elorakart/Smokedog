@@ -1,7 +1,10 @@
 import type { GameModule } from "@/lib/types";
-import { assignMafiaCityRoles, defaultRoleDistribution } from "./balance";
+import {
+  assignMafiaCityRoleList,
+  defaultRoleDistribution,
+} from "./balance";
 
-export { defaultRoleDistribution };
+export { defaultRoleDistribution, assignMafiaCityRoles } from "./balance";
 
 export const mafiaCityModule: GameModule = {
   id: "mafia-city",
@@ -17,6 +20,6 @@ export const mafiaCityModule: GameModule = {
     };
   },
   assignRoles(playerCount, settings) {
-    return assignMafiaCityRoles(playerCount, settings);
+    return assignMafiaCityRoleList(playerCount, settings);
   },
 };

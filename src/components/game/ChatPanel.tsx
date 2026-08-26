@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mic, MicOff, PhoneOff } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MessageCircle, Mic, MicOff, PhoneOff, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { ChatChannel, ChatMessage, PublicGameState } from "@/lib/types";
 import { GlassPanel } from "@/components/ui/primitives";
@@ -25,6 +25,7 @@ export function ChatPanel({
   joinVoiceRequest,
   onVoiceJoined,
   enableVoice = true,
+  mobileBubble = false,
 }: {
   state: PublicGameState;
   socket: GameSocket | null;
@@ -32,6 +33,8 @@ export function ChatPanel({
   joinVoiceRequest?: { nonce: number; channel: ChatChannel } | null;
   onVoiceJoined?: (channel: ChatChannel) => void;
   enableVoice?: boolean;
+  /** Fixed draggable chat bubble near the top (mobile). */
+  mobileBubble?: boolean;
 }) {
   const you = state.you;
   const channelOpts = useMemo(
@@ -60,6 +63,15 @@ export function ChatPanel({
 
   const [tab, setTab] = useState<ChatChannel>(tabs[0]?.id ?? "town");
   const active = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id ?? "town";
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [bubblePos, setBubblePos] = useState({ x: 16, y: 72 });
+  const dragRef = useRef<{
+    ox: number;
+    oy: number;
+    sx: number;
+    sy: number;
+    moved: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === tab) && tabs[0]) setTab(tabs[0].id);
@@ -106,7 +118,8 @@ export function ChatPanel({
     if (tabs.some((t) => t.id === joinVoiceRequest.channel)) {
       setTab(joinVoiceRequest.channel);
     }
-  }, [enableVoice, joinVoiceRequest, tabs]);
+    if (mobileBubble) setSheetOpen(true);
+  }, [enableVoice, joinVoiceRequest, tabs, mobileBubble]);
 
   useEffect(() => {
     if (!enableVoice || !joinVoiceRequest) return;
@@ -115,8 +128,6 @@ export function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinVoiceRequest?.nonce, active]);
 
-  // Clear parent invite banner whenever we successfully join this channel
-  // (banner JOIN VOICE or ChatPanel Join voice).
   useEffect(() => {
     if (!enableVoice || !voice.joined) return;
     onVoiceJoined?.(active);
@@ -139,7 +150,36 @@ export function ChatPanel({
     return ids;
   }, [state.voiceParticipants, active, voice.joined, you?.id]);
 
-  if (tabs.length === 0) {
+  const onBubblePointerDown = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragRef.current = {
+      ox: e.clientX,
+      oy: e.clientY,
+      sx: bubblePos.x,
+      sy: bubblePos.y,
+      moved: false,
+    };
+  };
+  const onBubblePointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.ox;
+    const dy = e.clientY - d.oy;
+    if (Math.abs(dx) + Math.abs(dy) > 6) d.moved = true;
+    const maxX = Math.max(8, window.innerWidth - 64);
+    const maxY = Math.max(8, window.innerHeight - 64);
+    setBubblePos({
+      x: Math.min(maxX, Math.max(8, d.sx + dx)),
+      y: Math.min(maxY, Math.max(56, d.sy + dy)),
+    });
+  };
+  const onBubblePointerUp = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (d && !d.moved) setSheetOpen(true);
+  };
+
+  if (tabs.length === 0 && !mobileBubble) {
     return (
       <GlassPanel className="flex h-[420px] max-md:h-[50vh] flex-col items-center justify-center p-6 text-center">
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
@@ -154,9 +194,25 @@ export function ChatPanel({
     );
   }
 
-  return (
-    <GlassPanel className="relative flex h-[420px] max-md:h-[50vh] flex-col">
+  const panel = (
+    <GlassPanel
+      className={`relative flex flex-col ${
+        mobileBubble
+          ? "h-[min(70vh,520px)] w-full"
+          : "h-[420px] max-md:h-[50vh]"
+      }`}
+    >
       <div className="flex divide-x divide-crimson/30 border-b border-crimson/30">
+        {mobileBubble && (
+          <button
+            type="button"
+            onClick={() => setSheetOpen(false)}
+            className="px-3 text-crimson"
+            aria-label="Close chat"
+          >
+            <X size={16} />
+          </button>
+        )}
         {tabs.map((t) => {
           const selected = active === t.id;
           return (
@@ -172,9 +228,6 @@ export function ChatPanel({
               }`}
             >
               {t.label}
-              {selected && (
-                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-manila/80" />
-              )}
             </button>
           );
         })}
@@ -215,12 +268,6 @@ export function ChatPanel({
             </div>
             <span className="max-w-[55%] truncate text-right font-mono text-[10px] uppercase tracking-widest text-ink-steel">
               {Math.max(voiceRoster.length, voice.joined ? 1 : 0)} in voice
-              {voice.participantLabels.length > 0 && (
-                <span className="block normal-case tracking-normal text-ink-steel/80">
-                  {voice.participantLabels.slice(0, 3).join(", ")}
-                  {voice.participantLabels.length > 3 ? "…" : ""}
-                </span>
-              )}
             </span>
           </div>
 
@@ -359,5 +406,40 @@ export function ChatPanel({
         </button>
       </form>
     </GlassPanel>
+  );
+
+  if (!mobileBubble) return panel;
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Open chat"
+        onPointerDown={onBubblePointerDown}
+        onPointerMove={onBubblePointerMove}
+        onPointerUp={onBubblePointerUp}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+        className="fixed z-40 flex size-14 touch-none items-center justify-center rounded-full border-2 border-crimson bg-manila text-crimson shadow-stamp"
+        style={{ left: bubblePos.x, top: bubblePos.y }}
+      >
+        <MessageCircle size={22} />
+        {unread > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-crimson px-1 font-mono text-[9px] text-manila">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+      {sheetOpen && (
+        <div className="fixed inset-x-0 bottom-0 z-50 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div
+            className="absolute inset-0 -z-10 bg-void/40"
+            onClick={() => setSheetOpen(false)}
+          />
+          {panel}
+        </div>
+      )}
+    </>
   );
 }

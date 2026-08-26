@@ -18,7 +18,7 @@ import { AfkHostModal } from "@/components/game/AfkHostModal";
 import { ActionPrompt } from "@/components/game/ActionPrompt";
 import { ActionDialog } from "@/components/game/mafia/ActionDialog";
 import { PhaseResultPopup } from "@/components/game/mafia/PhaseResultPopup";
-import { DetectivePanel } from "@/components/game/mafia/DetectivePanel";
+import { DayIntelPanel } from "@/components/game/mafia/DayIntelPanel";
 import { AnnouncementsPanel } from "@/components/game/AnnouncementsPanel";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import { GameHud } from "@/components/game/GameHud";
@@ -390,6 +390,8 @@ export function GameClient({ roomId }: { roomId: string }) {
     socket.emit("day:vote", { roomId: state.roomId, targetId });
   const emitVoteSkip = () =>
     socket.emit("day:voteSkip", { roomId: state.roomId });
+  const emitJuggle = (targetIds: string[]) =>
+    socket.emit("day:juggle", { roomId: state.roomId, targetIds });
   const emitFiveAlivePlay = (payload: {
     cardId?: string | null;
     wildValue?: number;
@@ -794,25 +796,16 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "night" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-                <NightActionPanel
-                  state={state}
-                  onAct={emitNight}
-                  onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
-                />
                 <div className="space-y-4">
-                  {state.detectiveLog && (
-                    <DetectivePanel log={state.detectiveLog} />
-                  )}
-                  <GlassPanel className="p-4">
-                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-                      Night log
-                    </h3>
-                    <ul className="mt-2 space-y-1 text-sm text-ink-steel">
-                      {state.logs.slice(-6).map((l) => (
-                        <li key={l.id}>{l.text}</li>
-                      ))}
-                    </ul>
-                  </GlassPanel>
+                  <AnnouncementsPanel logs={state.logs} />
+                  <DayIntelPanel intel={state.dayIntel} />
+                  <NightActionPanel
+                    state={state}
+                    onAct={emitNight}
+                    onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
+                  />
+                </div>
+                <div className="space-y-4 max-md:hidden">
                   <ChatPanel
                     state={state}
                     socket={socket}
@@ -826,38 +819,28 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" && state.phase === "day" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-                <VotePanel
-                  state={state}
-                  onVote={emitVote}
-                  onSkipVote={emitVoteSkip}
-                  onSkipDay={() =>
-                    socket.emit("host:skipDay", { roomId: state.roomId })
-                  }
-                  onInviteVoice={
-                    townVoiceOpen && voiceChannel
-                      ? emitVoiceInvite
-                      : undefined
-                  }
-                />
                 <div className="space-y-4">
-                  {state.detectiveLog && (
-                    <DetectivePanel log={state.detectiveLog} />
-                  )}
                   <AnnouncementsPanel logs={state.logs} />
-                  {state.detectiveResult && (
-                    <GlassPanel className="p-4">
-                      <p className="font-mono text-[10px] uppercase text-crimson-glow">
-                        Case file
-                      </p>
-                      <p className="mt-1">
-                        Subject is aligned with the{" "}
-                        <strong className="uppercase">
-                          {state.detectiveResult.faction}
-                        </strong>
-                        .
-                      </p>
-                    </GlassPanel>
-                  )}
+                  <DayIntelPanel intel={state.dayIntel} />
+                  <VotePanel
+                    state={state}
+                    onVote={emitVote}
+                    onSkipVote={emitVoteSkip}
+                    onSkipDay={() =>
+                      socket.emit("host:skipDay", { roomId: state.roomId })
+                    }
+                    onSkipTimer={() =>
+                      socket.emit("host:skipTimer", { roomId: state.roomId })
+                    }
+                    onJuggle={emitJuggle}
+                    onInviteVoice={
+                      townVoiceOpen && voiceChannel
+                        ? emitVoiceInvite
+                        : undefined
+                    }
+                  />
+                </div>
+                <div className="space-y-4 max-md:hidden">
                   <ChatPanel
                     state={state}
                     socket={socket}
@@ -868,6 +851,20 @@ export function GameClient({ roomId }: { roomId: string }) {
                 </div>
               </div>
             )}
+
+            {state.gameId === "mafia-city" &&
+              (state.phase === "night" || state.phase === "day") && (
+                <div className="md:hidden">
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    joinVoiceRequest={joinVoiceRequest}
+                    onVoiceJoined={clearVoiceInviteForChannel}
+                    mobileBubble
+                  />
+                </div>
+              )}
           </motion.div>
         </AnimatePresence>
         )}

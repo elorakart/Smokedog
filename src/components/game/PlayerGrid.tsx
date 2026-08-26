@@ -31,6 +31,9 @@ function tags(p: PublicPlayer, intel?: PublicGameState["mafiaNightIntel"]) {
       {intel?.blackmailTargetId === p.id && (
         <StatusChip tone="mute">Silenced</StatusChip>
       )}
+      {intel?.poisonTargetId === p.id && (
+        <StatusChip tone="afk">Poison mark</StatusChip>
+      )}
       {p.blackmailed && p.alive && (
         <StatusChip tone="mute">
           <MicOff size={10} className="mr-1" /> Muted
@@ -84,6 +87,7 @@ export function PlayerGrid({
   selectable,
   allowSelf,
   selectedId,
+  selectedIds,
   onSelect,
   showVotes,
   onInviteVoice,
@@ -92,6 +96,7 @@ export function PlayerGrid({
   selectable?: boolean;
   allowSelf?: boolean;
   selectedId?: string | null;
+  selectedIds?: string[];
   onSelect?: (id: string) => void;
   showVotes?: boolean;
   onInviteVoice?: (id: string) => void;
@@ -133,7 +138,8 @@ export function PlayerGrid({
           !selectable ||
           !p.alive ||
           (p.id === state.you?.id && !allowSelf);
-        const selected = selectedId === p.id;
+        const selected =
+          selectedId === p.id || !!selectedIds?.includes(p.id);
         const canInvite =
           !!onInviteVoice &&
           p.alive &&
@@ -256,9 +262,13 @@ export function NightActionPanel({
   onInviteVoice?: (id: string) => void;
 }) {
   const you = state.you;
-  const type = you?.role ? (nightActionFor(you.role) as NightActionType | null) : null;
+  const type = you?.role
+    ? (nightActionFor(you.role) as NightActionType | null)
+    : null;
   const noBullets = you?.role === "vigilante" && (you.bulletsLeft ?? 0) <= 0;
   const target = state.players.find((p) => p.id === state.nightActionTargetId);
+  const skipped =
+    state.submittedNightAction && state.nightActionTargetId === SKIP_VOTE_ID;
   const dead = !you?.alive;
 
   if (dead) {
@@ -295,8 +305,19 @@ export function NightActionPanel({
 
   return (
     <div>
-      <h3 className="font-display text-xl font-bold">{NIGHT_ACTION_PROMPTS[type]}</h3>
-      {state.submittedNightAction && target ? (
+      {you?.role === "vigilante" && (
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-crimson">
+          Bullets left: {you.bulletsLeft ?? 0}
+        </p>
+      )}
+      <h3 className="font-display text-xl font-bold">
+        {NIGHT_ACTION_PROMPTS[type]}
+      </h3>
+      {skipped ? (
+        <p className="mt-1 font-mono text-xs uppercase text-crimson">
+          You skipped your shot tonight
+        </p>
+      ) : state.submittedNightAction && target ? (
         <p className="mt-1 font-mono text-xs uppercase text-crimson">
           {NIGHT_ACTION_LOCKED[type](target.name)}
         </p>
@@ -309,11 +330,24 @@ export function NightActionPanel({
           Tap a card to lock your target.
         </p>
       )}
+      {type === "vigilante_shoot" && !state.submittedNightAction && (
+        <button
+          type="button"
+          onClick={() => onAct(type, SKIP_VOTE_ID)}
+          className="mt-3 rounded-sm border border-crimson/30 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-crimson"
+        >
+          Skip this night — do not kill
+        </button>
+      )}
       <div className="mt-4">
         <PlayerGrid
           state={state}
-          selectable
-          selectedId={state.nightActionTargetId}
+          selectable={!state.submittedNightAction}
+          selectedId={
+            state.nightActionTargetId === SKIP_VOTE_ID
+              ? null
+              : state.nightActionTargetId
+          }
           onSelect={(id) => onAct(type, id)}
           onInviteVoice={onInviteVoice}
         />
@@ -327,13 +361,17 @@ export function VotePanel({
   onVote,
   onSkipVote,
   onSkipDay,
+  onSkipTimer,
   onInviteVoice,
+  onJuggle,
 }: {
   state: PublicGameState;
   onVote: (targetId: string) => void;
   onSkipVote?: () => void;
   onSkipDay?: () => void;
+  onSkipTimer?: () => void;
   onInviteVoice?: (id: string) => void;
+  onJuggle?: (targetIds: string[]) => void;
 }) {
   const muted = !!state.you?.blackmailed;
   const deadVillager = !!state.deadVillagerVote;
@@ -348,18 +386,62 @@ export function VotePanel({
   const skipVoteCount = Object.values(state.votes).filter(
     (v) => v === SKIP_VOTE_ID
   ).length;
-  // Prefer server eligible count (includes dead villagers). Never fall back to full roster.
   const livingEligible = state.players.filter(
     (p) => p.alive && !p.blackmailed
   ).length;
   const youIneligibleDead =
     !!state.you && !state.you.alive && !deadVillager;
   let votesNeeded = state.dayVotesNeeded || livingEligible;
-  // If server still reports full roster while you are a dead non-voter, exclude that seat.
   if (youIneligibleDead && votesNeeded >= state.players.length) {
     votesNeeded = Math.max(livingEligible, state.players.length - 1);
   }
   const votesIn = Math.min(state.dayVotesIn, votesNeeded);
+
+  const [jugglePick, setJugglePick] = useState<string[]>([]);
+  const juggleReady = !!state.jugglerAvailable && !!onJuggle;
+
+  const toggleJuggle = (id: string) => {
+    setJugglePick((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 4) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const compactSkip = (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      {!isDiscussion && canParticipate && onSkipVote && (
+        <button
+          type="button"
+          onClick={onSkipVote}
+          disabled={!!votedId}
+          className="rounded-sm border border-crimson/25 bg-crimson/[0.05] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-steel disabled:opacity-40"
+        >
+          Skip vote
+        </button>
+      )}
+      {isHost && isDiscussion && onSkipTimer && (
+        <button
+          type="button"
+          disabled={state.paused}
+          onClick={onSkipTimer}
+          className="rounded-sm border border-crimson/40 bg-crimson/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-crimson-glow disabled:opacity-40"
+        >
+          Skip day
+        </button>
+      )}
+      {isHost && onSkipDay && !isDiscussion && (
+        <button
+          type="button"
+          disabled={!state.canSkipDay || state.paused}
+          onClick={onSkipDay}
+          className="rounded-sm border border-crimson/40 bg-crimson/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-crimson-glow disabled:opacity-40"
+        >
+          {state.canSkipDay ? "Skip day" : "Skip day (waiting)"}
+        </button>
+      )}
+    </div>
+  );
 
   if (isDiscussion) {
     return (
@@ -370,21 +452,63 @@ export function VotePanel({
             ? "You are eliminated — watch the debate. Voting opens in the final 15 seconds."
             : "Debate suspects on town voice and chat. Voting opens in the final 15 seconds."}
         </p>
-        <PlayerGrid state={state} onInviteVoice={onInviteVoice} />
+        {compactSkip}
+        {juggleReady && (
+          <div className="mt-3 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-3">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">
+              Juggle — pick 4 ({jugglePick.length}/4)
+            </p>
+            <p className="mt-1 text-xs text-ink-steel">
+              Town will see whom you juggled. Only you learn how many are evil.
+            </p>
+            {jugglePick.length === 4 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onJuggle?.(jugglePick);
+                  setJugglePick([]);
+                }}
+                className="mt-2 rounded-sm bg-crimson px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-manila"
+              >
+                Confirm juggle
+              </button>
+            )}
+          </div>
+        )}
+        <div className="mt-4">
+          <PlayerGrid
+            state={state}
+            selectable={juggleReady}
+            selectedIds={jugglePick}
+            onSelect={juggleReady ? toggleJuggle : undefined}
+            onInviteVoice={onInviteVoice}
+          />
+        </div>
+        {juggleReady && jugglePick.length > 0 && (
+          <p className="mt-2 font-mono text-[10px] text-ink-steel">
+            Selected:{" "}
+            {jugglePick
+              .map((id) => state.players.find((p) => p.id === id)?.name)
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <div>
-      <h3 className="font-display text-xl font-bold">Lynch vote</h3>
+      <h3 className="font-display text-xl font-bold">Day vote</h3>
       <p className="mt-1 text-sm text-ink-steel">
         {dead && !deadVillager
           ? "You cannot vote — watch the tally. Town voice is closed during voting."
-          : "Most votes alone hangs a suspect — a tie spares everyone. Skip counts like any other option. Town voice is closed during voting."}
+          : "Most votes alone eliminates a suspect — a tie spares everyone. Skip counts like any other option. Town voice is closed during voting."}
       </p>
-      <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+      {compactSkip}
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Votes in: {votesIn}/{votesNeeded}
+        {skipVoteCount > 0 ? ` · Skip: ${skipVoteCount}` : ""}
       </p>
       {muted && (
         <p className="mt-2 font-mono text-xs uppercase text-crimson/80">
@@ -398,17 +522,12 @@ export function VotePanel({
       )}
       {votedSkip && (
         <p className="mt-2 font-mono text-xs uppercase text-crimson">
-          You voted to skip the lynch
+          You voted to skip
         </p>
       )}
       {votedName && !muted && !votedSkip && (
         <p className="mt-2 font-mono text-xs uppercase text-crimson">
-          You voted to lynch {votedName}
-        </p>
-      )}
-      {skipVoteCount > 0 && (
-        <p className="mt-1 font-mono text-[10px] uppercase text-ink-steel">
-          Skip votes: {skipVoteCount}
+          You voted for {votedName}
         </p>
       )}
       <div className="mt-4">
@@ -420,28 +539,6 @@ export function VotePanel({
           showVotes
         />
       </div>
-      {canParticipate && onSkipVote && (
-        <button
-          type="button"
-          onClick={onSkipVote}
-          disabled={!!votedId}
-          className="mt-4 w-full rounded-sm border border-crimson/25 bg-crimson/[0.05] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink-steel transition hover:border-crimson/40 hover:text-crimson disabled:opacity-40"
-        >
-          Skip lynch — no one hangs today
-        </button>
-      )}
-      {isHost && onSkipDay && (
-        <button
-          type="button"
-          disabled={!state.canSkipDay || state.paused}
-          onClick={onSkipDay}
-          className="mt-4 w-full rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-crimson-glow disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {state.canSkipDay
-            ? "Skip day — resolve outcome"
-            : "Skip day — waiting for all votes"}
-        </button>
-      )}
     </div>
   );
 }

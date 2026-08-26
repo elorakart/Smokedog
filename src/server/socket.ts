@@ -180,6 +180,15 @@ export function attachSocketServer(
       runtime.submitVoteSkip(payload.roomId, socket.data.playerId);
     });
 
+    socket.on("day:juggle", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitJuggle(
+        payload.roomId,
+        socket.data.playerId,
+        payload.targetIds
+      );
+    });
+
     socket.on("fivealive:playCard", (payload) => {
       if (!socket.data.playerId) return;
       runtime.submitFiveAlivePlayCard(

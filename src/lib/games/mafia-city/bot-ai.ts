@@ -1,5 +1,6 @@
 import type { NightActionType, Player, Role } from "@/lib/types";
-import { isMafiaRole, nightActionFor } from "./roles";
+import { SKIP_VOTE_ID } from "@/lib/types";
+import { isMafiaRole, nightActionForPlayer } from "./roles";
 import { validNightTargets } from "./resolve";
 
 /** Noir-style aliases — indistinguishable from human display names. */
@@ -65,9 +66,14 @@ export function pickBotNightAction(
   players: Player[],
   actor: Player
 ): { type: NightActionType; targetId: string } | null {
-  const type = nightActionFor(actor.role) as NightActionType | null;
+  const type = nightActionForPlayer(actor) as NightActionType | null;
   if (!type) return null;
-  if (type === "vigilante_shoot" && (actor.bulletsLeft ?? 0) <= 0) return null;
+  if (type === "vigilante_shoot") {
+    if ((actor.bulletsLeft ?? 0) <= 0) return null;
+    if (Math.random() < 0.2) {
+      return { type, targetId: SKIP_VOTE_ID };
+    }
+  }
   const targets = validNightTargets(players, actor);
   const chosen = pick(targets);
   return chosen ? { type, targetId: chosen.id } : null;
