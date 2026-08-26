@@ -10,7 +10,7 @@ export const mafiaCityModule: GameModule = {
   id: "mafia-city",
   displayName: "Mafia City",
   minPlayers: 4,
-  maxPlayers: 12,
+  maxPlayers: 99,
   createSettings() {
     return {
       nightSeconds: 30,

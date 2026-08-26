@@ -37,7 +37,7 @@ const GAME_CARDS: GameCard[] = [
     id: "mafia-city",
     title: "Mafia City",
     pitch: "The city's last night. Trust no one. Vote wisely.",
-    players: "4–12 Players",
+    players: "4+ Players",
     duration: "15–30 Min",
     image: "/games/mafia-city.jpg",
     badge: "Featured",

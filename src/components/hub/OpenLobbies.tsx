@@ -162,7 +162,9 @@ export function OpenLobbies({
               <div className="flex flex-wrap items-center gap-3">
                 <StatusChip tone="live">
                   <Users size={10} className="mr-1" />
-                  {lobby.playerCount}/{lobby.maxPlayers}
+                  {lobby.gameId === "mafia-city" || lobby.maxPlayers >= 99
+                    ? `${lobby.playerCount} seated`
+                    : `${lobby.playerCount}/${lobby.maxPlayers}`}
                 </StatusChip>
                 <StatusChip>{lobby.openSlots} open</StatusChip>
                 <button

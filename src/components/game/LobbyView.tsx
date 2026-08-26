@@ -6,12 +6,9 @@ import { PlayerAvatar } from "@/components/ui/PlayerAvatar";
 import { GlassPanel, PrimaryButton, StatusChip } from "@/components/ui/primitives";
 import { popIn, stagger } from "@/components/ui/motion";
 import type { PublicGameState, RoleDistribution, RoomSettings } from "@/lib/types";
-import {
-  defaultRoleDistribution,
-  normalizeRoleDistribution,
-  ROLE_KEYS,
-} from "@/lib/games/mafia-city/balance";
+import { defaultRoleDistribution, normalizeRoleDistribution, ROLE_KEYS } from "@/lib/games/mafia-city/balance";
 import { ROLE_META } from "@/lib/games/mafia-city/roles";
+import { getGameModule } from "@/lib/games/registry";
 
 function RoleDistributionEditor({
   dist,
@@ -144,8 +141,10 @@ function AutoPlayerControls({
   onAddBot: (fillTo?: number) => void;
   onRemoveBot: () => void;
 }) {
-  const full = state.players.length >= 12;
+  const maxPlayers = getGameModule(state.gameId).maxPlayers;
+  const full = state.players.length >= maxPlayers;
   const autoCount = state.autoPlayerCount;
+  const fillTargets = [4, 8, 12, 16, 24].filter((n) => n <= maxPlayers);
 
   return (
     <div className="mt-4 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-4">
@@ -179,13 +178,13 @@ function AutoPlayerControls({
           <UserMinus size={12} /> Remove one
         </button>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {([4, 6, 8, 12] as const).map((target) => (
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {fillTargets.map((target) => (
           <button
             key={target}
             type="button"
             onClick={() => onAddBot(target)}
-            disabled={state.players.length >= target}
+            disabled={state.players.length >= target || full}
             className="rounded-sm border border-crimson/20 py-2 font-mono text-[10px] uppercase tracking-widest transition hover:border-crimson/50 hover:text-crimson-glow disabled:opacity-40"
           >
             Fill {target}
@@ -223,7 +222,7 @@ function LobbySidebar({
           You&apos;re in. The host will start when everyone is seated.
         </p>
         <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-ink-steel">
-          {state.players.length}/12 operators seated
+          {state.players.length} operators seated
         </p>
         {state.roleDistributionPreview && (
           <RoleDistributionPreview
@@ -301,7 +300,7 @@ function LobbySidebar({
         ))}
       </div>
       <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-ink-steel">
-        {state.players.length}/12 seated · Roles scale with lobby size
+        {state.players.length} seated · Extra seats become Villagers
       </p>
       <PrimaryButton
         className="mt-6 w-full"
@@ -349,8 +348,8 @@ export function LobbyView({
         </p>
         <h1 className="mt-2 font-display text-4xl font-extrabold">Mafia City</h1>
         <p className="mt-2 text-ink-steel">
-          Assemble your crew. Four operators minimum — the host can seat auto
-          players if you&apos;re flying solo.
+          Assemble your crew — four minimum. Host picks the role lineup; every
+          extra seat is a Villager.
         </p>
         <motion.div
           variants={stagger}

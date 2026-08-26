@@ -21,6 +21,9 @@ export type NightPowerLog = {
   actorRole: Role;
   type: string;
   targetId: string | null;
+  /** Compact clause without actor name, e.g. "shot Crimson" or "shielded LowKey (drunk — failed)". */
+  clause: string;
+  /** @deprecated Prefer clause — kept for older personal-result copy. */
   outcome: string;
 };
 
@@ -119,14 +122,15 @@ export function resolveNight(
     actor: Player,
     type: string,
     targetId: string | null,
-    outcome: string
+    clause: string
   ) => {
     powerLogs.push({
       actorId: actor.id,
       actorRole: actor.role ?? effectiveRole(actor) ?? "villager",
       type,
       targetId,
-      outcome,
+      clause,
+      outcome: clause,
     });
   };
 
@@ -144,15 +148,10 @@ export function resolveNight(
     const target = byId(players, poisonAction.targetId);
     if (target?.alive) {
       target.poisoned = true;
-      logPower(
-        poisoner,
-        "poison",
-        target.id,
-        `Poisoned ${target.name} for the night.`
-      );
+      logPower(poisoner, "poison", target.id, `poisoned ${target.name}`);
     }
   } else if (poisonAction && poisoner) {
-    logPower(poisoner, "poison", poisonAction.targetId, "Poison failed.");
+    logPower(poisoner, "poison", poisonAction.targetId, "poison failed");
   }
 
   let poisonClearedTargetId: string | null = null;
@@ -171,22 +170,24 @@ export function resolveNight(
         (isDrunkDoc && doctorActor.fakeRole === "doctor"));
 
     if (doctorActor && realDoc) {
+      const protectTarget = byId(players, doctorAction.targetId);
+      const protectName = protectTarget?.name ?? "someone";
       if (doctorActor.poisoned) {
         logPower(
           doctorActor,
           "doctor_protect",
           doctorAction.targetId,
-          "Investigation interrupted — Doctor was poisoned; protect failed."
+          `shielded ${protectName} (poisoned — failed)`
         );
       } else if (isDrunkDoc && drunkLies()) {
         logPower(
           doctorActor,
           "doctor_protect",
           doctorAction.targetId,
-          "Drunk Doctor believed they protected someone — no effect."
+          `shielded ${protectName} (drunk — failed)`
         );
       } else {
-        const target = byId(players, doctorAction.targetId);
+        const target = protectTarget;
         if (target?.alive) {
           if (target.poisoned) {
             target.poisoned = false;
@@ -195,14 +196,18 @@ export function resolveNight(
               doctorActor,
               "doctor_protect",
               target.id,
-              `Protected ${target.name} and cleared poison.`
+              isDrunkDoc
+                ? `shielded ${target.name}, cleared poison (drunk — worked)`
+                : `shielded ${target.name}, cleared poison`
             );
           } else {
             logPower(
               doctorActor,
               "doctor_protect",
               target.id,
-              `Protected ${target.name}.`
+              isDrunkDoc
+                ? `shielded ${target.name} (drunk — worked)`
+                : `shielded ${target.name}`
             );
           }
           doctorProtect = target.id;
@@ -222,11 +227,12 @@ export function resolveNight(
     blackmailer.role === "blackmailer"
   ) {
     if (blackmailer.poisoned) {
+      const tName = byId(players, blackmail.targetId)?.name ?? "someone";
       logPower(
         blackmailer,
         "blackmail",
         blackmail.targetId,
-        "Blackmail interrupted — Poisoner blocked their power."
+        `blackmailed ${tName} (poisoned — failed)`
       );
     } else {
       const silenced = byId(players, blackmail.targetId);
@@ -238,10 +244,15 @@ export function resolveNight(
           blackmailer,
           "blackmail",
           silenced.id,
-          `Blackmailed ${silenced.name}.`
+          `blackmailed ${silenced.name}`
         );
       } else {
-        logPower(blackmailer, "blackmail", blackmail.targetId, "Blackmail failed.");
+        logPower(
+          blackmailer,
+          "blackmail",
+          blackmail.targetId,
+          "blackmail failed"
+        );
       }
     }
   }
@@ -255,19 +266,20 @@ export function resolveNight(
       bodyguard.role === "drunk" && bodyguard.fakeRole === "bodyguard";
     const realBg = bodyguard.role === "bodyguard" || isDrunkBg;
     if (realBg) {
+      const chargeName = byId(players, bgAction.targetId)?.name ?? "someone";
       if (bodyguard.poisoned) {
         logPower(
           bodyguard,
           "bodyguard_protect",
           bgAction.targetId,
-          "Bodyguard was poisoned — guard failed."
+          `guarded ${chargeName} (poisoned — failed)`
         );
       } else if (isDrunkBg && drunkLies()) {
         logPower(
           bodyguard,
           "bodyguard_protect",
           bgAction.targetId,
-          "Drunk Bodyguard believed they guarded — no effect."
+          `guarded ${chargeName} (drunk — failed)`
         );
       } else {
         bgProtect = bgAction.targetId;
@@ -275,7 +287,9 @@ export function resolveNight(
           bodyguard,
           "bodyguard_protect",
           bgAction.targetId,
-          `Guarding target.`
+          isDrunkBg
+            ? `guarded ${chargeName} (drunk — worked)`
+            : `guarded ${chargeName}`
         );
       }
     }
@@ -306,13 +320,6 @@ export function resolveNight(
     const target = byId(players, mafiaHit.targetId);
     const attacker = byId(players, mafiaHit.attackerId);
     if (target?.alive && attacker?.alive) {
-      logPower(
-        attacker,
-        "mafia_kill",
-        target.id,
-        `Mafia marked ${target.name}.`
-      );
-
       const soldierImmune =
         target.role === "soldier" && !target.poisoned;
 
@@ -322,7 +329,7 @@ export function resolveNight(
           attacker,
           "mafia_kill",
           target.id,
-          `${target.name} (Soldier) shrugged off the mafia hit.`
+          `marked ${target.name} (soldier — blocked)`
         );
       } else if (doctorProtect === target.id) {
         doctorSavedTargetId = target.id;
@@ -333,6 +340,12 @@ export function resolveNight(
               doctorActor.fakeRole === "doctor"))
             ? doctorActor.id
             : living(players).find((p) => p.role === "doctor")?.id ?? null;
+        logPower(
+          attacker,
+          "mafia_kill",
+          target.id,
+          `marked ${target.name} (doctor saved)`
+        );
       } else if (
         activeBodyguard &&
         bgProtect === target.id &&
@@ -362,12 +375,24 @@ export function resolveNight(
             }
           }
         }
+        logPower(
+          attacker,
+          "mafia_kill",
+          target.id,
+          `marked ${target.name} (bodyguard intercepted)`
+        );
       } else {
         markDead(
           target.id,
           "Eliminated overnight",
           attacker.id,
           attacker.role ?? null
+        );
+        logPower(
+          attacker,
+          "mafia_kill",
+          target.id,
+          `marked ${target.name}`
         );
       }
     }
@@ -385,22 +410,23 @@ export function resolveNight(
 
     if (shooter && realVig) {
       if (vig.targetId === SKIP_VOTE_ID) {
-        logPower(shooter, "vigilante_shoot", null, "Skipped the night — no shot.");
+        logPower(shooter, "vigilante_shoot", null, "skipped the shot");
       } else if (shooter.poisoned) {
+        const tName = byId(players, vig.targetId)?.name ?? "someone";
         logPower(
           shooter,
           "vigilante_shoot",
           vig.targetId,
-          "Vigilante was poisoned — shot interrupted."
+          `shot ${tName} (poisoned — failed)`
         );
       } else if (isDrunkVig && drunkLies()) {
+        const tName = byId(players, vig.targetId)?.name ?? "someone";
         logPower(
           shooter,
           "vigilante_shoot",
           vig.targetId,
-          "Drunk Vigilante believed they fired — no bullet left the chamber."
+          `shot ${tName} (drunk — failed)`
         );
-        // Still burn a fake bullet feel? Don't change real bullets for drunk.
       } else if ((shooter.bulletsLeft ?? 0) > 0 || isDrunkVig) {
         const vigTarget = byId(players, vig.targetId);
         if (
@@ -424,7 +450,9 @@ export function resolveNight(
               shooter,
               "vigilante_shoot",
               vigTarget.id,
-              `Shot at ${vigTarget.name} — blocked by Doctor.`
+              isDrunkVig
+                ? `shot ${vigTarget.name} (drunk — blocked by doctor)`
+                : `shot ${vigTarget.name} (doctor blocked)`
             );
           } else if (
             activeBodyguard &&
@@ -450,7 +478,9 @@ export function resolveNight(
               shooter,
               "vigilante_shoot",
               vigTarget.id,
-              `Shot at ${vigTarget.name} — Bodyguard intercepted.`
+              isDrunkVig
+                ? `shot ${vigTarget.name} (drunk — bodyguard intercepted)`
+                : `shot ${vigTarget.name} (bodyguard intercepted)`
             );
           } else {
             markDead(
@@ -463,7 +493,9 @@ export function resolveNight(
               shooter,
               "vigilante_shoot",
               vigTarget.id,
-              `Shot ${vigTarget.name}.`
+              isDrunkVig
+                ? `shot ${vigTarget.name} (drunk — worked)`
+                : `shot ${vigTarget.name}`
             );
           }
         }
@@ -494,12 +526,18 @@ export function resolveNight(
           investigator,
           "detective_inspect",
           inspected.id,
-          "Investigation interrupted — Detective was poisoned."
+          `investigated ${inspected.name} (poisoned — failed)`
         );
       } else {
         let faction = factionOf(inspected.role);
-        if (isDrunkDet && drunkLies()) {
-          faction = faction === "mafia" ? "town" : "mafia";
+        let drunkNote = "";
+        if (isDrunkDet) {
+          if (drunkLies()) {
+            faction = faction === "mafia" ? "town" : "mafia";
+            drunkNote = " (drunk — false)";
+          } else {
+            drunkNote = " (drunk — worked)";
+          }
         }
         detective = {
           investigatorId: investigator.id,
@@ -511,9 +549,7 @@ export function resolveNight(
           investigator,
           "detective_inspect",
           inspected.id,
-          isDrunkDet
-            ? `Drunk Detective read ${inspected.name} as ${faction}.`
-            : `Investigated ${inspected.name} — ${faction}.`
+          `investigated ${inspected.name} — ${faction}${drunkNote}`
         );
       }
     }

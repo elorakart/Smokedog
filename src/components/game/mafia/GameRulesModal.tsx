@@ -15,7 +15,7 @@ const RULES_BY_GAME: Record<string, GameRules> = {
     sections: [
       {
         title: "The setup",
-        body: "4–12 players get secret roles. Most are Town — they want to find and vote out the Mafia. Mafia want to outnumber Town without getting caught. Hosts can add Poisoner, Drunk, Soldier, and Juggler (Juggler needs more than 10 players).",
+        body: "Four or more players get secret roles. Hosts pick the lineup — everyone else is a Villager. Mafia want to outnumber Town without getting caught.",
       },
       {
         title: "Night",

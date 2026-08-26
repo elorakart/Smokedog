@@ -1439,10 +1439,11 @@ export class GameRuntime {
         (pl) => pl.type === "poison" && pl.actorId === poisoner?.id
       );
       if (poisoner?.socketId && poisonLog) {
+        const text = poisonLog.clause ?? poisonLog.outcome;
         this.emitNightPowerResult(poisoner.socketId, {
-          tone: poisonLog.outcome.includes("Poisoned") ? "good" : "info",
+          tone: /failed/i.test(text) ? "info" : "good",
           title: `${nightLabel} — poison`,
-          detail: poisonLog.outcome,
+          detail: text.charAt(0).toUpperCase() + text.slice(1) + ".",
         });
       }
     }
@@ -1581,10 +1582,13 @@ export class GameRuntime {
     this.handlePhaseTimeoutAfk(room);
     const result = resolveNight(room.players, room.nightActions);
 
-    for (const pl of result.powerLogs) {
-      const actor = room.players.find((p) => p.id === pl.actorId);
-      const name = actor?.name ?? "Someone";
-      this.addChronicle(room, "night", `${name}: ${pl.outcome}`);
+    if (result.powerLogs.length > 0) {
+      const clauses = result.powerLogs.map((pl) => {
+        const actor = room.players.find((p) => p.id === pl.actorId);
+        const name = actor?.name ?? "Someone";
+        return `${name} ${pl.clause ?? pl.outcome}`;
+      });
+      this.addChronicle(room, "night", clauses.join(", ") + ".");
     }
 
     if (result.detective) {
@@ -1660,19 +1664,15 @@ export class GameRuntime {
         const p = room.players.find((x) => x.id === d.playerId);
         if (p) {
           if (p.role === "mafia_boss") deadBossIds.push(p.id);
-          const by = this.byActorRolePhrase(room, d.actorId, d.actorRole);
-          this.addChronicle(
-            room,
-            "night",
-            `${p.name} was eliminated overnight${by}.`
-          );
           this.leaveMafiaRooms(p, room.id);
           this.removeFromAllVoice(room, p.id);
         }
       }
-      if (names.length === 0) {
-        this.addChronicle(room, "night", "Someone was eliminated overnight.");
-      }
+      this.addChronicle(
+        room,
+        "night",
+        `${nameList} ${verb} eliminated overnight.`
+      );
       this.setAnnouncement(
         room,
         "bad",

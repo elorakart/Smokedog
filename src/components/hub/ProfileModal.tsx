@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -39,17 +39,19 @@ export function ProfileModal({
   const [name, setName] = useState(defaultName);
   const [avatarId, setAvatarId] = useState(defaultAvatar);
   const [code, setCode] = useState("");
-  const [mode, setMode] = useState<"create" | "join">(initialMode ?? "create");
   const [localError, setLocalError] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setName(defaultName);
       setAvatarId(defaultAvatar);
       setLocalError(null);
-      if (initialCode) setCode(initialCode);
-      if (initialMode) setMode(initialMode);
+      setCode(initialCode ?? "");
+      if (initialMode === "join") {
+        requestAnimationFrame(() => codeRef.current?.focus());
+      }
     }
   }, [open, defaultName, defaultAvatar, initialCode, initialMode]);
 
@@ -65,29 +67,36 @@ export function ProfileModal({
   const ready = name.trim().length >= 2;
   const isPending = pending !== null;
   const pendingLabel =
-    pending === "create" ? "Creating party…" : pending === "join" ? "Joining party…" : null;
+    pending === "create"
+      ? "Creating party…"
+      : pending === "join"
+        ? "Joining party…"
+        : null;
+  const joining = code.trim().length > 0;
 
-  const title =
-    mode === "create" && createGameId
+  const title = joining
+    ? "Join with code"
+    : createGameId
       ? `Open ${gameLabel(createGameId)}`
-      : mode === "join"
-        ? "Join with code"
-        : "Stamp your name";
+      : "Stamp your name";
 
-  const ctaLabel =
-    mode === "create" ? "Open a room" : "Join with code";
-
-  const submitJoin = () => {
-    if (isPending) return;
-    const check = validateRoomCode(code);
-    if (!check.ok) {
-      setLocalError(check.message);
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
+  const submit = () => {
+    if (isPending || !ready) return;
+    const trimmed = code.trim();
+    if (trimmed) {
+      const check = validateRoomCode(trimmed);
+      if (!check.ok) {
+        setLocalError(check.message);
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+        return;
+      }
+      setLocalError(null);
+      onJoin(name.trim(), avatarId, check.code);
+    } else {
+      setLocalError(null);
+      onCreate(name.trim(), avatarId);
     }
-    setLocalError(null);
-    onJoin(name.trim(), avatarId, check.code);
   };
 
   return (
@@ -129,7 +138,7 @@ export function ProfileModal({
                 <h1 className="mb-2 font-display text-4xl font-bold text-crimson md:text-5xl">
                   {title}
                 </h1>
-                {mode === "create" && createGameId && (
+                {!joining && createGameId && (
                   <p className="font-mono text-xs uppercase tracking-[0.1em] text-crimson/60">
                     Game: {gameLabel(createGameId)}
                   </p>
@@ -185,63 +194,32 @@ export function ProfileModal({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 pt-1 sm:flex-row">
-                  <button
-                    type="button"
+                <div className="space-y-2">
+                  <label
+                    htmlFor="room_code"
+                    className="block font-mono text-xs font-bold uppercase tracking-[0.1em] text-crimson/70"
+                  >
+                    Room code{" "}
+                    <span className="font-normal normal-case tracking-normal text-crimson/50">
+                      (optional)
+                    </span>
+                  </label>
+                  <input
+                    ref={codeRef}
+                    id="room_code"
+                    value={code}
+                    maxLength={6}
                     disabled={isPending}
-                    onClick={() => {
-                      setMode("create");
+                    onChange={(e) => {
+                      setCode(e.target.value.toUpperCase());
                       setLocalError(null);
                     }}
-                    className={`flex-1 border py-4 px-6 font-mono text-sm font-bold uppercase tracking-[0.15em] shadow-md transition-colors disabled:opacity-40 ${
-                      mode === "create"
-                        ? "border-crimson/80 bg-crimson text-manila hover:bg-crimson/90"
-                        : "border-crimson/25 bg-transparent text-crimson hover:bg-crimson/5"
+                    placeholder="Leave blank to open a room"
+                    className={`w-full border-0 border-b border-dashed bg-transparent pb-2 text-center font-mono text-lg tracking-[0.35em] text-crimson outline-none placeholder:tracking-normal placeholder:text-crimson/35 focus:border-crimson disabled:opacity-50 ${
+                      displayError ? "border-crimson" : "border-crimson/35"
                     }`}
-                  >
-                    Open a room
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => {
-                      setMode("join");
-                      setLocalError(null);
-                    }}
-                    className={`flex-1 border py-4 px-6 font-mono text-sm font-bold uppercase tracking-[0.15em] transition-colors disabled:opacity-40 ${
-                      mode === "join"
-                        ? "border-crimson/80 bg-crimson text-manila shadow-md hover:bg-crimson/90"
-                        : "border-crimson/25 bg-transparent text-crimson hover:bg-crimson/5"
-                    }`}
-                  >
-                    Join with code
-                  </button>
+                  />
                 </div>
-
-                {mode === "join" && (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="room_code"
-                      className="block font-mono text-xs font-bold uppercase tracking-[0.1em] text-crimson/70"
-                    >
-                      Room Code
-                    </label>
-                    <input
-                      id="room_code"
-                      value={code}
-                      maxLength={6}
-                      disabled={isPending}
-                      onChange={(e) => {
-                        setCode(e.target.value.toUpperCase());
-                        setLocalError(null);
-                      }}
-                      placeholder="ROOM CODE"
-                      className={`w-full border-0 border-b border-dashed bg-transparent pb-2 text-center font-mono text-lg tracking-[0.4em] text-crimson outline-none placeholder:tracking-[0.4em] placeholder:text-crimson/35 focus:border-crimson disabled:opacity-50 ${
-                        displayError ? "border-crimson" : "border-crimson/35"
-                      }`}
-                    />
-                  </div>
-                )}
 
                 <AnimatePresence>
                   {isPending && pendingLabel && (
@@ -274,14 +252,10 @@ export function ProfileModal({
                 <PrimaryButton
                   className="w-full border border-crimson/90 py-5 text-sm tracking-[0.2em] shadow-lg"
                   loading={isPending}
-                  disabled={mode === "create" ? !ready : !name.trim()}
-                  onClick={() => {
-                    if (isPending) return;
-                    if (mode === "create") onCreate(name.trim(), avatarId);
-                    else submitJoin();
-                  }}
+                  disabled={!ready}
+                  onClick={submit}
                 >
-                  {isPending ? pendingLabel ?? "Processing…" : ctaLabel}
+                  {isPending ? pendingLabel ?? "Processing…" : "Stamp in"}
                 </PrimaryButton>
               </div>
             </div>
