@@ -16,10 +16,7 @@ const httpServer = createServer((req, res) => {
         ok: true,
         service: "smokedog-game",
         games: listGameIds(),
-        commit:
-          process.env.RAILWAY_GIT_COMMIT_SHA ??
-          process.env.VERCEL_GIT_COMMIT_SHA ??
-          null,
+        commit: process.env.GIT_COMMIT ?? null,
       })
     );
     return;

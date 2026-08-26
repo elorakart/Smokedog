@@ -13,25 +13,39 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The custom `server.ts` serves Next.js and Socket.io on one port.
 
-## Production
+## Production (Cloudflare)
 
-- **UI:** [Vercel](https://smokedog.vercel.app) — set `NEXT_PUBLIC_SOCKET_URL` to the game server origin.
-- **Game server:** [Railway](https://game-production-22ef.up.railway.app) today; [Oracle Cloud migration planned](docs/GAME_SERVER.md).
+| Layer | Worker | URL |
+| --- | --- | --- |
+| **UI** | `smokedog` | https://smokedog.balmeek544.workers.dev |
+| **Game server** | `smokedog-game` | https://smokedog-game.balmeek544.workers.dev |
 
-**Rollback:** If the game server fails, point Vercel `NEXT_PUBLIC_SOCKET_URL` back to Railway. See [docs/GAME_SERVER.md](docs/GAME_SERVER.md).
+The UI reads **`NEXT_PUBLIC_SOCKET_URL`** from `wrangler.jsonc` (baked in at deploy). The game worker runs Socket.io via Durable Objects.
 
-**Oracle migration:** Step-by-step guide → [docs/ORACLE_WALKTHROUGH.md](docs/ORACLE_WALKTHROUGH.md).
+Deploy both workers:
 
 ```bash
-npm run start:game
+npm run deploy:cf:all
 ```
 
-Env for the game process:
+Or separately:
 
-- `PORT` — provided by the host
-- `CORS_ORIGIN` — your Vercel URL, e.g. `https://smokedog.vercel.app`
+```bash
+npm run deploy:cf:game   # game server first
+npm run deploy:cf        # UI (OpenNext)
+```
 
-`.env.example` lists all variables. Do not commit `.env`.
+See [docs/GAME_SERVER.md](docs/GAME_SERVER.md) for architecture, env vars, and health checks.
+
+### Local game-server-only mode
+
+Useful when testing split UI + game server without Cloudflare:
+
+```bash
+PORT=3001 CORS_ORIGIN=http://localhost:3000 npm run start:game
+```
+
+Set `NEXT_PUBLIC_SOCKET_URL=http://localhost:3001` in `.env.local`.
 
 ## Play
 

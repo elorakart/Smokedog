@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO="${REPO:-https://github.com/elorakart/Smokedog.git}"
 APP_DIR="${APP_DIR:-$HOME/Smokedog}"
-CORS_ORIGIN="${CORS_ORIGIN:-https://smokedog.vercel.app}"
+CORS_ORIGIN="${CORS_ORIGIN:-https://smokedog.balmeek544.workers.dev}"
 PORT="${PORT:-3001}"
 SERVICE_NAME="${SERVICE_NAME:-smokedog-game}"
 
@@ -85,7 +85,7 @@ echo " Public health URL (after OCI port ${PORT} is open):"
 echo "   http://${PUBLIC_IP}:${PORT}/health"
 echo ""
 echo " Next: open TCP ${PORT} in Oracle Cloud security list,"
-echo " then tell your dev to run cutover on Vercel with:"
+echo " then set NEXT_PUBLIC_SOCKET_URL in wrangler.jsonc to:"
 echo "   http://${PUBLIC_IP}:${PORT}"
 echo " (or https://your-domain if you add nginx later)"
 echo "=============================================="

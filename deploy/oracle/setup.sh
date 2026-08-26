@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO="${REPO:-https://github.com/elorakart/Smokedog.git}"
 APP_DIR="${APP_DIR:-$HOME/Smokedog}"
-CORS_ORIGIN="${CORS_ORIGIN:-https://smokedog.vercel.app}"
+CORS_ORIGIN="${CORS_ORIGIN:-https://smokedog.balmeek544.workers.dev}"
 
 echo "==> Installing Node.js 20..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -32,4 +32,4 @@ echo "  1. sudo cp deploy/oracle/smokedog-game.service /etc/systemd/system/"
 echo "  2. Edit WorkingDirectory if not $APP_DIR"
 echo "  3. sudo systemctl enable --now smokedog-game"
 echo "  4. Open OCI security list: TCP 3001 (or use nginx on 443)"
-echo "  5. Test https://smokedog.vercel.app after setting NEXT_PUBLIC_SOCKET_URL"
+echo "  5. Test the Cloudflare UI after setting NEXT_PUBLIC_SOCKET_URL in wrangler.jsonc"

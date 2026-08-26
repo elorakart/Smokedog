@@ -1,125 +1,107 @@
-# Game server deployment & rollback
+# Game server deployment
 
-SMOKEDOG splits production into two parts:
+SMOKEDOG production runs entirely on **Cloudflare Workers**:
 
-| Layer | Host | URL (current) |
+| Layer | Worker | URL |
 | --- | --- | --- |
-| **UI** | Vercel | https://smokedog.vercel.app |
-| **Game server** | Railway (primary today) | https://game-production-22ef.up.railway.app |
+| **UI** | `smokedog` (OpenNext) | https://smokedog.balmeek544.workers.dev |
+| **Game server** | `smokedog-game` (Socket.io + Durable Objects) | https://smokedog-game.balmeek544.workers.dev |
 
-The UI connects via **`NEXT_PUBLIC_SOCKET_URL`** (Vercel env). The game server accepts WebSockets and runs `npm run start:game`.
-
----
-
-## Rollback plan (keep this working)
-
-**Rule:** Do not shut down Railway until Oracle has been stable for at least a week.
-
-### Instant rollback (under 2 minutes)
-
-If Oracle fails or players cannot connect:
-
-1. Open **Vercel → smokedog → Settings → Environment Variables**
-2. Set `NEXT_PUBLIC_SOCKET_URL` back to the Railway URL:
-   ```
-   https://game-production-22ef.up.railway.app
-   ```
-3. **Redeploy** the Vercel production deployment (or push any commit to `main`).
-4. Confirm health: open  
-   `https://game-production-22ef.up.railway.app/health`  
-   → should return `{"ok":true,"service":"smokedog-game","games":["mafia-city","five-alive"],...}`
-
-If `games` is missing or only lists `mafia-city`, the game server is on an old build — **Redeploy** the Railway **game** service from the dashboard (or run `railway up --service game` with a linked project).
-
-No code changes required. Active lobbies on Oracle will be lost; Railway starts fresh rooms.
-
-### Keep Railway alive during migration
-
-- Leave the Railway **game** service **Online** (Hobby plan or trial).
-- Railway auto-deploys from `main` — same code as Oracle.
-- CORS on Railway must include `https://smokedog.vercel.app`:
-  ```
-  CORS_ORIGIN=https://smokedog.vercel.app
-  ```
-
-### Backup env values (save in password manager / Vercel notes)
-
-| Variable | Railway (backup) | Oracle (future) |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SOCKET_URL` | `https://game-production-22ef.up.railway.app` | `https://<your-oracle-domain-or-ip>` |
-| `CORS_ORIGIN` | `https://smokedog.vercel.app` | same |
-| `PORT` | Railway sets automatically | `3001` (or behind nginx) |
+The UI connects via **`NEXT_PUBLIC_SOCKET_URL`**, set in `wrangler.jsonc` and embedded at build/deploy time.
 
 ---
 
-## Oracle Cloud migration plan (next step)
+## Deploy
 
-### Why Oracle
+From the repo root (requires `wrangler login`):
 
-Always-free ARM VM (24/7, no spin-down) — good fit for Socket.io + in-memory rooms.
+```bash
+# Game server (deploy first when changing socket handlers)
+npm run deploy:cf:game
 
-### High-level steps
+# UI
+npm run deploy:cf
 
-1. **Create OCI account** → Always Free → Ubuntu 22.04/24.04 VM (Ampere A1).
-2. **Open firewall:** allow TCP `3001` (or `80`/`443` if using nginx).
-3. **Install Node 20+**, clone repo, `npm ci`, `npm run build` (optional for game-only).
-4. **Run game server:**
-   ```bash
-   PORT=3001 CORS_ORIGIN=https://smokedog.vercel.app npm run start:game
-   ```
-5. **systemd** — use `deploy/oracle/smokedog-game.service` (copy to `/etc/systemd/system/`).
-6. **Health check:** `curl https://<host>/health`
-7. **Cutover:** set Vercel `NEXT_PUBLIC_SOCKET_URL` to Oracle URL → redeploy.
-8. **Monitor** 24–48h; keep Railway running for rollback.
+# Both
+npm run deploy:cf:all
+```
 
-### Oracle checklist before cutover
-
-- [ ] `/health` returns OK from public internet
-- [ ] Create party + join from two browsers on https://smokedog.vercel.app
-- [ ] Night/day actions, chat, voice signaling work
-- [ ] CORS_ORIGIN matches Vercel URL exactly (no trailing slash)
-- [ ] Railway still online (rollback ready)
-
-### Optional: nginx + TLS on Oracle
-
-Point a subdomain (e.g. `game.smokedog.app`) to the VM, terminate TLS with Let's Encrypt, proxy to `localhost:3001`.
+After changing game logic in `src/server/*`, redeploy **`smokedog-game`**. After UI/client changes, redeploy **`smokedog`** (or both).
 
 ---
 
-## Local dev
+## Health checks
 
-Single process (Next + Socket.io):
+**Game server:**
+
+```bash
+curl https://smokedog-game.balmeek544.workers.dev/health
+```
+
+Expected: `{"ok":true,"service":"smokedog-game","host":"cloudflare"}`
+
+**UI:** open https://smokedog.balmeek544.workers.dev — hub should load and open lobbies should list.
+
+---
+
+## Configuration
+
+### UI (`wrangler.jsonc`)
+
+```jsonc
+"vars": {
+  "NEXT_PUBLIC_SOCKET_URL": "https://smokedog-game.balmeek544.workers.dev"
+}
+```
+
+Update the subdomain if you change your Cloudflare `workers.dev` account subdomain.
+
+### Game worker (`wrangler.game.jsonc`)
+
+Socket.io runs in Durable Objects (`EngineActor`, `SocketActor`). Entry: `workers/game/main.ts` → `wireGameSockets()`.
+
+CORS for the standalone Node server (`npm run start:game`) is only needed for local split-mode testing — the Cloudflare game worker handles browser origins via the Socket.io stack.
+
+---
+
+## Local development
+
+**Unified (recommended):**
 
 ```bash
 npm run dev
 ```
 
-Game server only:
+Next.js + Socket.io on one port.
+
+**Split mode (matches production topology locally):**
 
 ```bash
+# Terminal 1
 PORT=3001 CORS_ORIGIN=http://localhost:3000 npm run start:game
-```
 
-Set `NEXT_PUBLIC_SOCKET_URL=http://localhost:3001` in `.env.local` to test split mode locally.
+# Terminal 2 — .env.local
+# NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+npm run dev
+```
 
 ---
 
-## Deploy commands
+## Architecture
 
-**Vercel (UI):**
-
-```bash
-npx vercel --prod --yes
+```
+Browser → smokedog (UI worker, OpenNext)
+       → smokedog-game (WebSocket /socket.io/)
+              → EngineActor DO
+              → SocketActor DO → GameRuntime (in-memory rooms)
 ```
 
-**Railway (game server):**
+Game state lives in memory inside `GameRuntime`. After Durable Object hibernation, clients reconnect via `room:rejoin` / `room:spectate` and sockets are re-joined in `restoreSocketRoomMemberships()`.
 
-Requires `RAILWAY_TOKEN` in GitHub repo secrets (workflow: `.github/workflows/deploy-game-server.yml`) or manual deploy:
+---
 
-```bash
-railway login
-railway link --project <your-project>
-railway up --service game --detach
-```
+## Optional: self-hosted game server
 
-Both deploy from the same GitHub repo: https://github.com/elorakart/Smokedog
+`src/server/standalone.ts` + `npm run start:game` can run the game server on any Node host (e.g. a VM). Point `NEXT_PUBLIC_SOCKET_URL` at that host and set `CORS_ORIGIN` to your UI origin. Production today uses Cloudflare only.
+
+See `deploy/oracle/` for a systemd template if you ever run the standalone server on a Linux VM.
