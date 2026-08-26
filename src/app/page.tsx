@@ -85,6 +85,18 @@ const GAME_CARDS: GameCard[] = [
     disabled: true,
     moreInfo: true,
   },
+  {
+    id: "detonation-cats",
+    title: "Detonation Cats",
+    pitch: "Draw carefully. Defuse the boom. Last player standing wins.",
+    players: "2–5 Players",
+    duration: "Turn-based",
+    image: "/games/five-alive.jpg",
+    badge: "Coming soon",
+    badgeTone: "steel",
+    disabled: false,
+    moreInfo: true,
+  },
 ];
 
 export default function HomePage() {

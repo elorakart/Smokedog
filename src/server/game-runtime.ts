@@ -16,6 +16,7 @@ import type {
   PhaseAnnouncement,
   Player,
   PublicFiveAliveCard,
+  PublicDcCard,
   PublicGameState,
   PublicPlayer,
   RoomSettings,
@@ -84,6 +85,7 @@ import {
 function isChatOnlyGame(gameId: string): boolean {
   return (
     gameId === "five-alive" ||
+    gameId === "detonation-cats" ||
     gameId === "spot-it" ||
     gameId === "tic-tac-toe" ||
     gameId === "connect-4"
@@ -104,6 +106,28 @@ import {
   pickBotFiveAliveBombResponse,
   pickBotFiveAliveTurnPlay,
 } from "@/lib/games/5-alive/bot-ai";
+import {
+  botDcDelayMs,
+  pickBotDefusePosition,
+  pickBotDiscardIndex,
+  pickBotDcPlay,
+  pickBotStealTarget,
+} from "@/lib/games/detonation-cats/bot-ai";
+import {
+  advanceTurn,
+  createDetonationCatsState,
+  dcMaybeWin,
+  insertDefuse,
+  newLog,
+  pickFromDiscard,
+  resolveDraw,
+  resolvePlayedCards,
+  stealRandomCard,
+  takeCardsFromHand,
+  toPublicDcCard,
+  validatePlayCards,
+  type DetonationCatsRoomState,
+} from "@/server/detonation-cats-runtime";
 import { canAccessChannel } from "@/lib/chat-access";
 
 import {
@@ -157,6 +181,7 @@ interface Room {
     bombActorId: string | null;
     bombResponderIds: string[];
   };
+  detonationCats?: DetonationCatsRoomState;
   spotIt?: SpotItRoomState;
   ttt?: TttRoomState;
   connect4?: Connect4RoomState;
@@ -295,6 +320,7 @@ export class GameRuntime {
     const revealAll = room.phase === "gameover";
     const viewerIsMafia = you?.role ? isMafiaRole(you.role) : false;
     const five = room.gameId === "five-alive" ? room.fiveAlive : undefined;
+    const dc = room.gameId === "detonation-cats" ? room.detonationCats : undefined;
     const rolePreview =
       room.phase === "lobby"
         ? normalizeRoleDistribution(
@@ -405,6 +431,36 @@ export class GameRuntime {
                     five.centerPile[five.centerPile.length - 1] as FiveAliveCardInstance
                   )
                 : null,
+          }
+        : undefined,
+      detonationCats: dc
+        ? {
+            turnPlayerId: dc.turnPlayerId,
+            pendingTurns: dc.pendingTurns,
+            yourHand: (dc.handsByPlayerId[you?.id ?? ""] ?? []).map(toPublicDcCard),
+            drawPileCount: dc.drawDeck.length,
+            discardCount: dc.discardPile.length,
+            discardTop:
+              dc.discardPile.length > 0
+                ? toPublicDcCard(dc.discardPile[dc.discardPile.length - 1]!)
+                : null,
+            seeFutureCards:
+              you?.id === dc.turnPlayerId && dc.seeFuturePeek
+                ? dc.seeFuturePeek.map(toPublicDcCard)
+                : null,
+            awaitingDefuse:
+              room.phase === "ek_defuse" && dc.defusePlayerId === you?.id,
+            awaitingPickDiscard:
+              room.phase === "ek_pick_discard" &&
+              dc.pickDiscardPlayerId === you?.id,
+            awaitingStealTarget:
+              room.phase === "ek_steal" && dc.stealActorId === you?.id,
+            stealTargetIds:
+              room.phase === "ek_steal" && dc.stealActorId === you?.id
+                ? room.players
+                    .filter((p) => p.alive && p.id !== you?.id)
+                    .map((p) => p.id)
+                : [],
           }
         : undefined,
       spotIt:
@@ -592,6 +648,80 @@ export class GameRuntime {
           } else {
             this.submitFiveAlivePlayCard(room.id, bot.id, response.cardId);
           }
+        });
+      }
+      return;
+    }
+
+    if (room.gameId === "detonation-cats") {
+      const dc = room.detonationCats;
+      if (!dc) return;
+
+      if (room.phase === "ek_turn" && dc.turnPlayerId) {
+        const bot = room.players.find(
+          (p) => p.id === dc.turnPlayerId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        this.delayBot(room, botDcDelayMs(), () => {
+          if (room.phase !== "ek_turn" || room.paused || !bot.alive) return;
+          if (dc.turnPlayerId !== bot.id) return;
+          const hand = dc.handsByPlayerId[bot.id] ?? [];
+          const play = pickBotDcPlay(hand);
+          if (play) {
+            this.submitEkPlayCards(room.id, bot.id, play.cardIds);
+            if (play.endTurn) {
+              setTimeout(() => {
+                this.submitEkEndTurn(room.id, bot.id);
+              }, 400);
+            }
+          } else {
+            this.submitEkEndTurn(room.id, bot.id);
+          }
+        });
+        return;
+      }
+
+      if (room.phase === "ek_defuse" && dc.defusePlayerId) {
+        const bot = room.players.find(
+          (p) => p.id === dc.defusePlayerId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        this.delayBot(room, botDcDelayMs(), () => {
+          this.submitEkPlaceDefuse(
+            room.id,
+            bot.id,
+            pickBotDefusePosition(dc.drawDeck.length)
+          );
+        });
+        return;
+      }
+
+      if (room.phase === "ek_pick_discard" && dc.pickDiscardPlayerId) {
+        const bot = room.players.find(
+          (p) => p.id === dc.pickDiscardPlayerId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        this.delayBot(room, botDcDelayMs(), () => {
+          this.submitEkPickDiscard(
+            room.id,
+            bot.id,
+            pickBotDiscardIndex(dc.discardPile.length)
+          );
+        });
+        return;
+      }
+
+      if (room.phase === "ek_steal" && dc.stealActorId) {
+        const bot = room.players.find(
+          (p) => p.id === dc.stealActorId && p.isBot && p.alive
+        );
+        if (!bot) return;
+        this.delayBot(room, botDcDelayMs(), () => {
+          const target = pickBotStealTarget(
+            room.players.filter((p) => p.alive).map((p) => p.id),
+            bot.id
+          );
+          if (target) this.submitEkStealTarget(room.id, bot.id, target);
         });
       }
       return;
@@ -1063,6 +1193,10 @@ export class GameRuntime {
       this.startFiveAlive(room);
       return;
     }
+    if (room.gameId === "detonation-cats") {
+      this.startDetonationCats(room);
+      return;
+    }
     if (room.gameId === "spot-it") {
       this.startSpotIt(room);
       return;
@@ -1194,6 +1328,267 @@ export class GameRuntime {
     this.setPhase(room, "fivealive_turn", room.settings.daySeconds);
     this.scheduleBots(room);
     this.emitRoom(room);
+  }
+
+  private startDetonationCats(room: Room) {
+    room.cycle = 1;
+    room.winner = null;
+    room.logs = [];
+    room.votes = {};
+    room.nightActions = [];
+    room.detectiveByPlayer = {};
+    room.afkWarnedPlayerIds = [];
+    room.boardWinnerId = null;
+    room.boardDraw = false;
+
+    for (const p of room.players) {
+      p.role = undefined;
+      p.bulletsLeft = undefined;
+      p.blackmailed = false;
+      p.lives = undefined;
+      p.alive = true;
+      p.ready = false;
+      p.afkCount = 0;
+      this.leaveMafiaRooms(p, room.id);
+    }
+
+    room.detonationCats = createDetonationCatsState(
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive }))
+    );
+
+    log(room, "Detonation Cats begins — don't draw the boom.");
+    this.setPhase(room, "ek_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  private dcMaybeWinRoom(room: Room): boolean {
+    const dc = room.detonationCats;
+    if (!dc) return false;
+    const winnerId = dcMaybeWin(
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive })),
+      dc.turnOrder
+    );
+    if (!winnerId) return false;
+    room.boardWinnerId = winnerId;
+    const winner = room.players.find((p) => p.id === winnerId);
+    log(room, `${winner?.name ?? "Someone"} wins Detonation Cats!`);
+    this.setPhase(room, "gameover", null);
+    this.emitRoom(room);
+    return true;
+  }
+
+  private dcFinishTurnDraw(room: Room, playerId: string) {
+    const dc = room.detonationCats;
+    if (!dc) return;
+    const actor = room.players.find((p) => p.id === playerId);
+    if (!actor?.alive) return;
+
+    if (dc.skipDraw) {
+      dc.skipDraw = false;
+      advanceTurn(
+        dc,
+        room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive })),
+        playerId
+      );
+      if (this.dcMaybeWinRoom(room)) return;
+      this.setPhase(room, "ek_turn", room.settings.daySeconds);
+      this.scheduleBots(room);
+      this.emitRoom(room);
+      return;
+    }
+
+    const result = resolveDraw(
+      dc,
+      actor,
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive }))
+    );
+    room.logs.push(newLog(result.logs.join(" ")));
+
+    if (result.needsDefuse) {
+      this.setPhase(room, "ek_defuse", room.settings.daySeconds);
+      this.scheduleBots(room);
+      this.emitRoom(room);
+      return;
+    }
+
+    if (result.eliminated) {
+      if (this.dcMaybeWinRoom(room)) return;
+    }
+
+    advanceTurn(
+      dc,
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive })),
+      playerId
+    );
+    if (this.dcMaybeWinRoom(room)) return;
+    this.setPhase(room, "ek_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitEkPlayCards(roomId: string, playerId: string, cardIds: string[]) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    if (room.phase !== "ek_turn") return;
+    const dc = room.detonationCats;
+    if (!dc || dc.turnPlayerId !== playerId) return;
+    const actor = room.players.find((p) => p.id === playerId);
+    if (!actor?.alive) return;
+
+    const hand = dc.handsByPlayerId[playerId] ?? [];
+    const validated = validatePlayCards(hand, cardIds);
+    if (!validated.ok) return;
+
+    const { taken, remaining } = takeCardsFromHand(hand, cardIds);
+    dc.handsByPlayerId[playerId] = remaining;
+
+    const result = resolvePlayedCards(
+      dc,
+      { id: actor.id, name: actor.name, alive: actor.alive },
+      taken,
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive }))
+    );
+    for (const line of result.logs) {
+      room.logs.push(newLog(line));
+    }
+
+    if (result.nextPhase === "ek_steal") {
+      this.setPhase(room, "ek_steal", room.settings.daySeconds);
+      this.scheduleBots(room);
+      this.emitRoom(room);
+      return;
+    }
+    if (result.nextPhase === "ek_pick_discard") {
+      this.setPhase(room, "ek_pick_discard", room.settings.daySeconds);
+      this.scheduleBots(room);
+      this.emitRoom(room);
+      return;
+    }
+    if (result.endTurnWithoutDraw) {
+      if (!result.turnAlreadyAdvanced) {
+        advanceTurn(
+          dc,
+          room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive })),
+          playerId
+        );
+      }
+      if (this.dcMaybeWinRoom(room)) return;
+      this.setPhase(room, "ek_turn", room.settings.daySeconds);
+      this.scheduleBots(room);
+      this.emitRoom(room);
+      return;
+    }
+
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitEkEndTurn(roomId: string, playerId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    if (room.phase !== "ek_turn") return;
+    const dc = room.detonationCats;
+    if (!dc || dc.turnPlayerId !== playerId) return;
+    this.dcFinishTurnDraw(room, playerId);
+  }
+
+  submitEkPlaceDefuse(roomId: string, playerId: string, deckIndex: number) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    if (room.phase !== "ek_defuse") return;
+    const dc = room.detonationCats;
+    if (!dc || dc.defusePlayerId !== playerId) return;
+
+    insertDefuse(dc, dc.pendingDefuseCard ?? { id: randomUUID(), type: "defuse" }, deckIndex);
+    dc.defusePlayerId = null;
+    dc.pendingDefuseCard = null;
+    log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} hides a Purr Defuse in the deck.`);
+
+    advanceTurn(
+      dc,
+      room.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive })),
+      playerId
+    );
+    if (this.dcMaybeWinRoom(room)) return;
+    this.setPhase(room, "ek_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitEkPickDiscard(
+    roomId: string,
+    playerId: string,
+    discardIndex: number
+  ) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    if (room.phase !== "ek_pick_discard") return;
+    const dc = room.detonationCats;
+    if (!dc || dc.pickDiscardPlayerId !== playerId) return;
+    if (dc.discardPile.length === 0) return;
+
+    const picked = pickFromDiscard(dc, playerId, discardIndex);
+    if (picked) {
+      log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} takes ${picked.type} from discard.`);
+    }
+
+    this.setPhase(room, "ek_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  submitEkStealTarget(roomId: string, playerId: string, targetId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    if (room.phase !== "ek_steal") return;
+    const dc = room.detonationCats;
+    if (!dc || dc.stealActorId !== playerId) return;
+    const target = room.players.find((p) => p.id === targetId && p.alive);
+    if (!target || target.id === playerId) return;
+
+    const label = stealRandomCard(dc, target.id, playerId);
+    if (label) {
+      log(room, `${room.players.find((p) => p.id === playerId)?.name ?? "Player"} steals ${label} from ${target.name}.`);
+    }
+
+    this.setPhase(room, "ek_turn", room.settings.daySeconds);
+    this.scheduleBots(room);
+    this.emitRoom(room);
+  }
+
+  private onTimeoutDetonationCats(roomId: string) {
+    const room = this.getRoom(roomId);
+    if (!room || room.paused || room.gameId !== "detonation-cats") return;
+    const dc = room.detonationCats;
+    if (!dc) return;
+
+    if (room.phase === "ek_turn" && dc.turnPlayerId) {
+      log(room, `${room.players.find((p) => p.id === dc.turnPlayerId)?.name ?? "Player"} timed out — auto draw.`);
+      this.dcFinishTurnDraw(room, dc.turnPlayerId);
+      return;
+    }
+    if (room.phase === "ek_defuse" && dc.defusePlayerId) {
+      this.submitEkPlaceDefuse(roomId, dc.defusePlayerId, pickBotDefusePosition(dc.drawDeck.length));
+      return;
+    }
+    if (room.phase === "ek_pick_discard" && dc.pickDiscardPlayerId) {
+      this.submitEkPickDiscard(
+        roomId,
+        dc.pickDiscardPlayerId,
+        pickBotDiscardIndex(dc.discardPile.length)
+      );
+      return;
+    }
+    if (room.phase === "ek_steal" && dc.stealActorId) {
+      const target = pickBotStealTarget(
+        room.players.filter((p) => p.alive).map((p) => p.id),
+        dc.stealActorId
+      );
+      if (target) {
+        this.submitEkStealTarget(roomId, dc.stealActorId, target);
+      }
+    }
   }
 
   private startNight(room: Room) {
@@ -1760,6 +2155,10 @@ export class GameRuntime {
     if (!room || room.paused) return;
     if (room.gameId === "five-alive") {
       this.onTimeoutFiveAlive(roomId);
+      return;
+    }
+    if (room.gameId === "detonation-cats") {
+      this.onTimeoutDetonationCats(roomId);
       return;
     }
     if (room.gameId === "tic-tac-toe" && room.phase === "ttt_play" && room.ttt) {
@@ -2696,6 +3095,7 @@ export class GameRuntime {
     room.afkGraceEndsAt = null;
     room.afkGracePlayerId = null;
     room.fiveAlive = undefined;
+    room.detonationCats = undefined;
     room.spotIt = undefined;
     room.ttt = undefined;
     room.connect4 = undefined;

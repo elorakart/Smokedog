@@ -21,6 +21,10 @@ export type Phase =
   | "gameover"
   | "fivealive_turn"
   | "fivealive_bomb"
+  | "ek_turn"
+  | "ek_defuse"
+  | "ek_pick_discard"
+  | "ek_steal"
   | "spotit_play"
   | "ttt_play"
   | "connect4_play";
@@ -220,6 +224,7 @@ export interface PublicGameState {
   deadVillagerVote?: boolean;
   // Optional per-game state for 5 Alive.
   fiveAlive?: FiveAlivePublicState;
+  detonationCats?: DetonationCatsPublicState;
   spotIt?: SpotItPublicState;
   ttt?: TttPublicState;
   connect4?: Connect4PublicState;
@@ -267,6 +272,36 @@ export type PublicFiveAliveCard = {
     | "bomb"
     | "wild";
   value?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+};
+
+export type PublicDcCard = {
+  id: string;
+  type:
+    | "detonation"
+    | "defuse"
+    | "skip"
+    | "attack"
+    | "shuffle"
+    | "see_future"
+    | "taco_cat"
+    | "beard_cat"
+    | "rainbow_cat"
+    | "potato_cat"
+    | "melon_cat";
+};
+
+export type DetonationCatsPublicState = {
+  turnPlayerId: string | null;
+  pendingTurns: number;
+  yourHand: PublicDcCard[];
+  drawPileCount: number;
+  discardCount: number;
+  discardTop: PublicDcCard | null;
+  seeFutureCards: PublicDcCard[] | null;
+  awaitingDefuse: boolean;
+  awaitingPickDiscard: boolean;
+  awaitingStealTarget: boolean;
+  stealTargetIds: string[];
 };
 
 export type FiveAlivePublicState = {
@@ -356,6 +391,11 @@ export type ClientToServerEvents = {
     // For bomb forced responses when you cannot (or choose not) to play 0.
     pass?: boolean;
   }) => void;
+  "ek:playCards": (payload: { roomId: string; cardIds: string[] }) => void;
+  "ek:endTurn": (payload: { roomId: string }) => void;
+  "ek:placeDefuse": (payload: { roomId: string; deckIndex: number }) => void;
+  "ek:pickDiscard": (payload: { roomId: string; discardIndex: number }) => void;
+  "ek:stealTarget": (payload: { roomId: string; targetId: string }) => void;
   "spotit:submitMatch": (payload: {
     roomId: string;
     symbolId: number;

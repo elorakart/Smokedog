@@ -201,6 +201,47 @@ export function attachSocketServer(
       );
     });
 
+    socket.on("ek:playCards", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitEkPlayCards(
+        payload.roomId,
+        socket.data.playerId,
+        payload.cardIds
+      );
+    });
+
+    socket.on("ek:endTurn", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitEkEndTurn(payload.roomId, socket.data.playerId);
+    });
+
+    socket.on("ek:placeDefuse", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitEkPlaceDefuse(
+        payload.roomId,
+        socket.data.playerId,
+        payload.deckIndex
+      );
+    });
+
+    socket.on("ek:pickDiscard", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitEkPickDiscard(
+        payload.roomId,
+        socket.data.playerId,
+        payload.discardIndex
+      );
+    });
+
+    socket.on("ek:stealTarget", (payload) => {
+      if (!socket.data.playerId) return;
+      runtime.submitEkStealTarget(
+        payload.roomId,
+        socket.data.playerId,
+        payload.targetId
+      );
+    });
+
     socket.on("spotit:submitMatch", (payload) => {
       if (!socket.data.playerId) return;
       runtime.submitSpotItMatch(

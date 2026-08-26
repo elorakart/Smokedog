@@ -38,6 +38,8 @@ import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
 import { FiveAliveTurnPanel } from "@/components/game/five-alive/FiveAliveTurnPanel";
 import { FiveAliveBombPanel } from "@/components/game/five-alive/FiveAliveBombPanel";
+import { DetonationCatsLobbyView } from "@/components/game/DetonationCatsLobbyView";
+import { DetonationCatsTurnPanel } from "@/components/game/detonation-cats/DetonationCatsTurnPanel";
 import { SpotItLobbyView } from "@/components/game/SpotItLobbyView";
 import { SpotItTable } from "@/components/game/spot-it/SpotItTable";
 import { BoardLobbyView } from "@/components/game/board/BoardLobbyView";
@@ -404,6 +406,16 @@ export function GameClient({ roomId }: { roomId: string }) {
       wildValue: payload.wildValue,
       pass: payload.pass,
     });
+  const emitEkPlayCards = (cardIds: string[]) =>
+    socket.emit("ek:playCards", { roomId: state.roomId, cardIds });
+  const emitEkEndTurn = () =>
+    socket.emit("ek:endTurn", { roomId: state.roomId });
+  const emitEkPlaceDefuse = (deckIndex: number) =>
+    socket.emit("ek:placeDefuse", { roomId: state.roomId, deckIndex });
+  const emitEkPickDiscard = (discardIndex: number) =>
+    socket.emit("ek:pickDiscard", { roomId: state.roomId, discardIndex });
+  const emitEkStealTarget = (targetId: string) =>
+    socket.emit("ek:stealTarget", { roomId: state.roomId, targetId });
   const emitChat = (channel: ChatChannel, text: string) => {
     const trimmed = text.trim().slice(0, 240);
     if (!trimmed || !state.you) {
@@ -642,6 +654,16 @@ export function GameClient({ roomId }: { roomId: string }) {
                     onAddBot={emitAddBot}
                     onRemoveBot={emitRemoveBot}
                   />
+                ) : state.gameId === "detonation-cats" ? (
+                  <DetonationCatsLobbyView
+                    state={state}
+                    onStart={emitStart}
+                    starting={startingGame}
+                    onSettings={emitSettings}
+                    onKick={emitKick}
+                    onAddBot={emitAddBot}
+                    onRemoveBot={emitRemoveBot}
+                  />
                 ) : state.gameId === "spot-it" ? (
                   <SpotItLobbyView
                     state={state}
@@ -785,6 +807,41 @@ export function GameClient({ roomId }: { roomId: string }) {
                     </h3>
                     <ul className="mt-2 space-y-1 text-sm text-ink-steel">
                       {state.logs.slice(-6).map((l) => (
+                        <li key={l.id}>{l.text}</li>
+                      ))}
+                    </ul>
+                  </GlassPanel>
+                  <ChatPanel
+                    state={state}
+                    socket={socket}
+                    onSend={emitChat}
+                    enableVoice={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {state.gameId === "detonation-cats" &&
+              (state.phase === "ek_turn" ||
+                state.phase === "ek_defuse" ||
+                state.phase === "ek_pick_discard" ||
+                state.phase === "ek_steal") && (
+              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                <DetonationCatsTurnPanel
+                  state={state}
+                  onPlayCards={emitEkPlayCards}
+                  onEndTurn={emitEkEndTurn}
+                  onPlaceDefuse={emitEkPlaceDefuse}
+                  onPickDiscard={emitEkPickDiscard}
+                  onStealTarget={emitEkStealTarget}
+                />
+                <div className="space-y-4">
+                  <GlassPanel className="p-4">
+                    <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                      Game log
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-sm text-ink-steel">
+                      {state.logs.slice(-8).map((l) => (
                         <li key={l.id}>{l.text}</li>
                       ))}
                     </ul>

@@ -4,6 +4,8 @@ export function gameLabel(gameId: string): string {
   switch (gameId) {
     case "five-alive":
       return "5 Alive";
+    case "detonation-cats":
+      return "Detonation Cats";
     case "mafia-city":
       return "Mafia City";
     case "spot-it":
