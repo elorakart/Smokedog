@@ -114,8 +114,9 @@ function RoleDistributionPreview({
   dist: RoleDistribution;
   playerCount: number;
 }) {
+  const normalized = normalizeRoleDistribution(dist, playerCount);
   const entries = (
-    Object.entries(dist) as [keyof RoleDistribution, number][]
+    Object.entries(normalized) as [keyof RoleDistribution, number][]
   ).filter(([, n]) => n > 0);
 
   return (
