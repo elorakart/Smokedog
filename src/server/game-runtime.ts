@@ -12,6 +12,7 @@ import type {
   NightAction,
   NightActionType,
   OpenLobby,
+  LiveGameListing,
   Phase,
   PhaseAnnouncement,
   Player,
@@ -24,7 +25,6 @@ import type {
   VoiceSignalPayload,
 } from "@/lib/types";
 import {
-  AFK_GRACE_MS,
   DAY_VOTE_SECONDS,
   REVEAL_SECONDS,
   SKIP_VOTE_ID,
@@ -142,11 +142,20 @@ export type IoServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
 const FIVE_ALIVE_HAND_SIZE = 10;
 
+interface Spectator {
+  id: string;
+  playerId: string;
+  socketId: string;
+  name: string;
+  avatarId: number;
+}
+
 interface Room {
   id: string;
   gameId: string;
   settings: RoomSettings;
   players: Player[];
+  spectators: Spectator[];
   phase: Phase;
   cycle: number;
   phaseEndsAt: number | null;
@@ -401,8 +410,8 @@ export class GameRuntime {
         (room.daySubPhase === "discussion" ||
           (!!room.settings.localMode && room.daySubPhase === "vote")),
       chronicle: revealAll ? room.chronicle : undefined,
-      afkGraceEndsAt: room.afkGraceEndsAt,
-      afkGracePlayerId: room.afkGracePlayerId,
+      afkGraceEndsAt: null,
+      afkGracePlayerId: null,
       roleDistributionPreview: rolePreview,
       deadVillagerVote:
         !!you &&
@@ -497,12 +506,6 @@ export class GameRuntime {
     return votesIn >= eligible.length;
   }
 
-  private maybeFinishDayFromVotes(room: Room) {
-    // Plurality can resolve with few votes — wait until every eligible voter has cast.
-    if (!this.canSkipDay(room)) return;
-    this.finishDayPhase(room);
-  }
-
   private publicVoiceParticipants(
     room: Room
   ): Partial<Record<ChatChannel, string[]>> {
@@ -538,7 +541,30 @@ export class GameRuntime {
       if (!player.socketId) continue;
       this.io.to(player.socketId).emit("room:state", this.sanitize(room, player.id));
     }
+    for (const spec of room.spectators) {
+      if (!spec.socketId) continue;
+      this.io.to(spec.socketId).emit("room:state", {
+        ...this.sanitize(room, null),
+        spectatorMode: true,
+      });
+    }
     this.broadcastLobbies();
+    this.broadcastLiveGames();
+  }
+
+  restoreSocketRoomMemberships() {
+    for (const room of this.rooms.values()) {
+      for (const player of room.players) {
+        if (player.socketId) {
+          this.joinSocketRooms(player.socketId, room, player);
+        }
+      }
+      for (const spec of room.spectators) {
+        if (spec.socketId) {
+          this.joinSocketRooms(spec.socketId, room);
+        }
+      }
+    }
   }
 
   listOpenLobbies(query = ""): OpenLobby[] {
@@ -578,6 +604,76 @@ export class GameRuntime {
     this.io.to("lobby-browser").emit("lobbies:list", {
       lobbies: this.listOpenLobbies(),
     });
+  }
+
+  listLiveGames(query = ""): LiveGameListing[] {
+    const q = query.trim().toUpperCase();
+    const rows: LiveGameListing[] = [];
+    for (const room of this.rooms.values()) {
+      if (room.phase === "lobby" || room.phase === "gameover") continue;
+      const host = room.players.find((p) => p.isHost) ?? room.players[0];
+      if (!host) continue;
+      const listing: LiveGameListing = {
+        roomId: room.id,
+        gameId: room.gameId,
+        hostName: host.name,
+        hostAvatarId: host.avatarId,
+        playerCount: room.players.length,
+        phase: room.phase,
+        cycle: room.cycle,
+      };
+      if (
+        q &&
+        !listing.roomId.includes(q) &&
+        !listing.hostName.toUpperCase().includes(q)
+      ) {
+        continue;
+      }
+      rows.push(listing);
+    }
+    return rows.sort((a, b) => a.roomId.localeCompare(b.roomId));
+  }
+
+  broadcastLiveGames() {
+    this.io.to("lobby-browser").emit("games:live", {
+      games: this.listLiveGames(),
+    });
+  }
+
+  private blockIfSeatedElsewhere(playerId: string, exceptRoomId?: string) {
+    const existingId = this.playerRoom.get(playerId);
+    if (!existingId || existingId === exceptRoomId) return;
+    const existing = this.getRoom(existingId);
+    if (!existing) {
+      this.playerRoom.delete(playerId);
+      return;
+    }
+    if (existing.phase !== "lobby") {
+      throw new RoomError(
+        "IN_PROGRESS",
+        "You are already in an active match. Leave or finish it first."
+      );
+    }
+    this.leaveRoom(existingId, playerId);
+  }
+
+  private removeSpectatorEverywhere(playerId: string, exceptRoomId?: string) {
+    for (const room of this.rooms.values()) {
+      if (exceptRoomId && room.id === exceptRoomId) continue;
+      const before = room.spectators.length;
+      room.spectators = room.spectators.filter((s) => s.playerId !== playerId);
+      if (room.spectators.length !== before && exceptRoomId) {
+        this.emitRoom(room);
+      }
+    }
+  }
+
+  private joinSocketRooms(socketId: string, room: Room, player?: Player) {
+    const sock = this.io.sockets.sockets.get(socketId);
+    if (!sock) return;
+    sock.join(room.id);
+    sock.join("lobby-browser");
+    if (player) this.joinMafiaRoom(player, room.id);
   }
 
   private clearTimer(room: Room) {
@@ -921,6 +1017,8 @@ export class GameRuntime {
     gameId?: string;
     localMode?: boolean;
   }): Room {
+    this.blockIfSeatedElsewhere(opts.playerId);
+    this.removeSpectatorEverywhere(opts.playerId);
     const requestedId = resolveGameId(opts.gameId);
     const mod = getGameModule(opts.gameId);
     if (mod.status === "maintenance") {
@@ -954,6 +1052,7 @@ export class GameRuntime {
       gameId: mod.id,
       settings: mod.createSettings(),
       players: [player],
+      spectators: [],
       phase: "lobby",
       cycle: 0,
       phaseEndsAt: null,
@@ -995,7 +1094,13 @@ export class GameRuntime {
     name: string;
     avatarId: number;
   }): Room {
-    const parsed = validateRoomCode(opts.roomId);
+    const parsedJoin = validateRoomCode(opts.roomId);
+    this.blockIfSeatedElsewhere(
+      opts.playerId,
+      parsedJoin.ok ? parsedJoin.code : undefined
+    );
+    this.removeSpectatorEverywhere(opts.playerId);
+    const parsed = parsedJoin;
     if (!parsed.ok) {
       throw new RoomError("INVALID_CODE", parsed.message);
     }
@@ -1020,7 +1125,7 @@ export class GameRuntime {
       existing.avatarId = opts.avatarId;
       if (room.phase === "lobby") existing.ready = true;
       this.playerRoom.set(opts.playerId, room.id);
-      this.joinMafiaRoom(existing, room.id);
+      this.joinSocketRooms(opts.socketId, room, existing);
       return room;
     }
 
@@ -1052,6 +1157,7 @@ export class GameRuntime {
       isBot: false,
     });
     this.playerRoom.set(opts.playerId, room.id);
+    this.joinSocketRooms(opts.socketId, room, room.players[room.players.length - 1]);
     return room;
   }
 
@@ -1074,8 +1180,56 @@ export class GameRuntime {
     player.socketId = opts.socketId;
     if (room.phase === "lobby") player.ready = true;
     this.playerRoom.set(opts.playerId, room.id);
-    this.joinMafiaRoom(player, room.id);
-    this.io.sockets.sockets.get(opts.socketId)?.join(room.id);
+    this.joinSocketRooms(opts.socketId, room, player);
+    return room;
+  }
+
+  spectateRoom(opts: {
+    roomId: string;
+    socketId: string;
+    playerId: string;
+    name: string;
+    avatarId: number;
+  }): Room {
+    const parsed = validateRoomCode(opts.roomId);
+    if (!parsed.ok) {
+      throw new RoomError("INVALID_CODE", parsed.message);
+    }
+    this.blockIfSeatedElsewhere(opts.playerId);
+    this.removeSpectatorEverywhere(opts.playerId, parsed.code);
+    const room = this.getRoom(parsed.code);
+    if (!room) {
+      throw new RoomError(
+        "NOT_FOUND",
+        `No match exists for code ${parsed.code}.`
+      );
+    }
+    if (room.phase === "lobby") {
+      throw new RoomError(
+        "NOT_FOUND",
+        "That party has not started yet. Join as a player instead."
+      );
+    }
+    if (room.phase === "gameover") {
+      throw new RoomError("NOT_FOUND", "That match has already ended.");
+    }
+    if (room.players.some((p) => p.id === opts.playerId)) {
+      throw new RoomError(
+        "IN_PROGRESS",
+        "You are already in this match as a player."
+      );
+    }
+
+    room.spectators = room.spectators.filter((s) => s.playerId !== opts.playerId);
+    room.spectators.push({
+      id: randomUUID(),
+      playerId: opts.playerId,
+      socketId: opts.socketId,
+      name: opts.name.trim().slice(0, 18) || "Observer",
+      avatarId: opts.avatarId,
+    });
+    this.joinSocketRooms(opts.socketId, room);
+    this.emitRoom(room);
     return room;
   }
 
@@ -1668,30 +1822,21 @@ export class GameRuntime {
     return dayVoteEligible(room).filter((p) => !room.votes[p.id]);
   }
 
-  private startAfkGrace(room: Room, player: Player) {
-    room.afkGracePlayerId = player.id;
-    room.afkGraceEndsAt = Date.now() + AFK_GRACE_MS;
-    log(room, `${player.name} missed their action — ${AFK_GRACE_MS / 1000}s grace period.`);
-    this.emitRoom(room);
-    this.delayBot(room, AFK_GRACE_MS, () => {
-      if (room.afkGracePlayerId !== player.id) return;
-      this.killAfkPlayer(room, player.id);
-    });
-  }
-
-  private killAfkPlayer(room: Room, playerId: string) {
-    const player = room.players.find((p) => p.id === playerId);
-    if (!player?.alive) return;
-    player.alive = false;
-    room.afkGracePlayerId = null;
-    room.afkGraceEndsAt = null;
-    log(room, `${player.name} died due to AFK.`);
-    this.leaveMafiaRooms(player, room.id);
-    this.removeFromAllVoice(room, player.id);
-    this.addChronicle(room, room.phase === "night" ? "night" : "day", `${player.name} died due to AFK`);
-    this.maybePromoteMafiaAfterBossDeath(room, playerId);
-    this.emitRoom(room);
-    this.maybeWin(room);
+  private markMafiaAfkOnTimeout(room: Room) {
+    if (room.gameId !== "mafia-city") return;
+    if (room.phase === "night") {
+      for (const player of this.playersNeedingNightAction(room)) {
+        if (player.isBot) continue;
+        player.afkCount = 1;
+      }
+      return;
+    }
+    if (room.phase === "day" && room.daySubPhase === "vote") {
+      for (const player of this.playersNeedingVote(room)) {
+        if (player.isBot) continue;
+        player.afkCount = 1;
+      }
+    }
   }
 
   private maybePromoteMafiaAfterBossDeath(room: Room, deadPlayerId: string) {
@@ -1717,29 +1862,7 @@ export class GameRuntime {
   }
 
   private handlePhaseTimeoutAfk(room: Room) {
-    if (room.phase === "night") {
-      for (const player of this.playersNeedingNightAction(room)) {
-        if (player.isBot) continue;
-        player.afkCount += 1;
-        if (player.afkCount >= 2) {
-          this.killAfkPlayer(room, player.id);
-        } else if (room.afkGracePlayerId !== player.id) {
-          this.startAfkGrace(room, player);
-        }
-      }
-      return;
-    }
-    if (room.phase === "day" && room.daySubPhase === "vote") {
-      for (const player of this.playersNeedingVote(room)) {
-        if (player.isBot) continue;
-        player.afkCount += 1;
-        if (player.afkCount >= 2) {
-          this.killAfkPlayer(room, player.id);
-        } else if (room.afkGracePlayerId !== player.id) {
-          this.startAfkGrace(room, player);
-        }
-      }
-    }
+    this.markMafiaAfkOnTimeout(room);
   }
 
   private updateMafiaNightIntel(room: Room) {
@@ -2595,10 +2718,7 @@ export class GameRuntime {
     room.nightActions = room.nightActions.filter((a) => a.playerId !== playerId);
     room.nightActions.push({ playerId, type, targetId, auto: false });
     this.updateMafiaNightIntel(room);
-    if (room.afkGracePlayerId === playerId) {
-      room.afkGracePlayerId = null;
-      room.afkGraceEndsAt = null;
-    }
+    actor.afkCount = 0;
     this.emitRoom(room);
   }
 
@@ -2683,13 +2803,8 @@ export class GameRuntime {
     if (!voter) return;
     if (!playerCanDayVote(voter)) return;
     room.votes[playerId] = SKIP_VOTE_ID;
-    if (room.afkGracePlayerId === playerId) {
-      room.afkGracePlayerId = null;
-      room.afkGraceEndsAt = null;
-    }
+    voter.afkCount = 0;
     this.emitRoom(room);
-
-    this.maybeFinishDayFromVotes(room);
   }
 
   submitVote(roomId: string, playerId: string, targetId: string) {
@@ -2708,13 +2823,8 @@ export class GameRuntime {
       return;
     }
     room.votes[playerId] = targetId;
-    if (room.afkGracePlayerId === playerId) {
-      room.afkGracePlayerId = null;
-      room.afkGraceEndsAt = null;
-    }
+    voter.afkCount = 0;
     this.emitRoom(room);
-
-    this.maybeFinishDayFromVotes(room);
   }
 
   skipDay(roomId: string, hostId: string) {
@@ -3370,6 +3480,14 @@ export class GameRuntime {
   }
 
   disconnect(socketId: string) {
+    for (const room of this.rooms.values()) {
+      const specIdx = room.spectators.findIndex((s) => s.socketId === socketId);
+      if (specIdx >= 0) {
+        room.spectators.splice(specIdx, 1);
+        this.emitRoom(room);
+      }
+    }
+
     const found = this.playerBySocket(socketId);
     if (!found) return;
     const { room, player } = found;

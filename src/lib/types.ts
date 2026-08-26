@@ -230,6 +230,8 @@ export interface PublicGameState {
   connect4?: Connect4PublicState;
   boardWinnerId?: string | null;
   boardDraw?: boolean;
+  /** External observer — not seated as a player. */
+  spectatorMode?: boolean;
 }
 
 export type SpotItPublicState = {
@@ -337,6 +339,16 @@ export interface OpenLobby {
   humanCount: number;
 }
 
+export interface LiveGameListing {
+  roomId: string;
+  gameId: string;
+  hostName: string;
+  hostAvatarId: number;
+  playerCount: number;
+  phase: Phase;
+  cycle: number;
+}
+
 export interface GameModule {
   id: string;
   displayName: string;
@@ -412,6 +424,13 @@ export type ClientToServerEvents = {
   "host:resume": (payload: { roomId: string }) => void;
   "lobby:return": (payload: { roomId: string }) => void;
   "lobbies:list": (payload?: { query?: string }) => void;
+  "games:listLive": (payload?: { query?: string }) => void;
+  "room:spectate": (payload: {
+    roomId: string;
+    playerId: string;
+    name: string;
+    avatarId: number;
+  }) => void;
   "host:skipDay": (payload: { roomId: string }) => void;
   "host:skipTimer": (payload: { roomId: string }) => void;
   "voice:join": (payload: { roomId: string; channel: ChatChannel }) => void;
@@ -464,6 +483,7 @@ export type ServerToClientEvents = {
   "room:error": (payload: { message: string; code?: string }) => void;
   "room:left": () => void;
   "lobbies:list": (payload: { lobbies: OpenLobby[] }) => void;
+  "games:live": (payload: { games: LiveGameListing[] }) => void;
   "voice:participants": (payload: {
     channel: ChatChannel;
     participantIds: string[];

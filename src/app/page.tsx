@@ -18,6 +18,9 @@ import {
 } from "@/lib/profile";
 import { getSocket } from "@/lib/socket/client";
 import { getGameModule } from "@/lib/games/registry";
+import type { PublicGameState } from "@/lib/types";
+
+type HubPending = "create" | "join" | "spectate" | null;
 
 type GameCard = {
   id: string;
@@ -109,9 +112,18 @@ export default function HomePage() {
   const [profile, setProfile] = useState(() => loadProfile());
   const [guestAvatarId] = useState(() => randomAvatarId());
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<"create" | "join" | null>(null);
+  const [pending, setPending] = useState<HubPending>(null);
+  const pendingRef = useRef<HubPending>(null);
+  const spectateNavRef = useRef(false);
   const [joiningCode, setJoiningCode] = useState<string | null>(null);
+  const [spectatingCode, setSpectatingCode] = useState<string | null>(null);
+  const [needProfileMode, setNeedProfileMode] = useState<"join" | "spectate">("join");
   const [rulesGameId, setRulesGameId] = useState<string | null>(null);
+
+  const setHubPending = (next: HubPending) => {
+    pendingRef.current = next;
+    setPending(next);
+  };
 
   const setPendingGameId = (gameId: string) => {
     createGameIdRef.current = gameId;
@@ -120,14 +132,49 @@ export default function HomePage() {
 
   useEffect(() => {
     setProfile(loadProfile());
-    return () => {
-      const p = loadProfile();
-      if (!p) return;
-      const s = getSocket(p.playerId);
-      s.off("room:error");
-      s.off("room:state");
+    const p = loadProfile();
+    if (!p) return;
+    const socket = getSocket(p.playerId);
+
+    const onError = ({ message }: { message: string }) => {
+      if (!pendingRef.current) return;
+      setHubPending(null);
+      setJoiningCode(null);
+      setSpectatingCode(null);
+      spectateNavRef.current = false;
+      setError(message);
     };
-  }, []);
+
+    const onState = (state: PublicGameState) => {
+      if (!pendingRef.current) return;
+      const mode = pendingRef.current;
+      if (mode === "create") {
+        const requested = createGameIdRef.current;
+        if (requested && state.gameId !== requested) {
+          setHubPending(null);
+          setJoiningCode(null);
+          setError(
+            `Server started ${state.gameId} instead of ${requested}. The game server may need a redeploy — try again in a minute.`
+          );
+          return;
+        }
+      }
+      setError(null);
+      setHubPending(null);
+      setJoiningCode(null);
+      setSpectatingCode(null);
+      const suffix = spectateNavRef.current ? "?spectate=1" : "";
+      spectateNavRef.current = false;
+      router.push(`/room/${state.roomId}${suffix}`);
+    };
+
+    socket.on("room:error", onError);
+    socket.on("room:state", onState);
+    return () => {
+      socket.off("room:error", onError);
+      socket.off("room:state", onState);
+    };
+  }, [router]);
 
   const persist = (name: string, avatarId: number) => {
     const playerId = ensurePlayerId();
@@ -137,30 +184,7 @@ export default function HomePage() {
     return next;
   };
 
-  const bindErrors = (playerId: string) => {
-    const socket = getSocket(playerId);
-    socket.off("room:error");
-    socket.off("room:state");
-    socket.on("room:error", ({ message }) => {
-      setPending(null);
-      setJoiningCode(null);
-      setError(message);
-    });
-    socket.on("room:state", (state) => {
-      const requested = createGameIdRef.current;
-      if (requested && state.gameId !== requested) {
-        setPending(null);
-        setJoiningCode(null);
-        setError(
-          `Server started ${state.gameId} instead of ${requested}. The game server may need a redeploy — try again in a minute.`
-        );
-        return;
-      }
-      setError(null);
-      router.push(`/room/${state.roomId}`);
-    });
-    return socket;
-  };
+  const emitHub = (playerId: string) => getSocket(playerId);
 
   const onCreate = (
     name: string,
@@ -178,11 +202,12 @@ export default function HomePage() {
       /* server will validate */
     }
     setError(null);
-    setPending("create");
+    setHubPending("create");
     setJoiningCode(null);
+    setSpectatingCode(null);
+    spectateNavRef.current = false;
     const p = persist(name, avatarId);
-    const socket = bindErrors(p.playerId);
-    socket.emit("room:create", {
+    emitHub(p.playerId).emit("room:create", {
       playerId: p.playerId,
       name: p.name,
       avatarId: p.avatarId,
@@ -197,11 +222,28 @@ export default function HomePage() {
   const onJoin = (name: string, avatarId: number, code: string) => {
     if (pending) return;
     setError(null);
-    setPending("join");
+    setHubPending("join");
     setJoiningCode(code);
+    setSpectatingCode(null);
+    spectateNavRef.current = false;
     const p = persist(name, avatarId);
-    const socket = bindErrors(p.playerId);
-    socket.emit("room:join", {
+    emitHub(p.playerId).emit("room:join", {
+      roomId: code,
+      playerId: p.playerId,
+      name: p.name,
+      avatarId: p.avatarId,
+    });
+  };
+
+  const onSpectate = (name: string, avatarId: number, code: string) => {
+    if (pending) return;
+    setError(null);
+    setHubPending("spectate");
+    setSpectatingCode(code);
+    setJoiningCode(null);
+    spectateNavRef.current = true;
+    const p = persist(name, avatarId);
+    emitHub(p.playerId).emit("room:spectate", {
       roomId: code,
       playerId: p.playerId,
       name: p.name,
@@ -219,6 +261,18 @@ export default function HomePage() {
       return;
     }
     onJoin(p.name, p.avatarId, code);
+  };
+
+  const spectateWithProfile = (code: string) => {
+    if (pending) return;
+    const p = loadProfile();
+    if (!p?.name) {
+      setPrefillCode(code);
+      setModalMode("join");
+      setModal(true);
+      return;
+    }
+    onSpectate(p.name, p.avatarId, code);
   };
 
   const openCreate = (gameId: string) => {
@@ -252,12 +306,16 @@ export default function HomePage() {
       >
         <OpenLobbies
           onJoin={joinWithProfile}
+          onSpectate={spectateWithProfile}
           joiningCode={joiningCode}
           joinPending={pending === "join"}
-          onNeedProfile={(code) => {
+          spectatingCode={spectatingCode}
+          spectatePending={pending === "spectate"}
+          onNeedProfile={(code, mode = "join") => {
             if (pending) return;
             setError(null);
             setPrefillCode(code ?? "");
+            setNeedProfileMode(mode);
             setModalMode("join");
             setModal(true);
           }}
@@ -360,18 +418,30 @@ export default function HomePage() {
         onClose={() => {
           setModal(false);
           setError(null);
-          setPending(null);
+          setHubPending(null);
           setJoiningCode(null);
+          setSpectatingCode(null);
+          spectateNavRef.current = false;
         }}
         onCreate={onCreate}
-        onJoin={onJoin}
+        onJoin={(name, avatarId, code) => {
+          if (needProfileMode === "spectate") {
+            onSpectate(name, avatarId, code);
+          } else {
+            onJoin(name, avatarId, code);
+          }
+        }}
       />
 
       {pending && !modal && (
         <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
           <div className="inline-flex items-center gap-2 rounded-sm border border-crimson/20 bg-surface/95 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-ink shadow-lg backdrop-blur-md">
             <LoadingSpinner size={14} />
-            {pending === "create" ? "Creating party…" : "Joining party…"}
+            {pending === "create"
+              ? "Creating party…"
+              : pending === "spectate"
+                ? "Opening spectator view…"
+                : "Joining party…"}
           </div>
         </div>
       )}

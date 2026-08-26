@@ -7,23 +7,15 @@ import type {
 import { RoomError } from "@/lib/room-code";
 import { GameRuntime, type IoServer } from "./game-runtime";
 
-export function attachSocketServer(
-  httpServer: HttpServer,
-  corsOrigin: string | string[] = "*"
-): IoServer {
-  const io: IoServer = new Server<ClientToServerEvents, ServerToClientEvents>(
-    httpServer,
-    {
-      cors: {
-        origin: corsOrigin,
-        methods: ["GET", "POST"],
-      },
-      pingTimeout: 20000,
-      pingInterval: 25000,
-    }
-  );
+let activeRuntime: GameRuntime | null = null;
 
+export function restoreSocketRoomMemberships() {
+  activeRuntime?.restoreSocketRoomMemberships();
+}
+
+export function wireGameSockets(io: IoServer): GameRuntime {
   const runtime = new GameRuntime(io);
+  activeRuntime = runtime;
   bindPlayerId(io);
 
   io.on("connection", (socket) => {
@@ -36,6 +28,30 @@ export function attachSocketServer(
       socket.emit("lobbies:list", {
         lobbies: runtime.listOpenLobbies(payload?.query),
       });
+    });
+
+    socket.on("games:listLive", (payload) => {
+      socket.emit("games:live", {
+        games: runtime.listLiveGames(payload?.query),
+      });
+    });
+
+    socket.on("room:spectate", (payload) => {
+      try {
+        remember(payload.playerId);
+        runtime.spectateRoom({
+          roomId: payload.roomId,
+          socketId: socket.id,
+          playerId: payload.playerId,
+          name: payload.name,
+          avatarId: payload.avatarId,
+        });
+      } catch (err) {
+        socket.emit("room:error", {
+          code: err instanceof RoomError ? err.code : "UNKNOWN",
+          message: err instanceof Error ? err.message : "Could not spectate",
+        });
+      }
     });
 
     socket.on("room:create", (payload) => {
@@ -355,6 +371,26 @@ export function attachSocketServer(
     });
   });
 
+  return runtime;
+}
+
+export function attachSocketServer(
+  httpServer: HttpServer,
+  corsOrigin: string | string[] = "*"
+): IoServer {
+  const io: IoServer = new Server<ClientToServerEvents, ServerToClientEvents>(
+    httpServer,
+    {
+      cors: {
+        origin: corsOrigin,
+        methods: ["GET", "POST"],
+      },
+      pingTimeout: 20000,
+      pingInterval: 25000,
+    }
+  );
+
+  wireGameSockets(io);
   return io;
 }
 

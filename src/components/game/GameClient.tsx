@@ -14,7 +14,6 @@ import type {
 } from "@/lib/types";
 import { loadProfile } from "@/lib/profile";
 import { getSocket, type GameSocket } from "@/lib/socket/client";
-import { AfkHostModal } from "@/components/game/AfkHostModal";
 import { ActionPrompt } from "@/components/game/ActionPrompt";
 import { ActionDialog } from "@/components/game/mafia/ActionDialog";
 import { PhaseResultPopup } from "@/components/game/mafia/PhaseResultPopup";
@@ -25,7 +24,11 @@ import { GameHud } from "@/components/game/GameHud";
 import { GameOverScreen } from "@/components/game/GameOverScreen";
 import { LobbyView } from "@/components/game/LobbyView";
 import { FiveAliveLobbyView } from "@/components/game/FiveAliveLobbyView";
-import { NightActionPanel, VotePanel } from "@/components/game/PlayerGrid";
+import {
+  NightActionPanel,
+  PlayerGrid,
+  VotePanel,
+} from "@/components/game/PlayerGrid";
 import { RoleRevealCard } from "@/components/game/RoleRevealCard";
 import { GlassPanel, PrimaryButton } from "@/components/ui/primitives";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
@@ -47,11 +50,16 @@ import { TttBoard } from "@/components/game/tic-tac-toe/TttBoard";
 import { Connect4Board } from "@/components/game/connect-4/Connect4Board";
 import { SpectatorBanner } from "@/components/game/mafia/SpectatorBanner";
 
-export function GameClient({ roomId }: { roomId: string }) {
+export function GameClient({
+  roomId,
+  spectate = false,
+}: {
+  roomId: string;
+  spectate?: boolean;
+}) {
   const router = useRouter();
   const [state, setState] = useState<PublicGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [afk, setAfk] = useState<{ playerId: string; name: string } | null>(null);
   const [socket, setSocket] = useState<GameSocket | null>(null);
   const [voiceInvite, setVoiceInvite] = useState<{
     channel: ChatChannel;
@@ -75,7 +83,6 @@ export function GameClient({ roomId }: { roomId: string }) {
     null
   );
   const [mafiaVoiceWarning, setMafiaVoiceWarning] = useState(false);
-  const [afkTick, setAfkTick] = useState(0);
   const [personalNightPopup, setPersonalNightPopup] = useState<{
     id: string;
     tone: "info" | "good" | "bad";
@@ -112,14 +119,6 @@ export function GameClient({ roomId }: { roomId: string }) {
     );
   };
 
-  useEffect(() => {
-    if (!state?.afkGraceEndsAt || state.afkGracePlayerId !== state.you?.id) {
-      return;
-    }
-    const t = setInterval(() => setAfkTick((n) => n + 1), 500);
-    return () => clearInterval(t);
-  }, [state?.afkGraceEndsAt, state?.afkGracePlayerId, state?.you?.id]);
-
   // Seed detective log cursor so reconnect/history does not spam old popups.
   // Live investigation popups come from detective:result (before town announcements).
   useEffect(() => {
@@ -147,6 +146,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     setSocket(s);
 
     const onState = (next: PublicGameState) => {
+      if (next.roomId !== roomId) return;
       setError(null);
       setState(next);
       if (next.you?.role) {
@@ -237,9 +237,6 @@ export function GameClient({ roomId }: { roomId: string }) {
         setState(null);
       }
     };
-    const onAfk = (payload: { playerId: string; name: string }) => {
-      setAfk({ playerId: payload.playerId, name: payload.name });
-    };
 
     const onInvite = (payload: {
       channel: ChatChannel;
@@ -265,7 +262,6 @@ export function GameClient({ roomId }: { roomId: string }) {
     s.on("room:state", onState);
     s.on("room:error", onErr);
     s.on("room:left", onLeft);
-    s.on("host:afkWarning", onAfk);
     s.on("voice:invite", onInvite);
     s.on("chat:message", onChat);
     s.on("role:reveal", onRoleReveal);
@@ -274,7 +270,16 @@ export function GameClient({ roomId }: { roomId: string }) {
 
     const join = () => {
       if (quittingRef.current) return;
-      s.emit("room:rejoin", { roomId, playerId: profile.playerId });
+      if (spectate) {
+        s.emit("room:spectate", {
+          roomId,
+          playerId: profile.playerId,
+          name: profile.name,
+          avatarId: profile.avatarId,
+        });
+      } else {
+        s.emit("room:rejoin", { roomId, playerId: profile.playerId });
+      }
     };
     if (s.connected) join();
     s.on("connect", join);
@@ -287,7 +292,6 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("room:state", onState);
       s.off("room:error", onErr);
       s.off("room:left", onLeft);
-      s.off("host:afkWarning", onAfk);
       s.off("voice:invite", onInvite);
       s.off("chat:message", onChat);
       s.off("role:reveal", onRoleReveal);
@@ -295,7 +299,7 @@ export function GameClient({ roomId }: { roomId: string }) {
       s.off("night:powerResult", onNightPowerResult);
       s.off("connect", join);
     };
-  }, [roomId, router]);
+  }, [roomId, router, spectate]);
 
   useEffect(() => {
     if (!state) return;
@@ -563,18 +567,6 @@ export function GameClient({ roomId }: { roomId: string }) {
           </div>
         </div>
       )}
-      {state.afkGracePlayerId === state.you?.id && state.afkGraceEndsAt && (
-        <div className="mx-auto mb-4 max-w-6xl px-4 md:px-8">
-          <div className="animate-pulse rounded-sm border border-crimson bg-crimson/15 px-4 py-3 text-sm text-crimson-glow">
-            AFK warning — take action within{" "}
-            {Math.max(
-              0,
-              Math.ceil((state.afkGraceEndsAt - Date.now()) / 1000)
-            )}
-            s or you will be eliminated.{afkTick ? "" : ""}
-          </div>
-        </div>
-      )}
 
       <main
         className={`mx-auto max-w-6xl px-3 pb-8 sm:px-4 sm:pb-16 md:px-8 ${
@@ -583,7 +575,10 @@ export function GameClient({ roomId }: { roomId: string }) {
             : ""
         }`}
       >
-        {voiceInvite && state.gameId === "mafia-city" && !localMafia && (
+        {voiceInvite &&
+          state.gameId === "mafia-city" &&
+          !localMafia &&
+          !state.spectatorMode && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3">
             <p className="text-sm text-crimson">
               <span className="font-semibold">{voiceInvite.fromName}</span> wants
@@ -614,8 +609,12 @@ export function GameClient({ roomId }: { roomId: string }) {
           </div>
         )}
         <ActionPrompt state={state} />
+        {state.spectatorMode && state.phase !== "lobby" && state.phase !== "gameover" && (
+          <SpectatorBanner external />
+        )}
         {state.gameId === "mafia-city" &&
           state.you &&
+          !state.spectatorMode &&
           !state.you.alive &&
           state.phase !== "lobby" &&
           state.phase !== "gameover" && (
@@ -711,7 +710,36 @@ export function GameClient({ roomId }: { roomId: string }) {
               </>
             )}
 
-            {state.gameId === "spot-it" && state.phase === "spotit_play" && (
+            {state.spectatorMode &&
+              state.gameId === "mafia-city" &&
+              (state.phase === "night" || state.phase === "day") && (
+                <div className="space-y-4">
+                  <AnnouncementsPanel logs={state.logs} />
+                  <PlayerGrid
+                    state={state}
+                    showVotes={state.daySubPhase === "vote"}
+                  />
+                </div>
+              )}
+
+            {state.spectatorMode &&
+              state.gameId !== "mafia-city" &&
+              state.phase !== "lobby" && (
+                <GlassPanel className="p-4">
+                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+                    Live match
+                  </h3>
+                  <ul className="mt-2 space-y-1 text-sm text-ink-steel">
+                    {state.logs.slice(-12).map((l) => (
+                      <li key={l.id}>{l.text}</li>
+                    ))}
+                  </ul>
+                </GlassPanel>
+              )}
+
+            {!state.spectatorMode &&
+              state.gameId === "spot-it" &&
+              state.phase === "spotit_play" && (
               <SpotItTable
                 state={state}
                 socket={socket}
@@ -725,7 +753,9 @@ export function GameClient({ roomId }: { roomId: string }) {
               />
             )}
 
-            {state.gameId === "tic-tac-toe" && state.phase === "ttt_play" && (
+            {!state.spectatorMode &&
+              state.gameId === "tic-tac-toe" &&
+              state.phase === "ttt_play" && (
               <TttBoard
                 state={state}
                 socket={socket}
@@ -736,7 +766,9 @@ export function GameClient({ roomId }: { roomId: string }) {
               />
             )}
 
-            {state.gameId === "connect-4" && state.phase === "connect4_play" && (
+            {!state.spectatorMode &&
+              state.gameId === "connect-4" &&
+              state.phase === "connect4_play" && (
               <Connect4Board
                 state={state}
                 onDrop={(column) =>
@@ -745,7 +777,7 @@ export function GameClient({ roomId }: { roomId: string }) {
               />
             )}
 
-            {state.phase === "reveal" && (
+            {!state.spectatorMode && state.phase === "reveal" && (
               <>
                 {(state.you?.role ?? localReveal?.role) ? (
                   <RoleRevealCard
@@ -765,7 +797,9 @@ export function GameClient({ roomId }: { roomId: string }) {
               </>
             )}
 
-            {state.gameId === "five-alive" && state.phase === "fivealive_turn" && (
+            {!state.spectatorMode &&
+              state.gameId === "five-alive" &&
+              state.phase === "fivealive_turn" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <FiveAliveTurnPanel
                   state={state}
@@ -794,7 +828,9 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.gameId === "five-alive" && state.phase === "fivealive_bomb" && (
+            {!state.spectatorMode &&
+              state.gameId === "five-alive" &&
+              state.phase === "fivealive_bomb" && (
               <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                 <FiveAliveBombPanel
                   state={state}
@@ -821,7 +857,8 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.gameId === "detonation-cats" &&
+            {!state.spectatorMode &&
+              state.gameId === "detonation-cats" &&
               (state.phase === "ek_turn" ||
                 state.phase === "ek_defuse" ||
                 state.phase === "ek_pick_discard" ||
@@ -856,7 +893,7 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.gameId === "mafia-city" && state.phase === "night" && (
+            {state.gameId === "mafia-city" && state.phase === "night" && !state.spectatorMode && (
               <div
                 className={`grid gap-6 ${
                   localMafia ? "" : "lg:grid-cols-[1fr_340px]"
@@ -889,7 +926,7 @@ export function GameClient({ roomId }: { roomId: string }) {
               </div>
             )}
 
-            {state.gameId === "mafia-city" && state.phase === "day" && (
+            {state.gameId === "mafia-city" && state.phase === "day" && !state.spectatorMode && (
               <div
                 className={`grid gap-6 ${
                   localMafia ? "" : "lg:grid-cols-[1fr_340px]"
@@ -932,6 +969,7 @@ export function GameClient({ roomId }: { roomId: string }) {
 
             {state.gameId === "mafia-city" &&
               !localMafia &&
+              !state.spectatorMode &&
               (state.phase === "night" || state.phase === "day") && (
                 <div className="md:hidden">
                   <ChatPanel
@@ -980,20 +1018,6 @@ export function GameClient({ roomId }: { roomId: string }) {
         </div>
       )}
 
-      {afk && state.you?.isHost && (
-        <AfkHostModal
-          name={afk.name}
-          onKick={() => {
-            emitKick(afk.playerId);
-            setAfk(null);
-          }}
-          onPause={() => {
-            socket.emit("host:pause", { roomId: state.roomId });
-            setAfk(null);
-          }}
-          onDismiss={() => setAfk(null)}
-        />
-      )}
     </motion.div>
   );
 }

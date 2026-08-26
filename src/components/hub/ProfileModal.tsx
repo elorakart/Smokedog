@@ -31,7 +31,7 @@ export function ProfileModal({
   error?: string | null;
   initialCode?: string;
   initialMode?: "create" | "join";
-  pending?: "create" | "join" | null;
+  pending?: "create" | "join" | "spectate" | null;
   onClose: () => void;
   onCreate: (name: string, avatarId: number, opts?: { localMode?: boolean }) => void;
   onJoin: (name: string, avatarId: number, code: string) => void;
@@ -73,7 +73,9 @@ export function ProfileModal({
       ? "Creating party…"
       : pending === "join"
         ? "Joining party…"
-        : null;
+        : pending === "spectate"
+          ? "Opening spectator view…"
+          : null;
   const joining = code.trim().length > 0;
   const showLocalToggle =
     !joining && createGameId === "mafia-city";

@@ -41,7 +41,7 @@ function tags(p: PublicPlayer, intel?: PublicGameState["mafiaNightIntel"]) {
         </StatusChip>
       )}
       {p.isBot && <StatusChip tone="bot">Auto</StatusChip>}
-      {p.afkCount >= 2 && p.alive && !p.isBot && (
+      {p.afkCount >= 1 && p.alive && !p.isBot && (
         <StatusChip tone="afk">AFK</StatusChip>
       )}
       {!p.connected && !p.isBot && (

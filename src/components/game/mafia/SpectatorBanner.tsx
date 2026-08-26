@@ -4,8 +4,10 @@ import { Eye } from "lucide-react";
 
 export function SpectatorBanner({
   canVoteDead = false,
+  external = false,
 }: {
   canVoteDead?: boolean;
+  external?: boolean;
 }) {
   return (
     <div className="mb-4 flex items-center gap-3 rounded-sm border border-crimson/20 bg-crimson/[0.05] px-4 py-3">
@@ -15,9 +17,11 @@ export function SpectatorBanner({
           Spectating
         </p>
         <p className="text-sm text-crimson/80">
-          {canVoteDead
-            ? "You are eliminated. You may still vote by day, but cannot act at night. Use graveyard chat."
-            : "You have been eliminated. Watch the city and use graveyard chat — you cannot act or vote."}
+          {external
+            ? "You are watching this match. You cannot act, vote, or chat."
+            : canVoteDead
+              ? "You are eliminated. You may still vote by day, but cannot act at night. Use graveyard chat."
+              : "You have been eliminated. Watch the city and use graveyard chat — you cannot act or vote."}
         </p>
       </div>
     </div>
