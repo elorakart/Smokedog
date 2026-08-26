@@ -10,6 +10,7 @@ import type { NightActionType, PublicGameState, PublicPlayer } from "@/lib/types
 import { SKIP_VOTE_ID } from "@/lib/types";
 import { nightActionFor } from "@/lib/games/mafia-city/roles";
 import { NIGHT_ACTION_LOCKED, NIGHT_ACTION_PROMPTS } from "@/lib/action-prompt";
+import { isLocalMafia } from "@/lib/mafia-local-mode";
 
 function tags(p: PublicPlayer, intel?: PublicGameState["mafiaNightIntel"]) {
   return (
@@ -383,6 +384,7 @@ export function VotePanel({
   const votedSkip = votedId === SKIP_VOTE_ID;
   const votedName = state.players.find((p) => p.id === votedId)?.name;
   const isDiscussion = state.daySubPhase === "discussion";
+  const local = isLocalMafia(state);
   const skipVoteCount = Object.values(state.votes).filter(
     (v) => v === SKIP_VOTE_ID
   ).length;
@@ -502,10 +504,44 @@ export function VotePanel({
       <h3 className="font-display text-xl font-bold">Day vote</h3>
       <p className="mt-1 text-sm text-ink-steel">
         {dead && !deadVillager
-          ? "You cannot vote — watch the tally. Town voice is closed during voting."
-          : "Most votes alone eliminates a suspect — a tie spares everyone. Skip counts like any other option. Town voice is closed during voting."}
+          ? local
+            ? "You cannot vote — watch the tally."
+            : "You cannot vote — watch the tally. Town voice is closed during voting."
+          : local
+            ? "Most votes alone eliminates a suspect — a tie spares everyone. Skip counts like any other option. Remember the popups — there is no announcement log."
+            : "Most votes alone eliminates a suspect — a tie spares everyone. Skip counts like any other option. Town voice is closed during voting."}
       </p>
       {compactSkip}
+      {juggleReady && (
+        <div className="mt-3 rounded-sm border border-crimson/20 bg-crimson/[0.04] p-3">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">
+            Juggle — pick 4 ({jugglePick.length}/4)
+          </p>
+          <p className="mt-1 text-xs text-ink-steel">
+            Tap four players below, then confirm. Town sees the targets; only you get the count.
+          </p>
+          <div className="mt-3">
+            <PlayerGrid
+              state={state}
+              selectable
+              selectedIds={jugglePick}
+              onSelect={toggleJuggle}
+            />
+          </div>
+          {jugglePick.length === 4 && (
+            <button
+              type="button"
+              onClick={() => {
+                onJuggle?.(jugglePick);
+                setJugglePick([]);
+              }}
+              className="mt-2 rounded-sm bg-crimson px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-manila"
+            >
+              Confirm juggle
+            </button>
+          )}
+        </div>
+      )}
       <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-ink-steel">
         Votes in: {votesIn}/{votesNeeded}
         {skipVoteCount > 0 ? ` · Skip: ${skipVoteCount}` : ""}

@@ -372,7 +372,8 @@ export class GameRuntime {
         you.role === "juggler" &&
         !you.jugglerUsed &&
         room.phase === "day" &&
-        room.daySubPhase === "discussion",
+        (room.daySubPhase === "discussion" ||
+          (!!room.settings.localMode && room.daySubPhase === "vote")),
       chronicle: revealAll ? room.chronicle : undefined,
       afkGraceEndsAt: room.afkGraceEndsAt,
       afkGracePlayerId: room.afkGracePlayerId,
@@ -761,18 +762,22 @@ export class GameRuntime {
     this.startNight(room);
   }
 
-  private startDayVoteSubphase(room: Room) {
+  private startDayVoteSubphase(room: Room, voteSeconds?: number) {
     room.daySubPhase = "vote";
     room.votes = {};
     this.clearVoiceChannels(room, "town");
+    const local = room.gameId === "mafia-city" && !!room.settings.localMode;
+    const seconds = voteSeconds ?? DAY_VOTE_SECONDS;
     this.setAnnouncement(
       room,
       "info",
       "Voting has started",
-      "Cast your vote or skip. Town voice is now closed."
+      local
+        ? "Cast your vote or skip."
+        : "Cast your vote or skip. Town voice is now closed."
     );
-    log(room, `Day ${room.cycle} — voting open for ${DAY_VOTE_SECONDS}s.`);
-    room.phaseEndsAt = Date.now() + DAY_VOTE_SECONDS * 1000;
+    log(room, `Day ${room.cycle} — voting open for ${seconds}s.`);
+    room.phaseEndsAt = Date.now() + seconds * 1000;
     this.schedule(room);
     this.scheduleBots(room);
     this.emitRoom(room);
@@ -784,6 +789,7 @@ export class GameRuntime {
     name: string;
     avatarId: number;
     gameId?: string;
+    localMode?: boolean;
   }): Room {
     const requestedId = resolveGameId(opts.gameId);
     const mod = getGameModule(opts.gameId);
@@ -842,6 +848,10 @@ export class GameRuntime {
       createdAt: Date.now(),
       voiceParticipants: emptyVoiceChannels(),
     };
+
+    if (mod.id === "mafia-city" && typeof opts.localMode === "boolean") {
+      room.settings.localMode = opts.localMode;
+    }
 
     this.rooms.set(code, room);
     this.playerRoom.set(opts.playerId, code);
@@ -974,6 +984,9 @@ export class GameRuntime {
           patch.roleDistribution,
           room.players.length
         );
+      }
+      if (typeof patch.localMode === "boolean" && room.gameId === "mafia-city") {
+        room.settings.localMode = patch.localMode;
       }
     }
     this.emitRoom(room);
@@ -1201,8 +1214,19 @@ export class GameRuntime {
 
   private startDay(room: Room) {
     this.clearVoiceChannels(room, "mafia");
-    room.daySubPhase = "discussion";
     room.votes = {};
+    room.phase = "day";
+    room.paused = false;
+    room.pausedRemainingMs = null;
+
+    const local = room.gameId === "mafia-city" && !!room.settings.localMode;
+    if (local) {
+      log(room, `Day ${room.cycle} — local vote (no discussion).`);
+      this.startDayVoteSubphase(room, room.settings.daySeconds);
+      return;
+    }
+
+    room.daySubPhase = "discussion";
     const discussionSeconds = Math.max(
       DAY_VOTE_SECONDS,
       room.settings.daySeconds - DAY_VOTE_SECONDS
@@ -1214,9 +1238,6 @@ export class GameRuntime {
       `Day ${room.cycle} discussion`,
       "Town voice is open. Voting starts in the final 15 seconds."
     );
-    room.phase = "day";
-    room.paused = false;
-    room.pausedRemainingMs = null;
     room.phaseEndsAt = Date.now() + discussionSeconds * 1000;
     this.schedule(room);
     this.emitRoom(room);
@@ -2184,10 +2205,12 @@ export class GameRuntime {
 
   submitJuggle(roomId: string, playerId: string, targetIds: string[]) {
     const room = this.getRoom(roomId);
+    const localVote =
+      !!room?.settings.localMode && room.daySubPhase === "vote";
     if (
       !room ||
       room.phase !== "day" ||
-      room.daySubPhase !== "discussion" ||
+      (room.daySubPhase !== "discussion" && !localVote) ||
       room.paused
     ) {
       return;
@@ -2351,6 +2374,14 @@ export class GameRuntime {
       }
       return;
     }
+    if (room.gameId === "mafia-city" && room.settings.localMode) {
+      if (player?.socketId) {
+        this.io.to(player.socketId).emit("voice:error", {
+          message: "Voice is disabled in Local mode.",
+        });
+      }
+      return;
+    }
     if (!player?.socketId) return;
     const opts = this.channelAccessOpts(room, player);
     if (!canAccessChannel(channel, opts)) {
@@ -2379,6 +2410,7 @@ export class GameRuntime {
   ) {
     const room = this.getRoom(roomId);
     if (!room || isChatOnlyGame(room.gameId)) return;
+    if (room.gameId === "mafia-city" && room.settings.localMode) return;
     const from = room.players.find((p) => p.id === fromId);
     const target = room.players.find((p) => p.id === targetId);
     if (!from?.socketId || !target?.socketId || target.isBot || from.id === target.id) {
@@ -2437,6 +2469,7 @@ export class GameRuntime {
   ) {
     const room = this.getRoom(roomId);
     if (!room) return;
+    if (room.gameId === "mafia-city" && room.settings.localMode) return;
     const player = room.players.find((p) => p.id === playerId);
     if (!player) return;
     const trimmed = text.trim().slice(0, 240);

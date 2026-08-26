@@ -1,4 +1,5 @@
 import type { PhaseAnnouncement, PublicGameState } from "@/lib/types";
+import { isLocalMafia } from "@/lib/mafia-local-mode";
 
 /** Rewrite shared room announcements for this viewer's status. */
 export function announcementForViewer(
@@ -11,6 +12,7 @@ export function announcementForViewer(
   const alive = you.alive;
   const blackmailed = !!you.blackmailed;
   const deadVillagerVote = !!state.deadVillagerVote;
+  const local = isLocalMafia(state);
   const yourName = state.players.find((p) => p.id === you.id)?.name;
   const title = announcement.title.trim();
   const detail = (announcement.detail ?? "").trim();
@@ -21,32 +23,45 @@ export function announcementForViewer(
       return {
         ...announcement,
         title: "Voting has started",
-        detail:
-          "You may still cast a vote as a dead villager. Town voice is closed.",
+        detail: local
+          ? "You may still cast a vote as a dead villager."
+          : "You may still cast a vote as a dead villager. Town voice is closed.",
       };
     }
     if (!alive) {
       return {
         ...announcement,
         title: "Voting has started",
-        detail: "Watch the tally — you cannot vote. Town voice is closed.",
+        detail: local
+          ? "Watch the tally — you cannot vote."
+          : "Watch the tally — you cannot vote. Town voice is closed.",
       };
     }
     if (blackmailed) {
       return {
         ...announcement,
         title: "Voting has started",
-        detail:
-          "You are blackmailed — you cannot vote or speak. Town voice is closed.",
+        detail: local
+          ? "You are blackmailed — you cannot vote."
+          : "You are blackmailed — you cannot vote or speak. Town voice is closed.",
       };
     }
     return {
       ...announcement,
-      detail: "Cast your vote or skip. Town voice is now closed.",
+      detail: local
+        ? "Cast your vote or skip."
+        : "Cast your vote or skip. Town voice is now closed.",
     };
   }
 
   if (titleLower.includes("discussion")) {
+    if (local) {
+      return {
+        ...announcement,
+        title: `Day ${state.cycle} vote`,
+        detail: "Cast your vote or skip.",
+      };
+    }
     if (!alive) {
       return {
         ...announcement,
@@ -72,24 +87,34 @@ export function announcementForViewer(
       return {
         ...announcement,
         title: "You were eliminated",
-        detail:
-          "You died overnight. Spectate from the graveyard — dead villagers may still vote by day.",
+        detail: local
+          ? "You died overnight. Spectate — dead villagers may still vote by day."
+          : "You died overnight. Spectate from the graveyard — dead villagers may still vote by day.",
       };
     }
     if (!alive) {
       return {
         ...announcement,
-        detail: `${detail} Watch from the graveyard.`,
+        detail: local
+          ? `${detail} Remember this — there is no log.`
+          : `${detail} Watch from the graveyard.`,
       };
     }
-    return announcement;
+    return local
+      ? {
+          ...announcement,
+          detail: `${detail} Remember this — there is no announcement log.`,
+        }
+      : announcement;
   }
 
   if (titleLower === "quiet night") {
     if (!alive) {
       return {
         ...announcement,
-        detail: "No one else fell overnight. Keep watching from the graveyard.",
+        detail: local
+          ? "No one else fell overnight."
+          : "No one else fell overnight. Keep watching from the graveyard.",
       };
     }
     return announcement;
@@ -100,7 +125,7 @@ export function announcementForViewer(
       return {
         ...announcement,
         title: "You were voted out",
-        detail: "The city voted you out. Spectate from the graveyard.",
+        detail: "The city voted you out. Spectate from here.",
       };
     }
     if (!alive) {
@@ -109,7 +134,12 @@ export function announcementForViewer(
         detail: `${detail} You remain a spectator.`,
       };
     }
-    return announcement;
+    return local
+      ? {
+          ...announcement,
+          detail: `${detail} Remember this — there is no announcement log.`,
+        }
+      : announcement;
   }
 
   if (
@@ -120,7 +150,7 @@ export function announcementForViewer(
     if (!alive) {
       return {
         ...announcement,
-        detail: `${detail} Keep watching the city.`,
+        detail: `${detail} Keep watching.`,
       };
     }
     return announcement;
@@ -134,7 +164,9 @@ export function announcementForViewer(
     if (actiony) {
       return {
         ...announcement,
-        detail: "Spectate the city. Use graveyard chat.",
+        detail: local
+          ? "Spectate the city."
+          : "Spectate the city. Use graveyard chat.",
       };
     }
   }

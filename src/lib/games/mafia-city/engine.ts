@@ -17,6 +17,7 @@ export const mafiaCityModule: GameModule = {
       daySeconds: 100,
       vigilanteBullets: null,
       roleDistribution: null,
+      localMode: false,
     };
   },
   assignRoles(playerCount, settings) {

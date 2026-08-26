@@ -221,6 +221,9 @@ function LobbySidebar({
         <p className="mt-2 text-sm text-ink-steel">
           You&apos;re in. The host will start when everyone is seated.
         </p>
+        <p className="mt-3 inline-flex rounded-sm border border-crimson/25 bg-crimson/[0.04] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-crimson">
+          {state.settings.localMode ? "Local mode" : "Online mode"}
+        </p>
         <p className="mt-4 font-mono text-[10px] leading-relaxed tracking-wide text-ink-steel">
           {state.players.length} operators seated
         </p>
@@ -244,6 +247,40 @@ function LobbySidebar({
   return (
     <GlassPanel className="h-fit p-6">
       <h2 className="font-display text-lg font-bold">Game Settings</h2>
+      <div className="mt-4">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-steel">
+          Play mode
+        </p>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => onSettings({ localMode: false })}
+            className={`flex-1 rounded-sm py-2 font-mono text-[10px] uppercase tracking-widest transition ${
+              !state.settings.localMode
+                ? "bg-crimson text-manila"
+                : "border border-crimson/20 text-ink-steel hover:text-crimson"
+            }`}
+          >
+            Online
+          </button>
+          <button
+            type="button"
+            onClick={() => onSettings({ localMode: true })}
+            className={`flex-1 rounded-sm py-2 font-mono text-[10px] uppercase tracking-widest transition ${
+              state.settings.localMode
+                ? "bg-crimson text-manila"
+                : "border border-crimson/20 text-ink-steel hover:text-crimson"
+            }`}
+          >
+            Local
+          </button>
+        </div>
+        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-steel">
+          {state.settings.localMode
+            ? "No chat, voice, or discussion — outcomes are popups only. Same room code on every phone."
+            : "Full table: chat, voice, and day discussion."}
+        </p>
+      </div>
       <AutoPlayerControls
         state={state}
         onAddBot={onAddBot}
@@ -261,7 +298,9 @@ function LobbySidebar({
         className="mt-2 w-full"
       />
       <label className="mt-4 block font-mono text-[10px] uppercase tracking-widest text-ink-steel">
-        Day timer — {state.settings.daySeconds}s
+        {state.settings.localMode
+          ? `Day vote timer — ${state.settings.daySeconds}s`
+          : `Day timer — ${state.settings.daySeconds}s`}
       </label>
       <input
         type="range"

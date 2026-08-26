@@ -52,17 +52,16 @@ export function pendingPlayerAction(state: PublicGameState): {
   }
 
   // Vote cue lives in the single "Voting has started" announcement — no second dialog.
-  if (state.phase === "day" && state.daySubPhase === "vote") {
-    return null;
+  // Juggler nudge can still show in local vote-only days.
+  if (state.phase === "day" && state.jugglerAvailable) {
+    return {
+      title: "Juggle ready",
+      detail: "Pick four players once this game to learn how many are evil.",
+    };
   }
 
-  if (state.phase === "day" && state.daySubPhase === "discussion") {
-    if (state.jugglerAvailable) {
-      return {
-        title: "Juggle ready",
-        detail: "Pick four players once this game to learn how many are evil.",
-      };
-    }
+  if (state.phase === "day" && state.daySubPhase === "vote") {
+    return null;
   }
 
   return null;

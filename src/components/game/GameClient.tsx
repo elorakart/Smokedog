@@ -32,6 +32,7 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { availableChannels, canUseTownVoice, CHANNEL_LABELS } from "@/lib/chat-access";
 import { pendingPlayerAction } from "@/lib/action-prompt";
+import { isLocalMafia } from "@/lib/mafia-local-mode";
 import { announcementForViewer } from "@/lib/announcement-for-viewer";
 import { isMafiaRole, ROLE_META } from "@/lib/games/mafia-city/roles";
 import { Mic } from "lucide-react";
@@ -427,7 +428,10 @@ export function GameClient({ roomId }: { roomId: string }) {
     socket.emit("chat:send", { roomId: state.roomId, channel, text: trimmed });
   };
 
+  const localMafia = isLocalMafia(state);
+
   const voiceChannel =
+    !localMafia &&
     state.gameId === "mafia-city" &&
     state.you &&
     availableChannels({
@@ -439,6 +443,7 @@ export function GameClient({ roomId }: { roomId: string }) {
     }).find((c) => c === "town" || c === "mafia");
 
   const townVoiceOpen =
+    !localMafia &&
     !!state.you &&
     canUseTownVoice({
       alive: state.you.alive,
@@ -566,7 +571,7 @@ export function GameClient({ roomId }: { roomId: string }) {
             : ""
         }`}
       >
-        {voiceInvite && state.gameId === "mafia-city" && (
+        {voiceInvite && state.gameId === "mafia-city" && !localMafia && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-crimson/40 bg-crimson/10 px-4 py-3">
             <p className="text-sm text-crimson">
               <span className="font-semibold">{voiceInvite.fromName}</span> wants
@@ -795,32 +800,46 @@ export function GameClient({ roomId }: { roomId: string }) {
             )}
 
             {state.gameId === "mafia-city" && state.phase === "night" && (
-              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+              <div
+                className={`grid gap-6 ${
+                  localMafia ? "" : "lg:grid-cols-[1fr_340px]"
+                }`}
+              >
                 <div className="space-y-4">
-                  <AnnouncementsPanel logs={state.logs} />
+                  {!localMafia && <AnnouncementsPanel logs={state.logs} />}
                   <DayIntelPanel intel={state.dayIntel} />
                   <NightActionPanel
                     state={state}
                     onAct={emitNight}
-                    onInviteVoice={voiceChannel ? emitVoiceInvite : undefined}
+                    onInviteVoice={
+                      !localMafia && voiceChannel
+                        ? emitVoiceInvite
+                        : undefined
+                    }
                   />
                 </div>
-                <div className="space-y-4 max-md:hidden">
-                  <ChatPanel
-                    state={state}
-                    socket={socket}
-                    onSend={emitChat}
-                    joinVoiceRequest={joinVoiceRequest}
-                    onVoiceJoined={clearVoiceInviteForChannel}
-                  />
-                </div>
+                {!localMafia && (
+                  <div className="space-y-4 max-md:hidden">
+                    <ChatPanel
+                      state={state}
+                      socket={socket}
+                      onSend={emitChat}
+                      joinVoiceRequest={joinVoiceRequest}
+                      onVoiceJoined={clearVoiceInviteForChannel}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
             {state.gameId === "mafia-city" && state.phase === "day" && (
-              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+              <div
+                className={`grid gap-6 ${
+                  localMafia ? "" : "lg:grid-cols-[1fr_340px]"
+                }`}
+              >
                 <div className="space-y-4">
-                  <AnnouncementsPanel logs={state.logs} />
+                  {!localMafia && <AnnouncementsPanel logs={state.logs} />}
                   <DayIntelPanel intel={state.dayIntel} />
                   <VotePanel
                     state={state}
@@ -834,25 +853,28 @@ export function GameClient({ roomId }: { roomId: string }) {
                     }
                     onJuggle={emitJuggle}
                     onInviteVoice={
-                      townVoiceOpen && voiceChannel
+                      !localMafia && townVoiceOpen && voiceChannel
                         ? emitVoiceInvite
                         : undefined
                     }
                   />
                 </div>
-                <div className="space-y-4 max-md:hidden">
-                  <ChatPanel
-                    state={state}
-                    socket={socket}
-                    onSend={emitChat}
-                    joinVoiceRequest={joinVoiceRequest}
-                    onVoiceJoined={clearVoiceInviteForChannel}
-                  />
-                </div>
+                {!localMafia && (
+                  <div className="space-y-4 max-md:hidden">
+                    <ChatPanel
+                      state={state}
+                      socket={socket}
+                      onSend={emitChat}
+                      joinVoiceRequest={joinVoiceRequest}
+                      onVoiceJoined={clearVoiceInviteForChannel}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
             {state.gameId === "mafia-city" &&
+              !localMafia &&
               (state.phase === "night" || state.phase === "day") && (
                 <div className="md:hidden">
                   <ChatPanel

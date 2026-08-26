@@ -30,8 +30,12 @@ const RULES_BY_GAME: Record<string, GameRules> = {
         body: "Drunk believes they hold a town power role (that real role is removed from the deck) — their results are usually wrong. If the Mafia Boss dies with no Goon left, a living Poisoner or Blackmailer is promoted to Goon and loses their old power. All mafia see their teammates.",
       },
       {
+        title: "Local mode",
+        body: "Choose Local at intake or in the lobby for a table-side game on multiple phones: no chat, voice, or day discussion. Deaths and vote results appear as popups only — remember them. Online mode keeps the full experience.",
+      },
+      {
         title: "Voice & chat",
-        body: "Town chat and voice open during day discussion. Mafia get a private channel at night only. Dead players use the graveyard. Personal intel is shown once as a popup and via an eye icon for that day only.",
+        body: "In Online mode, town chat and voice open during day discussion. Mafia get a private channel at night only. Dead players use the graveyard. Personal intel is shown once as a popup and via an eye icon for that day only.",
       },
       {
         title: "Winning",

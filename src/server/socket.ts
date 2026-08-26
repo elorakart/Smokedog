@@ -47,6 +47,7 @@ export function attachSocketServer(
           name: payload.name,
           avatarId: payload.avatarId,
           gameId: payload.gameId,
+          localMode: payload.localMode,
         });
         socket.join(room.id);
         runtime.emitRoom(room);

@@ -150,7 +150,11 @@ export default function HomePage() {
     return socket;
   };
 
-  const onCreate = (name: string, avatarId: number) => {
+  const onCreate = (
+    name: string,
+    avatarId: number,
+    opts?: { localMode?: boolean }
+  ) => {
     if (pending) return;
     try {
       const mod = getGameModule(createGameIdRef.current);
@@ -171,6 +175,10 @@ export default function HomePage() {
       name: p.name,
       avatarId: p.avatarId,
       gameId: createGameIdRef.current,
+      localMode:
+        createGameIdRef.current === "mafia-city"
+          ? !!opts?.localMode
+          : undefined,
     });
   };
 

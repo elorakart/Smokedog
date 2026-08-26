@@ -67,6 +67,8 @@ export interface RoomSettings {
   daySeconds: number;
   vigilanteBullets: number | null;
   roleDistribution?: RoleDistribution | null;
+  /** Mafia City: no chat/voice/discussion — popups + actions only. */
+  localMode?: boolean;
 }
 
 export type PhaseAnnouncement = {
@@ -316,6 +318,7 @@ export type ClientToServerEvents = {
     name: string;
     avatarId: number;
     gameId?: string;
+    localMode?: boolean;
   }) => void;
   "room:join": (payload: {
     roomId: string;

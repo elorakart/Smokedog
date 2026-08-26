@@ -33,12 +33,13 @@ export function ProfileModal({
   initialMode?: "create" | "join";
   pending?: "create" | "join" | null;
   onClose: () => void;
-  onCreate: (name: string, avatarId: number) => void;
+  onCreate: (name: string, avatarId: number, opts?: { localMode?: boolean }) => void;
   onJoin: (name: string, avatarId: number, code: string) => void;
 }) {
   const [name, setName] = useState(defaultName);
   const [avatarId, setAvatarId] = useState(defaultAvatar);
   const [code, setCode] = useState("");
+  const [localMode, setLocalMode] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
@@ -49,6 +50,7 @@ export function ProfileModal({
       setAvatarId(defaultAvatar);
       setLocalError(null);
       setCode(initialCode ?? "");
+      setLocalMode(false);
       if (initialMode === "join") {
         requestAnimationFrame(() => codeRef.current?.focus());
       }
@@ -73,6 +75,8 @@ export function ProfileModal({
         ? "Joining party…"
         : null;
   const joining = code.trim().length > 0;
+  const showLocalToggle =
+    !joining && createGameId === "mafia-city";
 
   const title = joining
     ? "Join with code"
@@ -95,7 +99,9 @@ export function ProfileModal({
       onJoin(name.trim(), avatarId, check.code);
     } else {
       setLocalError(null);
-      onCreate(name.trim(), avatarId);
+      onCreate(name.trim(), avatarId, {
+        localMode: showLocalToggle ? localMode : false,
+      });
     }
   };
 
@@ -193,6 +199,45 @@ export function ProfileModal({
                     })}
                   </div>
                 </div>
+
+                {showLocalToggle && (
+                  <div className="space-y-2">
+                    <p className="font-mono text-xs font-bold uppercase tracking-[0.1em] text-crimson/70">
+                      Play mode
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => setLocalMode(false)}
+                        className={`flex-1 border py-3 font-mono text-[10px] font-bold uppercase tracking-widest transition disabled:opacity-40 ${
+                          !localMode
+                            ? "border-crimson bg-crimson text-manila"
+                            : "border-crimson/25 text-crimson hover:bg-crimson/5"
+                        }`}
+                      >
+                        Online
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => setLocalMode(true)}
+                        className={`flex-1 border py-3 font-mono text-[10px] font-bold uppercase tracking-widest transition disabled:opacity-40 ${
+                          localMode
+                            ? "border-crimson bg-crimson text-manila"
+                            : "border-crimson/25 text-crimson hover:bg-crimson/5"
+                        }`}
+                      >
+                        Local
+                      </button>
+                    </div>
+                    <p className="font-mono text-[10px] leading-relaxed text-crimson/55">
+                      {localMode
+                        ? "Same room code on every phone — no chat, voice, or discussion. Outcomes are popups only."
+                        : "Full table: chat, voice, and day discussion."}
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label
